@@ -16,16 +16,16 @@
 
 <table>
   <tr>
-    <td width="50%"><img src="figures/wankel-engine/dist/hero-light.png" alt="Wankel Rotary Engine in Light theme showing cutaway housing, orange apex-sealed rotor, pressure gauge, brass plaque, routed spark cables, and confined 4-stroke GLSL chamber shader."></td>
-    <td width="50%"><img src="figures/wankel-engine/dist/hero-exploded.png" alt="Wankel Rotary Engine in exploded view showing front housing plate, dial wheel, rotor, eccentric shaft, and rear plate separated axially."></td>
+    <td width="50%"><img src=".github/assets/wankel-hero-light.webp" alt="Wankel Rotary Engine in Light theme showing cutaway housing, orange apex-sealed rotor, pressure gauge, brass plaque, routed spark cables, and confined 4-stroke GLSL chamber shader."></td>
+    <td width="50%"><img src=".github/assets/wankel-hero-exploded.webp" alt="Wankel Rotary Engine in exploded view showing front housing plate, dial wheel, rotor, eccentric shaft, and rear plate separated axially."></td>
   </tr>
   <tr>
     <td><sub><b><a href="figures/wankel-engine/">wankel-engine</a></b> (Light): cutaway epitrochoid housing, <code>34:51</code> phasing gearset, routed spark cables, and confined 4-stroke GLSL gas shader.</sub></td>
     <td><sub><b><a href="figures/wankel-engine/">wankel-engine</a></b> (Exploded): axial <code>APART</code> (<code>E</code>) separation across concentric housing, rotor, and shaft layers.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="figures/helicopter-swashplate/dist/hero-light.png" alt="Helicopter Rotor Swashplate in Light theme with 3-blade rotor hub, GLSL swept rotor-disc blur, 4:1 cutaway bevel gearbox, 120-degree CCPM servos, draggable cyclic stick, collective quadrant lever, and Blade 1 pitch protractor."></td>
-    <td width="50%"><img src="figures/helicopter-swashplate/dist/hero-dark.png" alt="Helicopter Rotor Swashplate in Dark theme showing 4-tone cel shading, crisp ink crease lines, and dark-mode rotor-disc shader."></td>
+    <td width="50%"><img src=".github/assets/helicopter-hero-light.webp" alt="Helicopter Rotor Swashplate in Light theme with 3-blade rotor hub, GLSL swept rotor-disc blur, 4:1 cutaway bevel gearbox, 120-degree CCPM servos, draggable cyclic stick, collective quadrant lever, and Blade 1 pitch protractor."></td>
+    <td width="50%"><img src=".github/assets/helicopter-hero-dark.webp" alt="Helicopter Rotor Swashplate in Dark theme showing 4-tone cel shading, crisp ink crease lines, and dark-mode rotor-disc shader."></td>
   </tr>
   <tr>
     <td><sub><b><a href="figures/helicopter-swashplate/">helicopter-swashplate</a></b> (Light): grab and drag the swashplate, cyclic stick, or collective lever directly in 3D while watching all three blades feather and the protractor needle track Blade 1.</sub></td>
@@ -152,8 +152,8 @@ Every figure is verified with headless Chrome CDP across orthographic elevations
 
 <table>
   <tr>
-    <td width="50%"><img src="figures/wankel-engine/dist/inspect-ortho.png" alt="Wankel engine 2x2 orthographic quad showing Front, Right, Top, and Canonical Iso views."></td>
-    <td width="50%"><img src="figures/helicopter-swashplate/dist/inspect-ortho.png" alt="Helicopter swashplate 2x2 orthographic quad showing Front, Right, Top, and Canonical Iso views."></td>
+    <td width="50%"><img src=".github/assets/wankel-inspect-ortho.webp" alt="Wankel engine 2x2 orthographic quad showing Front, Right, Top, and Canonical Iso views."></td>
+    <td width="50%"><img src=".github/assets/helicopter-inspect-ortho.webp" alt="Helicopter swashplate 2x2 orthographic quad showing Front, Right, Top, and Canonical Iso views."></td>
   </tr>
   <tr>
     <td><sub><b><code>inspect.mjs --ortho</code></b> (<code>wankel-engine</code>): checks vertical grounding, axial alignment, footprint symmetry, and canonical isometric framing.</sub></td>
@@ -168,8 +168,8 @@ Every figure is verified with headless Chrome CDP across orthographic elevations
 
 <table>
   <tr>
-    <td width="50%" valign="top"><img src="figures/helicopter-swashplate/dist/inspect-joints.png" alt="3x zoomed joint reticle crops across 32 registered joints on the helicopter swashplate."></td>
-    <td width="50%" valign="top"><img src="figures/wankel-engine/dist/inspect-drive.png" alt="8-state drive contact sheet for the Wankel engine across intake, compression, ignition, exhaust, exploded, cutaway-off, Dark, and Blueprint themes."></td>
+    <td width="50%" valign="top"><img src=".github/assets/helicopter-inspect-joints.webp" alt="3x zoomed joint reticle crops across 32 registered joints on the helicopter swashplate."></td>
+    <td width="50%" valign="top"><img src=".github/assets/wankel-inspect-drive.webp" alt="8-state drive contact sheet for the Wankel engine across intake, compression, ignition, exhaust, exploded, cutaway-off, Dark, and Blueprint themes."></td>
   </tr>
   <tr>
     <td><sub><b><code>inspect.mjs --joints</code></b> (<code>helicopter-swashplate</code>): 3× zoomed crops centered on all 32 registered joints and cable ports.</sub></td>
