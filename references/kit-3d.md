@@ -50,24 +50,28 @@ reg.part("stator.housing", housingGeo, {
 });
 ```
 
-### `reg.anchor(id, x, y, z, parentGroup)` & `reg.getAnchorWorldPos(id)`
-Registers a named 3D port or mounting point inside `parentGroup` and queries its exact world-space `THREE.Vector3`. Use anchors so downstream stages never hardcode magic coordinates from earlier stages.
+### `reg.anchor(id, x, y, z, parentGroup, opts)` & `reg.getAnchorWorldPos(id)` / `reg.getAnchorWorldDir(id)`
+Registers a named 3D port or mounting point inside `parentGroup` and queries its exact world-space `THREE.Vector3` position and optional outward port normal (`opts.dir = [dx, dy, dz]` in `parentGroup` local coordinates). Use anchors so downstream stages never hardcode magic coordinates from earlier stages.
 ```js
 // In structure.mjs (inside spGroup, which has its own position and rotation):
-reg.anchor("plug.leading.tip", 0, 0.68, 0, spGroup);
+reg.anchor("plug.leading.tip", 0, 0.68, 0, spGroup, { dir: [0, 1, 0] });
 
 // In mechanism.mjs:
 const plugTipWorld = reg.getAnchorWorldPos("plug.leading.tip");
+const plugDirWorld = reg.getAnchorWorldDir("plug.leading.tip");
 ```
 
 ### `reg.tube(id, anchorFromId, waypoints, anchorToId, opts)`
-Routes a `THREE.CatmullRomCurve3` + `THREE.TubeGeometry` between two registered anchors and registers it for tube-collision, bend-kink (`< 65°`), and terminal-attachment audits.
+Routes a centripetal `THREE.CatmullRomCurve3` + `THREE.TubeGeometry` between two registered anchors and registers it for bend-kink (`<= 42°` per arc-length step), port-axis tangency (`<= 38°`), natural slack (`length/chord >= 1.08`), tube-to-tube clearance, solid collision, and terminal-attachment audits. When either anchor carries a `dir` (or `opts.fromDir` / `opts.toDir` is passed), `reg.tube` automatically prepends/appends coaxial tangent handles at `leadOut` and `leadIn` (default `0.18`).
 ```js
 reg.tube("cable.spark.leading", "coil.tower.0.top", waypoints, "plug.leading.tip", {
   parent: baseGroup,
   radius: 0.032,
-  segments: 32,
+  segments: 40,
   radialSegments: 12,
+  leadOut: 0.18,
+  leadIn: 0.22,
+  // Optional overrides: fromDir, toDir, curveType: "centripetal", rigid: false
   ramp: "copper",
   outline: "lo",
   fromPart: "coil.tower.0",

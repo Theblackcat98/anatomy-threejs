@@ -95,6 +95,35 @@ function meshesTrulyOverlap(itemA, itemB, overlapBox) {
 }
 
 /**
+ * Narrowphase check for whether a curve point lies inside a solid mesh or within `radius` of its surface.
+ */
+function pointInsideOrNearMesh(item, pt, radius) {
+  const probe = new THREE.Box3().setFromCenterAndSize(
+    pt,
+    new THREE.Vector3(radius * 2, radius * 2, radius * 2)
+  );
+  if (getMeshTrianglesInBox(item, probe).length > 0) return true;
+
+  const solidMesh = item.group.getObjectByName("solid");
+  if (!solidMesh || !solidMesh.material) return false;
+  const origSide = solidMesh.material.side;
+  solidMesh.material.side = THREE.DoubleSide;
+  const raycaster = new THREE.Raycaster(pt, new THREE.Vector3(0, 0, 1));
+  const hits = raycaster.intersectObject(solidMesh, false);
+  solidMesh.material.side = origSide;
+
+  let distinctHits = 0;
+  let lastDist = -1;
+  for (const h of hits) {
+    if (h.distance > 1e-4 && Math.abs(h.distance - lastDist) > 1e-4) {
+      distinctHits++;
+      lastDist = h.distance;
+    }
+  }
+  return distinctHits % 2 === 1;
+}
+
+/**
  * Stage 1 Pure Model Audit: verifies physical constants, cycle bounds, and anchor definitions.
  */
 export function runModelAudit(model) {
@@ -290,21 +319,24 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
 
     // 4. TUBE-TO-SOLID PASS-THROUGH CHECK (in rest pose)
     if (pose.explode === 0 && pose.theta === 0) {
+      const tubeIds = new Set(reg.tubes.map((t) => t.id));
       for (const tube of reg.tubes) {
-        const pts = tube.curve.getPoints(40);
-        // Check interior points (excluding start/end mounting regions)
+        const pts = tube.curve.getSpacedPoints(40);
+        // Check interior points (excluding start/end mounting regions and other tubes checked in section 6)
         for (const [id, box] of boxes) {
           if (
             id === tube.id ||
+            tubeIds.has(id) ||
             id === tube.fromPart ||
             id === tube.toPart ||
             tube.opts.allowOverlap?.includes(id)
           ) {
             continue;
           }
+          const item = reg.parts.get(id);
           const innerBox = box.clone().expandByScalar(-0.015);
           for (let k = 4; k <= pts.length - 5; k++) {
-            if (innerBox.containsPoint(pts[k])) {
+            if (innerBox.containsPoint(pts[k]) && pointInsideOrNearMesh(item, pts[k], tube.radius)) {
               errors.push(
                 `[TUBE COLLISION] Tube "${tube.id}" passes through solid "${id}" at segment ${k}/40`
               );
@@ -316,11 +348,15 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
     }
   }
 
-  // 5. TUBE / CABLE BEND RADIUS (KINK) & TERMINAL CHECK
+  // 5. TUBE / CABLE BEND RADIUS (KINK), TANGENCY, SLACK & TERMINAL CHECK
   stepModelFn(0, 0);
   reg.root.updateMatrixWorld(true);
+  const tubeSamples = new Map();
+
   for (const tube of reg.tubes) {
-    const pts = tube.curve.getPoints(40);
+    const pts = tube.curve.getSpacedPoints(48);
+    tubeSamples.set(tube.id, pts);
+
     for (let i = 1; i < pts.length - 1; i++) {
       const v1 = pts[i].clone().sub(pts[i - 1]).normalize();
       const v2 = pts[i + 1].clone().sub(pts[i]).normalize();
@@ -330,6 +366,39 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
         break;
       }
     }
+
+    if (tube.fromDirWorld) {
+      const startErrDeg = THREE.MathUtils.radToDeg(tube.curve.getTangent(0).angleTo(tube.fromDirWorld));
+      if (startErrDeg > 38) {
+        errors.push(
+          `[TUBE TANGENT] "${tube.id}" exits "${tube.from}" at ${startErrDeg.toFixed(1)}° off port axis (max 38°)`
+        );
+      }
+    }
+
+    if (tube.toDirWorld) {
+      const endErrDeg = THREE.MathUtils.radToDeg(
+        tube.curve.getTangent(1).angleTo(tube.toDirWorld.clone().negate())
+      );
+      if (endErrDeg > 38) {
+        errors.push(
+          `[TUBE TANGENT] "${tube.id}" enters "${tube.to}" at ${endErrDeg.toFixed(1)}° off port axis (max 38°; avoid T-bone kinks)`
+        );
+      }
+    }
+
+    if (tube.opts.rigid !== true) {
+      const chord = pts[0].distanceTo(pts[pts.length - 1]);
+      if (chord > 0.001) {
+        const ratio = tube.curve.getLength() / chord;
+        if (ratio < 1.08) {
+          errors.push(
+            `[TUBE TAUT] "${tube.id}" is too taut/straight (length/chord ratio ${ratio.toFixed(3)} < 1.08); add an arch waypoint so the cable drapes naturally`
+          );
+        }
+      }
+    }
+
     const fromAnchor = reg.joints.get(tube.from);
     const toAnchor = reg.joints.get(tube.to);
     if (fromAnchor && toAnchor) {
@@ -340,6 +409,35 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
       }
       if (pts[pts.length - 1].distanceTo(pTo) > 0.05) {
         errors.push(`[TUBE TERMINAL] "${tube.id}" end misses anchor "${tube.to}" by ${pts[pts.length - 1].distanceTo(pTo).toFixed(3)}`);
+      }
+    }
+  }
+
+  // 6. TUBE-TO-TUBE CLEARANCE CHECK
+  for (let i = 0; i < reg.tubes.length; i++) {
+    for (let j = i + 1; j < reg.tubes.length; j++) {
+      const tubeA = reg.tubes[i];
+      const tubeB = reg.tubes[j];
+      if (
+        tubeA.opts.allowOverlap?.includes(tubeB.id) ||
+        tubeB.opts.allowOverlap?.includes(tubeA.id)
+      ) {
+        continue;
+      }
+      const ptsA = tubeSamples.get(tubeA.id);
+      const ptsB = tubeSamples.get(tubeB.id);
+      const minAllowed = (tubeA.radius + tubeB.radius) * 1.2;
+      let minDist = Infinity;
+      for (let ka = 4; ka <= 43; ka++) {
+        for (let kb = 4; kb <= 43; kb++) {
+          const d = ptsA[ka].distanceTo(ptsB[kb]);
+          if (d < minDist) minDist = d;
+        }
+      }
+      if (minDist < minAllowed) {
+        errors.push(
+          `[TUBE COLLISION] Tube "${tubeA.id}" passes too close to tube "${tubeB.id}" (min dist ${minDist.toFixed(3)} < ${minAllowed.toFixed(3)})`
+        );
       }
     }
   }

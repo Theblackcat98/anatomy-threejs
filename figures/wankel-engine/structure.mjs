@@ -195,7 +195,9 @@ export function buildStructure(reg, kit) {
   });
 
   // Pressure tap anchor on housing upper-left lobe
-  reg.anchor("stator.pressure.port", -1.35, 0.85, -0.18, statorGroup);
+  reg.anchor("stator.pressure.port", -1.35, 0.85, -0.18, statorGroup, {
+    dir: [-0.78, 0.62, 0]
+  });
 
   // 3. Intake Manifold (top-left lobe, pointing radially up-left)
   const [inX, inY] = epitrochoidPoint(2.42, 0.42);
@@ -229,7 +231,7 @@ export function buildStructure(reg, kit) {
   intakeBore.rotation.x = -Math.PI / 2;
   intakeBore.position.set(0, 0.358, 0);
   reg.detail("stator.intake.bore", intakeBore, { parent: intakeGroup });
-  reg.anchor("port.intake", 0, 0.35, 0, intakeGroup);
+  reg.anchor("port.intake", 0, 0.35, 0, intakeGroup, { dir: [0, 1, 0] });
 
   // 4. Exhaust Manifold (bottom-left lobe, pointing radially down-left)
   const [exX, exY] = epitrochoidPoint(3.62, 0.42);
@@ -268,7 +270,7 @@ export function buildStructure(reg, kit) {
     crease: "lo",
     mountOn: "stator.exhaust.tube"
   });
-  reg.anchor("port.exhaust", 0, 0.35, 0, exhaustGroup);
+  reg.anchor("port.exhaust", 0, 0.35, 0, exhaustGroup, { dir: [0, 1, 0] });
 
   // 5. Dual Spark Plugs (Leading & Trailing) with registered terminal anchors
   [
@@ -332,7 +334,7 @@ export function buildStructure(reg, kit) {
     });
 
     // Register exact 3D tip anchor so mechanism.mjs can route spark cables without magic numbers
-    reg.anchor(`plug.${key}.tip`, 0, 0.68, 0, spGroup);
+    reg.anchor(`plug.${key}.tip`, 0, 0.68, 0, spGroup, { dir: [0, 1, 0] });
   });
 
   // 6. Rear Endplate & Stationary 34-Tooth Phasing Gear

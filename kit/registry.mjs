@@ -48,12 +48,14 @@ export class Recorder3D {
   }
 
   /**
-   * Register a named 3D anchor/port so other files can snap to it without guessing coordinates
+   * Register a named 3D anchor/port so other files can snap to it without guessing coordinates.
+   * Pass opts.dir ([dx, dy, dz] in parentGroup local coordinates) for port outward normals.
    */
-  anchor(id, x, y, z, parentGroup = this.root) {
+  anchor(id, x, y, z, parentGroup = this.root, opts = {}) {
     const obj = new THREE.Object3D();
     obj.name = `anchor:${id}`;
     obj.position.set(x, y, z);
+    obj.userData.localDir = opts.dir ? new THREE.Vector3(...opts.dir).normalize() : null;
     parentGroup.add(obj);
     this.joints.set(id, obj);
     return obj;
@@ -69,6 +71,19 @@ export class Recorder3D {
     }
     this.root.updateMatrixWorld(true);
     return obj.getWorldPosition(new THREE.Vector3());
+  }
+
+  /**
+   * Get world-space outward port normal of a registered anchor, or null if none was registered
+   */
+  getAnchorWorldDir(id) {
+    const obj = this.joints.get(id);
+    if (!obj) {
+      throw new Error(`Missing registered anchor "${id}"`);
+    }
+    if (!obj.userData?.localDir) return null;
+    this.root.updateMatrixWorld(true);
+    return obj.userData.localDir.clone().transformDirection(obj.matrixWorld).normalize();
   }
 
   /**
@@ -166,9 +181,29 @@ export class Recorder3D {
     this.root.updateMatrixWorld(true);
     const pStart = fromObj.getWorldPosition(new THREE.Vector3());
     const pEnd = toObj.getWorldPosition(new THREE.Vector3());
-    const pts = [pStart, ...waypoints.map((p) => new THREE.Vector3(...p)), pEnd];
+    const fromDirWorld = opts.fromDir
+      ? new THREE.Vector3(...opts.fromDir).normalize()
+      : this.getAnchorWorldDir(anchorFromId);
+    const toDirWorld = opts.toDir
+      ? new THREE.Vector3(...opts.toDir).normalize()
+      : this.getAnchorWorldDir(anchorToId);
 
-    const curve = new THREE.CatmullRomCurve3(pts);
+    const leadOut = opts.leadOut !== undefined ? opts.leadOut : (fromDirWorld ? 0.18 : 0);
+    const leadIn = opts.leadIn !== undefined ? opts.leadIn : (toDirWorld ? 0.18 : 0);
+
+    const pts = [pStart];
+    if (fromDirWorld && leadOut > 0) {
+      pts.push(pStart.clone().addScaledVector(fromDirWorld, leadOut));
+    }
+    for (const wp of waypoints) {
+      pts.push(new THREE.Vector3(...wp));
+    }
+    if (toDirWorld && leadIn > 0) {
+      pts.push(pEnd.clone().addScaledVector(toDirWorld, leadIn));
+    }
+    pts.push(pEnd);
+
+    const curve = new THREE.CatmullRomCurve3(pts, false, opts.curveType || "centripetal");
     const radius = opts.radius || 0.03;
     const segments = opts.segments || 32;
     const radialSegments = opts.radialSegments || 12;
@@ -193,6 +228,8 @@ export class Recorder3D {
       radius,
       from: anchorFromId,
       to: anchorToId,
+      fromDirWorld,
+      toDirWorld,
       fromPart: opts.fromPart || null,
       toPart: opts.toPart || null,
       waypoints,

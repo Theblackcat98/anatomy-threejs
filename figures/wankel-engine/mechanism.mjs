@@ -71,10 +71,10 @@ export function buildMechanism(reg, kit) {
 
   // 2. Ignition Coil Pack & Towers
   const [coilBoxX, , coilBoxZ] = ANCHORS.coilMount;
-  const coilBoxGeo = new THREE.BoxGeometry(0.68, 0.46, 0.58);
+  const coilBoxGeo = new THREE.BoxGeometry(0.68, 0.56, 0.58);
   reg.part("coil.box", coilBoxGeo, {
     parent: baseGroup,
-    pos: [coilBoxX, topSurfaceY + 0.23, coilBoxZ],
+    pos: [coilBoxX, topSurfaceY + 0.28, coilBoxZ],
     ramp: "lo",
     outline: "mid",
     crease: "lo",
@@ -83,7 +83,7 @@ export function buildMechanism(reg, kit) {
 
   ["leading", "trailing"].forEach((key, idx) => {
     const towerX = coilBoxX - 0.12 + idx * 0.24;
-    const towerY = topSurfaceY + 0.51;
+    const towerY = topSurfaceY + 0.63;
     const towerZ = coilBoxZ + (idx === 0 ? 0.12 : -0.12);
 
     const towerGeo = buildCylinderGeometry(0.065, 0.08, 0.14, { segments: 16, axis: "y" });
@@ -97,26 +97,27 @@ export function buildMechanism(reg, kit) {
       allowOverlap: [`coil.tower.${idx === 0 ? 1 : 0}`]
     });
 
-    reg.anchor(`coil.tower.${idx}.top`, 0, 0.07, 0, towerPart);
+    reg.anchor(`coil.tower.${idx}.top`, 0, 0.07, 0, towerPart, { dir: [0, 1, 0] });
 
     const plugTipWorld = reg.getAnchorWorldPos(`plug.${key}.tip`);
     const p0y = towerY + 0.07;
-    const waypoints = [
-      [
-        towerX + (plugTipWorld.x - towerX) * 0.38 + 0.03,
-        p0y + (plugTipWorld.y - p0y) * 0.42,
-        towerZ * 0.65
-      ],
-      [
-        towerX + (plugTipWorld.x - towerX) * 0.74 + 0.04,
-        p0y + (plugTipWorld.y - p0y) * 0.76,
-        towerZ * 0.28
-      ]
-    ];
+    const waypoints =
+      idx === 0
+        ? [
+            [towerX + 0.25, p0y + 0.42, towerZ * 0.72],
+            [plugTipWorld.x + 0.28, plugTipWorld.y + 0.16, towerZ * 0.35]
+          ]
+        : [
+            [towerX + 0.24, p0y + 0.65, towerZ * 0.72],
+            [plugTipWorld.x + 0.30, plugTipWorld.y - 0.32, towerZ * 0.38]
+          ];
 
     reg.tube(`cable.spark.${key}`, `coil.tower.${idx}.top`, waypoints, `plug.${key}.tip`, {
       parent: baseGroup,
       radius: 0.032,
+      segments: 40,
+      leadOut: idx === 0 ? 0.18 : 0.24,
+      leadIn: 0.22,
       ramp: idx === 0 ? "copper" : "mid",
       outline: "lo",
       fromPart: `coil.tower.${idx}`,
@@ -128,9 +129,7 @@ export function buildMechanism(reg, kit) {
         "stator.housing",
         `plug.${key}.terminal`,
         `plug.${key}.insulator`,
-        `plug.${key}.hex`,
-        "cable.spark.leading",
-        "cable.spark.trailing"
+        `plug.${key}.hex`
       ]
     });
   });
@@ -158,7 +157,9 @@ export function buildMechanism(reg, kit) {
     allowOverlap: ["base.plate", "gauge.bezel"]
   });
 
-  reg.anchor("gauge.tap", gaugeX, topSurfaceY + 1.48, gaugeZ, baseGroup);
+  reg.anchor("gauge.tap", gaugeX, topSurfaceY + 1.48, gaugeZ, baseGroup, {
+    dir: [0.85, 0.25, -0.45]
+  });
 
   const gaugeHeadGroup = reg.group("gauge.head", {
     parent: baseGroup,
@@ -213,13 +214,15 @@ export function buildMechanism(reg, kit) {
   reg.tube(
     "tube.pressure.capillary",
     "gauge.tap",
-    [[gaugeX + 0.28, 0.35, 0.22]],
+    [[-1.92, 0.52, 0.22]],
     "stator.pressure.port",
     {
       parent: baseGroup,
       radius: 0.024,
       segments: 24,
       radialSegments: 10,
+      leadOut: 0.18,
+      leadIn: 0.18,
       ramp: "brass",
       outline: "lo",
       outlineWidth: 0.01,

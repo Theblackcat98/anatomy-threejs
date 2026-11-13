@@ -105,7 +105,7 @@ Read `inspect-base.png` to verify the feet sit cleanly underneath the bedplate a
 Build the stationary load-bearing supports, main cutaway housing, ports/manifolds, fasteners, and endplates:
 1. Mount support pedestals (`pedestal.rear`, `pedestal.front`) onto `base.plate` with flanged bases, bolt details, tapered columns, and bearing saddles.
 2. Build the main housing (`stator.housing`, `ramp: "mid"`, `outline: "hi"`). Leave the front (`+Z`) open or fitted with a cutaway cover ring (`front.cover`) so the interior bore is completely visible from the canonical isometric camera.
-3. Add intake/exhaust manifolds, flanged ports, or stationary fittings pointing **radially outward** from the housing. Register 3D port/terminal anchors (`reg.anchor("plug.leading.tip", ...)`, `reg.anchor("stator.pressure.port", ...)`) inside each local sub-group so Stage 5 tubes snap to their exact world positions automatically.
+3. Add intake/exhaust manifolds, flanged ports, or stationary fittings pointing **radially outward** from the housing. Register 3D port/terminal anchors with their local outward port normals (`reg.anchor("plug.leading.tip", 0, 0.68, 0, spGroup, { dir: [0, 1, 0] })`, `reg.anchor("stator.pressure.port", -1.35, 0.85, -0.18, statorGroup, { dir: [-0.78, 0.62, 0] })`) inside each local sub-group so Stage 5 tubes snap to their exact world positions and exit/enter coaxially.
 4. Configure axial `explode: [ex, ey, ez]` vectors on removable structural sub-groups (`rear.group`, `front.group`, `tieBolts.group`).
 
 **Stage 3 Gate**:
@@ -140,8 +140,8 @@ Connect the subject to the operator controls, telemetry instruments, and fluid/e
 1. Build the operator control (`knob.boss`, `knob.drum` with `makeKnurlLines` and pointer line) at `ANCHORS.knobMount`.
 2. Build the secondary instrument (`gauge.collar`, `gauge.post`, `gauge.bezel`, dial ticks, and `gauge.needle` group) at `ANCHORS.gaugeMount`. Place the gauge post forward in `+Z` and tall enough that the dial face stands completely clear of the housing silhouette in `CANONICAL ISO`.
 3. Route all pipes and cables using `reg.tube(id, fromAnchorId, waypoints, toAnchorId, opts)`:
-   - Never guess tube endpoints; always query `reg.getAnchorWorldPos(anchorId)` to compute smooth, monotonic intermediate waypoints.
-   - Keep every bend angle under `65°` (`audit3d.mjs` will fail with `[TUBE KINK]` if a tube kinks sharply or doubles back).
+   - Never guess tube endpoints; query `reg.getAnchorWorldPos(anchorId)` and `reg.getAnchorWorldDir(anchorId)` to build smooth 3D arch waypoints (`length / chord >= 1.12`) that sweep clear of adjacent ports and curve coaxially into the target port's outward normal.
+   - Use `{ dir }` on port anchors (and `leadOut` / `leadIn` options on `reg.tube`) instead of drawing a taut diagonal straight line between ports (`audit3d.mjs` fails with `[TUBE TANGENT]`, `[TUBE TAUT]`, or `[TUBE KINK]` if a cable exits/enters off-axis, drapes straight without slack, or bends sharper than `42°` per arc-length step).
 4. Build the coaxial drive shaft, eccentric journals, counterweights, and front timing pulley. Pass `cutawayHide: true` on front-side shaft parts/groups (`shaft.frontWeight`, `shaft.pulleyGroup`) that would block the cutaway view of the subject at rest (`cutaway: true, explode: 0`), while revealing them when Cutaway is toggled off or Explode is active.
 5. Implement `export function updateKinematics(reg, state)` to drive all groups (`rotor.orbit`, `rotor.spin`, `shaft.spin`, `knob.group`, `gauge.needle`, and shader uniforms) from `state.theta`, `state.rpm`, and `state.shaderEnv`.
 
