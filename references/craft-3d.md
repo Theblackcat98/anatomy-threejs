@@ -16,10 +16,10 @@ All geometry lives in a right-handed Three.js coordinate system (`+X` right, `+Y
   $$y_{\text{screen}} = 0.866\,y + 0.294\,x + 0.405\,z$$
   $$z_{\text{depth}} = 0.500\,y + 0.509\,x + 0.701\,z$$
 - **Practical Placement Rules**:
-  1. **Cutaway Window faces `+Z`**: The main housing (`stator.housing`) lies in the `XY` plane extruded along `Z`, with its open cutaway face at `+Z` so the interior bore and hero subject are completely visible.
-  2. **Front Apron is `+Z`**: Place operator controls (`knobMount`), graduated scales (`rulerCenter`), and brass specification plaques (`plaqueCenter`) along the front apron (`z > +0.9`) where nothing occludes them.
-  3. **Left-Side Instruments need `+Z` bias**: Because `-0.588 z` shifts negative-`z` objects rightward behind the housing in `CANONICAL ISO`, mount left-side instruments (like the Bourdon gauge at `x < -2.2`) at positive `z` (`z \approx +0.5 \dots +0.7`) and on a tall post so the dial face stands completely clear to the left of the housing silhouette.
-  4. **Framing**: Set `initialZoom` (`~0.95`) and `initialPanY` (`+0.18 \dots +0.24`) in `model.mjs` so all four corner feet of the bedplate and the top manifold have comfortable breathing room inside `#figure-card`.
+  1. **Cutaway Window faces `+Z`**: When a machine has an enclosing housing (`features.cutaway: true`), orient its open cutaway face toward `+Z` so the interior bore and hero subject stay visible from the canonical isometric camera.
+  2. **Front Apron is `+Z`**: Place primary operator controls (`cyclicMount`, `collectiveMount`, `knobMount`, etc.), graduated scales (`rulerCenter`), and brass specification plaques (`plaqueCenter`) along the front apron (`z > +0.8`) where nothing occludes them.
+  3. **Left-Side Instruments need `+Z` bias**: Because `-0.588 z` shifts negative-`z` objects rightward behind the central apparatus in `CANONICAL ISO`, mount left-side instruments (`x < -1.4`) at positive `z` or clear radial separation so their scales and needles stand unobstructed.
+  4. **Framing**: Set `initialZoom` (`~0.86–0.98`) and `initialPanY` in `model.mjs` so all four corner feet of the bedplate and the top of the assembly have comfortable breathing room inside `#figure-card`.
 
 ---
 
@@ -65,20 +65,32 @@ Every figure should read as a complete bench-top instrument composed of five phy
    - High-contrast `lit` body (`rotor.body`) with machined lightening pockets, combustion bathtub depressions on each flank, dual face oil-seal grooves, and `lit` apex seal bars (`rotor.apexSeal.*`).
    - Precision `brass` internal gear (`rotor.internalGear`) meshing visibly with the stationary `brass` phasing gear (`rear.statGear`).
 
-4. **Operator Controls, Telemetry & Routing (`mechanism.mjs`)**:
-   - Knurled bench control knob (`knob.drum` + `makeKnurlLines`) with a top pointer line that rotates as RPM/input changes.
-   - Secondary telemetry instrument (`gauge.bezel` + radial dial ticks + `gauge.needle`) driven in real time by the chamber state.
-   - Smooth 3D `CatmullRomCurve3` tubes/cables (`reg.tube`) connecting registered 3D port anchors.
-   - Coaxial drive shaft (`shaft.main`), eccentric journal (`shaft.journal` with oil hole), counterweights, and front timing pulley (`cutawayHide: true` so it hides in cutaway view and appears when Cutaway is off or Exploded is active).
+4. **Domain-Authentic Operator Controls, Telemetry & Direct 3D Manipulation (`mechanism.mjs`)**:
+   - **Never copy another figure's controls or instruments.** Choose physical hardware that genuinely belongs to the machine being explained:
+     - *Rotary / throttle / micrometer*: knurled drum (`makeKnurlLines`), Vernier micrometer barrel, or stepped cam detent.
+     - *2-axis directional / cyclic*: gimballed control stick with spherical boot (`cyclic.stick` + `cyclic.grip`), X/Y cross-slide stage, or tilting cradle.
+     - *Pitch / travel / valve*: notched quadrant lever with graduated degree arc (`collective.quadrant`), rack-and-pinion slide, or screw-jack handwheel.
+     - *Telemetry readout*: curved blade-pitch protractor arc (`pitchScale.arc`), fluid manometer column, linear vernier gauge, or Bourdon pressure dial (use a pressure gauge **only** when pressure is actually being measured).
+   - **Direct 3D Manipulation (`reg.interactable`)**: Always ask what the reader expects to grab directly on screen. Register the primary moving control element (`swash.assembly`, `cyclic.group`, `collective.group`, sliding carriage, etc.) with `reg.interactable` so dragging it in 3D drives `setParam(...)` immediately — including while rotation is paused.
+   - Smooth 3D `CatmullRomCurve3` conduits, pushrods, or cables (`reg.tube`) connecting registered 3D port anchors.
+   - Coaxial drive shafts, gears, and front-side shrouds (`cutawayHide: true` when `features.cutaway` is `true`).
 
 5. **Confined Physical Medium Shader (`shader.mjs`)**:
-   - Custom GLSL shader (`THREE.ShaderMaterial`) restricted strictly to the active physical medium (gas, fluid, plasma) inside the bore.
+   - Custom GLSL shader (`THREE.ShaderMaterial`) restricted strictly to the active physical medium (gas, fluid, plasma, rotor wake) inside the active zone.
    - Solid metal parts must **always** use `kit.createAnatomyPart`; never apply a custom plasma/glow shader to solid metal geometry.
+
+6. **When to Enable or Disable View Modes (`SPEC.features`)**:
+   - `explode: true` — use **only** for enclosed concentric assemblies with stacked axial layers (engines, transmissions, multi-layer valves) where separating layers reveals hidden internal fit.
+   - `explode: false` — use for open-frame mechanisms, articulated linkages, swashplates, or optical/fluid benches where separating parts disconnects joints without adding clarity. Hides the `APART` button and `<kbd>E</kbd> apart` hint automatically.
+   - `cutaway: true` — use when a casing conceals moving internals; set `false` when the apparatus is naturally open.
 
 ---
 
 ## 4. 3D Anti-Patterns to Avoid
 
+- **Cloning Stock Controls & Gauges Across Unrelated Machines**: Never copy a Wankel engine's knurled RPM knob, hydraulic manifold box, or tall Bourdon pressure dial onto an unrelated figure (such as a helicopter swashplate or optical interferometer). Design bespoke controls, levers, and telemetry indicators that physically drive and measure the actual domain variables.
+- **Passive-Only Figures When Direct 3D Dragging Fits**: If the reader sees a swashplate, lever, carriage, or lens mirror, they expect to drag it directly in 3D and see the linked blades/beams respond — even when time/RPM is paused.
+- **Forced Exploded Views on Open Linkages**: Do not invent arbitrary explode vectors for open ball-joint linkages or rods that look broken when pulled apart; set `features.explode = false`.
 - **Floating or Sunken Parts**: Never guess Y heights. Derive every base-mounted Y coordinate from `SPEC.topSurfaceY` and register `mountOn: "base.plate"` so `audit3d.mjs` verifies contact to within `[0, 0.08]` world units.
 - **Inward-Pointing Manifolds**: In Three.js right-handed coordinates, rotating around `+Z` by a positive angle tilts a `+Y` cylinder toward `-X` (counter-clockwise in XY). Always check `inspect-ortho.png` (`FRONT` and `TOP` panels) to confirm manifolds point radially outward from the housing.
 - **Taut Diagonal Rods & T-Bone Port Kinks**: Never connect two differently oriented ports (for example, an upward `+Y` coil tower and a horizontal `+X` spark plug boot) by interpolating waypoints monotonically along the straight chord between anchors. That produces a stiff diagonal stick that T-bones into the side of the connector boot and cuts across neighboring ports. Always pass `{ dir: [dx, dy, dz] }` on `reg.anchor()` so `reg.tube()` inserts coaxial `leadOut`/`leadIn` tangent handles, and place open 3D arch waypoints outside the target port (`length/chord >= 1.12`) so the cable rises out of its source port, drapes smoothly in 3D, and turns coaxially into the target boot without 90° T-bone kinks or 180° planar hairpin folds.

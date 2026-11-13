@@ -42,9 +42,9 @@ export function buildBase(reg, kit) {
   reg.anchor("servo.0.mount", ...ANCHORS.servo0Mount, baseGroup);
   reg.anchor("servo.1.mount", ...ANCHORS.servo1Mount, baseGroup);
   reg.anchor("servo.2.mount", ...ANCHORS.servo2Mount, baseGroup);
-  reg.anchor("knob.mount", ...ANCHORS.knobMount, baseGroup);
-  reg.anchor("manifold.mount", ...ANCHORS.manifoldMount, baseGroup);
-  reg.anchor("gauge.mount", ...ANCHORS.gaugeMount, baseGroup);
+  reg.anchor("cyclic.mount", ...ANCHORS.cyclicMount, baseGroup);
+  reg.anchor("collective.mount", ...ANCHORS.collectiveMount, baseGroup);
+  reg.anchor("pitchScale.mount", ...ANCHORS.pitchScaleMount, baseGroup);
 
   // Dual inset perimeter grooves
   reg.detail("base.groove.outer", makePlanOutline(BASE_W - 0.32, BASE_D - 0.32, 0.16, topSurfaceY + 0.003, kit, "faint"), {
@@ -90,8 +90,8 @@ export function buildBase(reg, kit) {
   });
 
   // Graduated pitch/azimuth bench scale strip on front apron
-  const rulerW = 1.88;
-  const rulerD = 0.26;
+  const rulerW = 1.62;
+  const rulerD = 0.24;
   const [rulerX, , rulerZ] = ANCHORS.rulerCenter;
   const rulerGeo = new THREE.BoxGeometry(rulerW, 0.03, rulerD);
   reg.part("base.ruler", rulerGeo, {
@@ -105,13 +105,13 @@ export function buildBase(reg, kit) {
 
   reg.detail(
     "base.ruler.ticks",
-    makeRulerTicks(rulerX, rulerW, rulerZ, rulerD, topSurfaceY + 0.032, 30, 5, kit),
+    makeRulerTicks(rulerX, rulerW, rulerZ, rulerD, topSurfaceY + 0.032, 25, 5, kit),
     { parent: baseGroup }
   );
 
   // Brass specification plaque on front-left apron with rule lines and corner rivets
-  const plaqueW = 1.16;
-  const plaqueD = 0.44;
+  const plaqueW = 1.12;
+  const plaqueD = 0.42;
   const [plaqueX, , plaqueZ] = ANCHORS.plaqueCenter;
   const plaqueGeo = new THREE.BoxGeometry(plaqueW, 0.035, plaqueD);
   reg.part("base.plaque", plaqueGeo, {

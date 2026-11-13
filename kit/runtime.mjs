@@ -14,16 +14,37 @@ export function mountAnatomyFigure(config) {
     formatReadout
   } = config;
 
+  const features = Object.assign(
+    { explode: true, cutaway: true, shader: true, crank: true },
+    spec.features || {}
+  );
+
+  const controlDefs =
+    Array.isArray(spec.controls) && spec.controls.length > 0
+      ? spec.controls
+      : [
+          {
+            id: "rpm",
+            label: "RPM",
+            min: 0,
+            max: 2400,
+            step: 20,
+            initial: spec.initialRpm !== undefined ? spec.initialRpm : 720,
+            title: "Shaft speed"
+          }
+        ];
+
   const state = {
     theta: spec.initialTheta !== undefined ? spec.initialTheta : 0.65,
     rpm: spec.initialRpm !== undefined ? spec.initialRpm : 720,
+    params: {},
     slowModes: [1, 0.2, 0.05, 0],
     slowLabels: ["SLOW 1×", "SLOW 1/5×", "SLOW 1/20×", "PAUSED"],
     slowIndex: 0,
     crankMode: false,
     exploded: false,
-    cutaway: true,
-    shaderEnabled: true,
+    cutaway: spec.initialCutaway !== undefined ? spec.initialCutaway : features.cutaway,
+    shaderEnabled: features.shader,
     hudVisible: true,
     debugPaused: false
   };
@@ -45,9 +66,18 @@ export function mountAnatomyFigure(config) {
     }
   }
 
+  const paramSprings = {};
+  for (const c of controlDefs) {
+    state.params[c.id] = c.initial;
+    paramSprings[c.id] = createSpring(c.initial);
+  }
+  if (state.params.rpm !== undefined) {
+    state.rpm = state.params.rpm;
+  }
+
   const explodeSpring = createSpring(0);
-  const rpmSpring = createSpring(state.rpm);
-  const shaderEnvSpring = createSpring(1);
+  const rpmSpring = paramSprings.rpm || createSpring(state.rpm);
+  const shaderEnvSpring = createSpring(features.shader ? 1 : 0);
 
   const host = document.getElementById("canvas-host");
   const cardEl = document.getElementById("figure-card");
@@ -118,7 +148,7 @@ export function mountAnatomyFigure(config) {
   if (buildShader) buildShader(reg, kit);
 
   const schemeButtonsEl = document.getElementById("scheme-buttons");
-  const rpmSlider = document.getElementById("rpm-slider");
+  const customSlidersEl = document.getElementById("custom-sliders");
   const crankBtn = document.getElementById("crank-btn");
   const slowBtn = document.getElementById("slow-btn");
   const explodeBtn = document.getElementById("explode-btn");
@@ -127,6 +157,83 @@ export function mountAnatomyFigure(config) {
   const hudBtn = document.getElementById("hud-btn");
   const hudQuickBtn = document.getElementById("hud-quick-btn");
   const resetBtn = document.getElementById("reset-btn");
+  const hintExplodeEl = document.getElementById("hint-explode");
+  const hintCrankEl = document.getElementById("hint-crank");
+  const hintInteractEl = document.getElementById("hint-interact");
+  const hintInteractMobileEl = document.getElementById("hint-interact-mobile");
+
+  const controlDefMap = new Map(controlDefs.map((c) => [c.id, c]));
+  const sliderInputs = new Map();
+
+  function setParam(id, value, immediate = false) {
+    const def = controlDefMap.get(id);
+    if (!def) return;
+    const clamped = Math.max(def.min, Math.min(def.max, value));
+    state.params[id] = clamped;
+    if (id === "rpm") state.rpm = clamped;
+    const input = sliderInputs.get(id);
+    if (input) input.value = String(clamped);
+    if (immediate && paramSprings[id]) {
+      paramSprings[id].at = clamped;
+      paramSprings[id].rate = 0;
+    }
+  }
+
+  if (customSlidersEl) {
+    customSlidersEl.innerHTML = "";
+    for (const c of controlDefs) {
+      const lbl = document.createElement("label");
+      lbl.className = "slider-label";
+      if (c.title) lbl.title = c.title;
+      const span = document.createElement("span");
+      span.textContent = c.label;
+      const input = document.createElement("input");
+      input.type = "range";
+      input.id = c.id === "rpm" ? "rpm-slider" : `param-slider-${c.id}`;
+      input.min = String(c.min);
+      input.max = String(c.max);
+      input.step = String(c.step);
+      input.value = String(c.initial);
+      input.addEventListener("input", (e) => {
+        setParam(c.id, parseFloat(e.target.value), false);
+      });
+      lbl.appendChild(span);
+      lbl.appendChild(input);
+      customSlidersEl.appendChild(lbl);
+      sliderInputs.set(c.id, input);
+    }
+  } else {
+    const rpmSlider = document.getElementById("rpm-slider");
+    if (rpmSlider) {
+      rpmSlider.addEventListener("input", (e) => {
+        setParam("rpm", parseFloat(e.target.value), false);
+      });
+      sliderInputs.set("rpm", rpmSlider);
+    }
+  }
+
+  if (!features.explode) {
+    if (explodeBtn) explodeBtn.style.display = "none";
+    if (hintExplodeEl) hintExplodeEl.style.display = "none";
+  }
+  if (!features.cutaway) {
+    if (cutawayBtn) cutawayBtn.style.display = "none";
+  } else if (cutawayBtn) {
+    cutawayBtn.classList.toggle("active", state.cutaway);
+  }
+  if (!features.shader) {
+    if (shaderBtn) shaderBtn.style.display = "none";
+  } else if (shaderBtn) {
+    shaderBtn.classList.toggle("active", state.shaderEnabled);
+  }
+  if (!features.crank) {
+    if (crankBtn) crankBtn.style.display = "none";
+    if (hintCrankEl) hintCrankEl.style.display = "none";
+  }
+  if (spec.interactionHint) {
+    if (hintInteractEl) hintInteractEl.textContent = `${spec.interactionHint} · `;
+    if (hintInteractMobileEl) hintInteractMobileEl.textContent = `${spec.interactionHint} · `;
+  }
 
   function applyTheme(themeOrId) {
     const theme = kit.applyTheme(themeOrId);
@@ -169,11 +276,13 @@ export function mountAnatomyFigure(config) {
   });
 
   function toggleCrankMode() {
+    if (!features.crank) return;
     state.crankMode = !state.crankMode;
     crankBtn.classList.toggle("active", state.crankMode);
   }
 
   function toggleExplode() {
+    if (!features.explode) return;
     state.exploded = !state.exploded;
     explodeBtn.classList.toggle("active", state.exploded);
   }
@@ -185,12 +294,14 @@ export function mountAnatomyFigure(config) {
   }
 
   function toggleCutaway() {
+    if (!features.cutaway) return;
     state.cutaway = !state.cutaway;
     cutawayBtn.classList.toggle("active", state.cutaway);
     reg.applyExplode(explodeSpring.at, state.cutaway);
   }
 
   function toggleShader() {
+    if (!features.shader) return;
     state.shaderEnabled = !state.shaderEnabled;
     shaderBtn.classList.toggle("active", state.shaderEnabled);
   }
@@ -216,9 +327,6 @@ export function mountAnatomyFigure(config) {
     updateCameraSize();
   }
 
-  rpmSlider.addEventListener("input", (e) => {
-    state.rpm = parseFloat(e.target.value);
-  });
   crankBtn.addEventListener("click", toggleCrankMode);
   slowBtn.addEventListener("click", cycleSlowMode);
   explodeBtn.addEventListener("click", toggleExplode);
@@ -235,6 +343,47 @@ export function mountAnatomyFigure(config) {
   let lastMidY = 0;
   let lastPinchDist = 0;
   let isMousePan = false;
+
+  const raycaster = new THREE.Raycaster();
+  const pointerNdc = new THREE.Vector2();
+  let activeInteractable = null;
+
+  function isEffectivelyVisible(obj) {
+    let cur = obj;
+    while (cur) {
+      if (!cur.visible) return false;
+      cur = cur.parent;
+    }
+    return true;
+  }
+
+  function pickInteractable(clientX, clientY) {
+    if (!reg.interactables || reg.interactables.length === 0) return null;
+    const rect = host.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
+
+    let bestEntry = null;
+    let bestDist = Infinity;
+    for (const entry of reg.interactables) {
+      if (!entry.object3d || !isEffectivelyVisible(entry.object3d)) continue;
+      const meshes = [];
+      entry.object3d.traverse((child) => {
+        if (child.isMesh && child.name === "solid" && isEffectivelyVisible(child)) {
+          meshes.push(child);
+        }
+      });
+      if (meshes.length === 0) continue;
+      const hits = raycaster.intersectObjects(meshes, false);
+      if (hits.length > 0 && hits[0].distance < bestDist) {
+        bestDist = hits[0].distance;
+        bestEntry = entry;
+      }
+    }
+    return bestEntry;
+  }
 
   host.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -256,13 +405,25 @@ export function mountAnatomyFigure(config) {
       lastSingleX = e.clientX;
       lastSingleY = e.clientY;
       isMousePan = e.button === 2 || e.button === 1;
+      activeInteractable =
+        !isMousePan && !e.shiftKey && !state.crankMode
+          ? pickInteractable(e.clientX, e.clientY)
+          : null;
+      host.style.cursor = "grabbing";
     } else if (activePointers.size === 2) {
+      activeInteractable = null;
       syncTwoFingerMetrics();
     }
   });
 
   host.addEventListener("pointermove", (e) => {
-    if (!activePointers.has(e.pointerId)) return;
+    if (!activePointers.has(e.pointerId)) {
+      if (activePointers.size === 0 && reg.interactables.length > 0) {
+        const hoverHit = pickInteractable(e.clientX, e.clientY);
+        host.style.cursor = hoverHit ? hoverHit.cursor : "grab";
+      }
+      return;
+    }
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     const w = Math.max(host.clientWidth, 1);
@@ -279,7 +440,17 @@ export function mountAnatomyFigure(config) {
       if (isMousePan) {
         targetPanX += dx * worldPerPixelX;
         targetPanY -= dy * worldPerPixelY;
-      } else if (e.shiftKey || state.crankMode || state.slowModes[state.slowIndex] === 0) {
+      } else if (activeInteractable && typeof activeInteractable.onDrag === "function") {
+        activeInteractable.onDrag({
+          dx,
+          dy,
+          worldDx: dx * worldPerPixelX,
+          worldDy: -dy * worldPerPixelY,
+          state,
+          setParam,
+          event: e
+        });
+      } else if (e.shiftKey || state.crankMode || (features.crank && state.slowModes[state.slowIndex] === 0)) {
         state.theta -= dx * 0.024;
       } else {
         targetRotY += dx * 0.0085;
@@ -313,7 +484,10 @@ export function mountAnatomyFigure(config) {
     if (host.hasPointerCapture(e.pointerId)) {
       host.releasePointerCapture(e.pointerId);
     }
-    if (activePointers.size === 1) {
+    if (activePointers.size === 0) {
+      activeInteractable = null;
+      host.style.cursor = "grab";
+    } else if (activePointers.size === 1) {
       const remaining = activePointers.values().next().value;
       lastSingleX = remaining.x;
       lastSingleY = remaining.y;
@@ -379,6 +553,11 @@ export function mountAnatomyFigure(config) {
 
     reg.applyExplode(explodeSpring.at, state.cutaway);
 
+    const smoothedParams = {};
+    for (const c of controlDefs) {
+      smoothedParams[c.id] = paramSprings[c.id].at;
+    }
+
     if (updateKinematics) {
       updateKinematics(reg, {
         theta: state.theta,
@@ -386,7 +565,10 @@ export function mountAnatomyFigure(config) {
         rpm: rpmSpring.at,
         effectiveRpm,
         shaderEnv: shaderEnvSpring.at,
-        cutaway: state.cutaway
+        cutaway: state.cutaway,
+        params: smoothedParams,
+        rawParams: state.params,
+        ...smoothedParams
       });
     }
 
@@ -396,7 +578,10 @@ export function mountAnatomyFigure(config) {
       const hudData = formatReadout({
         theta: state.theta,
         effectiveRpm,
-        explode: explodeSpring.at
+        explode: explodeSpring.at,
+        params: smoothedParams,
+        rawParams: state.params,
+        ...smoothedParams
       });
       if (hudData.readout && readoutEl) readoutEl.textContent = hudData.readout;
       if (hudData.phase && phaseCornerEl) phaseCornerEl.textContent = hudData.phase;
@@ -423,13 +608,24 @@ export function mountAnatomyFigure(config) {
       panX += (targetPanX - panX) * 0.22;
       panY += (targetPanY - panY) * 0.22;
 
-      stepSpring(explodeSpring, state.exploded ? 1.0 : 0.0, dt, 150, 19);
-      stepSpring(rpmSpring, state.rpm, dt, 110, 16);
-      stepSpring(shaderEnvSpring, state.shaderEnabled ? 1.0 : 0.0, dt, 140, 18);
+      stepSpring(explodeSpring, features.explode && state.exploded ? 1.0 : 0.0, dt, 150, 19);
+      if (!paramSprings.rpm) {
+        stepSpring(rpmSpring, state.rpm, dt, 110, 16);
+      }
+      for (const c of controlDefs) {
+        stepSpring(paramSprings[c.id], state.params[c.id], dt, 120, 17);
+      }
+      if (paramSprings.rpm) {
+        state.rpm = state.params.rpm;
+      }
+      stepSpring(shaderEnvSpring, features.shader && state.shaderEnabled ? 1.0 : 0.0, dt, 140, 18);
 
       const speedMult = state.slowModes[state.slowIndex];
       const effectiveRpm = rpmSpring.at * speedMult;
-      const isUserCranking = activePointers.size === 1 && (state.crankMode || speedMult === 0);
+      const isUserCranking =
+        activePointers.size === 1 &&
+        !activeInteractable &&
+        (state.crankMode || (features.crank && speedMult === 0));
       if (!isUserCranking) {
         const omegaShaft = (effectiveRpm * Math.PI * 2) / 60;
         state.theta -= omegaShaft * dt * 0.12;
@@ -493,20 +689,39 @@ export function mountAnatomyFigure(config) {
       state.debugPaused = opts.paused !== undefined ? opts.paused : true;
       if (opts.theta !== undefined) state.theta = opts.theta;
       if (opts.explode !== undefined) {
-        state.exploded = opts.explode > 0.5;
-        explodeSpring.at = opts.explode;
+        state.exploded = features.explode && opts.explode > 0.5;
+        explodeSpring.at = features.explode ? opts.explode : 0;
         explodeSpring.rate = 0;
-        explodeBtn.classList.toggle("active", state.exploded);
+        if (explodeBtn) explodeBtn.classList.toggle("active", state.exploded);
       }
       if (opts.cutaway !== undefined) {
-        state.cutaway = Boolean(opts.cutaway);
-        cutawayBtn.classList.toggle("active", state.cutaway);
+        state.cutaway = features.cutaway ? Boolean(opts.cutaway) : Boolean(spec.initialCutaway);
+        if (cutawayBtn) cutawayBtn.classList.toggle("active", state.cutaway);
       }
       if (opts.shader !== undefined) {
-        state.shaderEnabled = Boolean(opts.shader);
+        state.shaderEnabled = features.shader ? Boolean(opts.shader) : false;
         shaderEnvSpring.at = state.shaderEnabled ? 1.0 : 0.0;
         shaderEnvSpring.rate = 0;
-        shaderBtn.classList.toggle("active", state.shaderEnabled);
+        if (shaderBtn) shaderBtn.classList.toggle("active", state.shaderEnabled);
+      }
+      if (opts.rpm !== undefined) {
+        state.rpm = opts.rpm;
+        if (paramSprings.rpm) {
+          setParam("rpm", opts.rpm, true);
+        } else {
+          rpmSpring.at = opts.rpm;
+          rpmSpring.rate = 0;
+        }
+      }
+      if (opts.params && typeof opts.params === "object") {
+        for (const [pk, pv] of Object.entries(opts.params)) {
+          setParam(pk, pv, true);
+        }
+      }
+      for (const c of controlDefs) {
+        if (opts[c.id] !== undefined) {
+          setParam(c.id, opts[c.id], true);
+        }
       }
       if (opts.hud !== undefined) {
         setHudVisible(Boolean(opts.hud));
@@ -522,7 +737,8 @@ export function mountAnatomyFigure(config) {
         cutaway: state.cutaway,
         shader: state.shaderEnabled,
         hud: state.hudVisible,
-        theme: kit.currentTheme.id
+        theme: kit.currentTheme.id,
+        params: { ...state.params }
       };
     },
 
@@ -570,7 +786,11 @@ export function mountAnatomyFigure(config) {
         parts: reg.parts.size,
         tubes: reg.tubes.length,
         joints: Array.from(reg.joints.keys()),
-        themes: kit.THEMES.map((t) => t.id)
+        themes: kit.THEMES.map((t) => t.id),
+        features,
+        controls: controlDefs.map((c) => c.id),
+        interactables: reg.interactables.map((i) => i.id),
+        drivePoses: spec.drivePoses || null
       };
     }
   };

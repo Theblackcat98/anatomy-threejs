@@ -107,7 +107,7 @@ export function buildStructure(reg, kit) {
     allowOverlap: ["gearbox.topDeck", "gearbox.inputBoss", "gearbox.frontCover"]
   });
 
-  // Cutaway front cover arc (hidden in default cutaway mode; shown when C=0 or Exploded)
+  // Cutaway front cover arc (hidden in default cutaway mode; shown when C=0)
   const frontCoverGeo = buildCutawayArcGeometry(0.47, 0.59, housingH, -0.88 * Math.PI, -0.18 * Math.PI, 28);
   reg.part("gearbox.frontCover", frontCoverGeo, {
     parent: gearboxGroup,
@@ -116,7 +116,6 @@ export function buildStructure(reg, kit) {
     outline: "mid",
     crease: "lo",
     cutawayHide: true,
-    explode: [0, 0, 0.42],
     mountOn: "gearbox.flange",
     allowOverlap: ["gearbox.housing", "gearbox.topDeck"]
   });
@@ -289,78 +288,32 @@ export function buildStructure(reg, kit) {
     // Anchor at top of servo gland for piston rod articulation
     reg.anchor(`servo.${idx}.glandTop`, 0, topSurfaceY + 0.08 + bodyH + 0.06, 0, servoGroup);
 
-    // Hydraulic fitting port pointing cleanly outward toward perimeter route
-    const portAngs = [-Math.PI * 0.5, Math.PI * 0.56, 0.0];
+    // Mechanical Bowden control conduit fitting pointing cleanly toward pilot input
+    const portAngs = [0.0, Math.PI * 0.86, Math.PI * 0.30];
+    const tubeNames = ["tube.cyclicPitch", "tube.collective", "tube.cyclicRoll"];
     const pAng = portAngs[idx];
     const portPart = reg.part(
       `servo.port.${idx}`,
       buildCylinderGeometry(0.036, 0.036, 0.07, { segments: 12, axis: "x" }),
       {
         parent: bodyPart,
-        pos: [Math.cos(pAng) * 0.12, -0.16, Math.sin(pAng) * 0.12],
+        pos: [Math.cos(pAng) * 0.12, -0.18, Math.sin(pAng) * 0.12],
         rot: [0, -pAng, 0],
         ramp: "brass",
         outline: "lo",
         crease: "faint",
         mountOn: `servo.body.${idx}`,
-        allowOverlap: [`tube.hyd.${idx}`]
+        allowOverlap: [tubeNames[idx]]
       }
     );
-    reg.anchor(`servo.${idx}.hydPort`, 0.025, 0, 0, portPart, {
-      dir: [1, 0.08, 0]
+    reg.anchor(`servo.${idx}.ctrlPort`, 0.025, 0, 0, portPart, {
+      dir: [1, 0.06, 0]
     });
 
     const ring = makeRingLine(0.122, 24, kit, "lo");
     ring.rotation.x = Math.PI / 2;
     ring.position.y = topSurfaceY + 0.08 + bodyH * 0.5;
     reg.detail(`servo.band.${idx}`, ring, { parent: servoGroup });
-  });
-
-  // 4. Bench Hydraulic Distribution Manifold Block (feeds the 3 CCPM servos)
-  const [manX, , manZ] = ANCHORS.manifoldMount;
-  const manGroup = reg.group("manifold.group", {
-    parent: baseGroup,
-    pos: [manX, 0, manZ],
-    stage: "structure"
-  });
-
-  const manBlockGeo = new THREE.BoxGeometry(0.54, 0.44, 0.48);
-  reg.part("manifold.block", manBlockGeo, {
-    parent: manGroup,
-    pos: [0, topSurfaceY + 0.22, 0],
-    ramp: "mid",
-    outline: "mid",
-    crease: "lo",
-    mountOn: "base.plate"
-  });
-
-  const manCapGeo = new THREE.BoxGeometry(0.58, 0.06, 0.52);
-  reg.part("manifold.cap", manCapGeo, {
-    parent: manGroup,
-    pos: [0, topSurfaceY + 0.47, 0],
-    ramp: "lo",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "manifold.block"
-  });
-
-  // Three brass manifold outlet fittings facing -Z (rear) and +Z (front) clear of motor
-  [
-    { idx: 0, pos: [-0.08, topSurfaceY + 0.32, -0.25], rot: [0, 0, 0], axis: "z", anchorOff: [0, 0, -0.025], dir: [-0.15, 0.08, -1] },
-    { idx: 1, pos: [ 0.12, topSurfaceY + 0.22,  0.25], rot: [0, 0, 0], axis: "z", anchorOff: [0, 0,  0.025], dir: [ 0.15, 0.08,  1] },
-    { idx: 2, pos: [-0.12, topSurfaceY + 0.32,  0.25], rot: [0, 0, 0], axis: "z", anchorOff: [0, 0,  0.025], dir: [-0.12, 0.08,  1] }
-  ].forEach(({ idx, pos, axis, anchorOff, dir }) => {
-    const fittingGeo = buildCylinderGeometry(0.038, 0.042, 0.09, { segments: 12, axis });
-    const fPart = reg.part(`manifold.port.${idx}`, fittingGeo, {
-      parent: manGroup,
-      pos,
-      ramp: "brass",
-      outline: "lo",
-      crease: "faint",
-      mountOn: "manifold.block",
-      allowOverlap: [`tube.hyd.${idx}`]
-    });
-    reg.anchor(`manifold.port.${idx}`, ...anchorOff, fPart, { dir });
   });
 
   reg.anchor("gearbox.top", 0, gearboxTopY, 0, gearboxGroup);

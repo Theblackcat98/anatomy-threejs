@@ -9,6 +9,7 @@ export class Recorder3D {
     this.joints = new Map();     // id -> THREE.Object3D (named anchor points)
     this.groups = new Map();     // id -> { id, group, opts }
     this.tags = new Map();       // id -> { id, text, pos }
+    this.interactables = [];     // { id, object3d, cursor, hint, onDrag }
     this.currentStage = "base";  // 'base' | 'structure' | 'subject' | 'mechanism' | 'shader'
   }
 
@@ -243,6 +244,29 @@ export class Recorder3D {
    */
   tag(id, text, x, y, z) {
     this.tags.set(id, { id, text, pos: [x, y, z] });
+  }
+
+  /**
+   * Register a 3D group or part as directly draggable in the viewport via pointer raycasting.
+   * opts: { cursor = "move", hint = "", onDrag: ({ dx, dy, worldDx, worldDy, state, setParam, event }) => void }
+   */
+  interactable(targetId, opts = {}) {
+    const obj =
+      typeof targetId === "string"
+        ? this.groups.get(targetId)?.group || this.parts.get(targetId)?.group
+        : targetId;
+    if (!obj) {
+      throw new Error(`Interactable target "${targetId}" not found in registered groups or parts`);
+    }
+    const entry = {
+      id: typeof targetId === "string" ? targetId : obj.name || "interactable",
+      object3d: obj,
+      cursor: opts.cursor || "move",
+      hint: opts.hint || "",
+      onDrag: opts.onDrag || null
+    };
+    this.interactables.push(entry);
+    return entry;
   }
 
   /**

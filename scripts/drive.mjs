@@ -27,25 +27,27 @@ await withHeadlessPage(htmlPath, { width: 1440, height: 940, scale: 1.5 }, async
     `driving ${htmlPath} · ${summary.parts} parts · ${summary.tubes} tubes · ${summary.joints.length} joints`
   );
 
-  // 1. Capture Full Hero Stills (Light, Dark, Blueprint, Exploded)
+  // 1. Capture Full Hero Stills (Light, Dark, and Exploded when enabled)
   await evaluate(`window.__ANATOMY_DEBUG__.setOrthoView("iso")`);
   await evaluate(`window.__ANATOMY_DEBUG__.setPose({ theta: 0.65, explode: 0, cutaway: true, shader: true, hud: true, theme: "light" })`);
   await sleep(80);
   const heroLight = saveBase64Png(join(outDir, "hero-light.png"), await captureBase64(".wrapper", null, 1));
   console.log(`saved ${heroLight}`);
 
-  await evaluate(`window.__ANATOMY_DEBUG__.setPose({ theta: 0.65, explode: 1, cutaway: true, shader: true, hud: true, theme: "light" })`);
-  await sleep(80);
-  const heroExploded = saveBase64Png(join(outDir, "hero-exploded.png"), await captureBase64(".wrapper", null, 1));
-  console.log(`saved ${heroExploded}`);
+  if (summary.features?.explode !== false) {
+    await evaluate(`window.__ANATOMY_DEBUG__.setPose({ theta: 0.65, explode: 1, cutaway: true, shader: true, hud: true, theme: "light" })`);
+    await sleep(80);
+    const heroExploded = saveBase64Png(join(outDir, "hero-exploded.png"), await captureBase64(".wrapper", null, 1));
+    console.log(`saved ${heroExploded}`);
+  }
 
   await evaluate(`window.__ANATOMY_DEBUG__.setPose({ theta: 0.65, explode: 0, cutaway: true, shader: true, hud: true, theme: "dark" })`);
   await sleep(80);
   const heroDark = saveBase64Png(join(outDir, "hero-dark.png"), await captureBase64(".wrapper", null, 1));
   console.log(`saved ${heroDark}`);
 
-  // 2. Build 8-Frame Motion, Explode, Cutaway & Theme Contact Sheet (inspect-drive.png)
-  const states = [
+  // 2. Build Interactive Motion, Feature & Theme Contact Sheet (inspect-drive.png)
+  const defaultStates = [
     { label: "1. θ = 0° (INTAKE)",       pose: { theta: 0,              explode: 0, cutaway: true,  shader: true, hud: true, theme: "light" } },
     { label: "2. θ = 90° (COMPRESSION)", pose: { theta: Math.PI * 0.5,  explode: 0, cutaway: true,  shader: true, hud: true, theme: "light" } },
     { label: "3. θ = 180° (IGNITION)",   pose: { theta: Math.PI,        explode: 0, cutaway: true,  shader: true, hud: true, theme: "light" } },
@@ -55,10 +57,14 @@ await withHeadlessPage(htmlPath, { width: 1440, height: 940, scale: 1.5 }, async
     { label: "7. DARK THEME",            pose: { theta: 0.65,           explode: 0, cutaway: true,  shader: true, hud: true, theme: "dark" } },
     { label: "8. BLUEPRINT THEME",       pose: { theta: 0.65,           explode: 0, cutaway: true,  shader: true, hud: true, theme: "blueprint" } }
   ];
+  const states =
+    Array.isArray(summary.drivePoses) && summary.drivePoses.length > 0
+      ? summary.drivePoses
+      : defaultStates.filter((s) => summary.features?.explode !== false || !s.pose.explode);
 
   const tiles = [];
   for (const s of states) {
-    await evaluate(`window.__ANATOMY_DEBUG__.setOrthoView("iso")`);
+    await evaluate(`window.__ANATOMY_DEBUG__.setOrthoView(${JSON.stringify(s.view || "iso")})`);
     await evaluate(`window.__ANATOMY_DEBUG__.setPose(${JSON.stringify(s.pose)})`);
     await sleep(60);
     const readout = await evaluate(`(document.getElementById("readout") || {}).textContent || ""`);

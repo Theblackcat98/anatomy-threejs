@@ -16,9 +16,193 @@ export const SPEC = {
   hubY: 0.96,
   gearRatio: 4,              // 4:1 bevel drive reduction (motor input RPM -> rotor RPM)
 
+  // Feature flags: open articulated linkage — no exploded view
+  features: {
+    explode: false,
+    cutaway: true,
+    shader: true,
+    crank: true
+  },
+
+  interactionHint: "Drag swashplate, cyclic stick, or collective lever",
+
+  // Domain-authentic operator controls
+  controls: [
+    {
+      id: "collective",
+      label: "COLL",
+      min: 2,
+      max: 14,
+      step: 0.2,
+      initial: 8.5,
+      title: "Collective blade pitch angle (deg)"
+    },
+    {
+      id: "cyclicPitch",
+      label: "PITCH",
+      min: -10,
+      max: 10,
+      step: 0.2,
+      initial: 6.5,
+      title: "Fore/aft cyclic swashplate tilt (deg)"
+    },
+    {
+      id: "cyclicRoll",
+      label: "ROLL",
+      min: -10,
+      max: 10,
+      step: 0.2,
+      initial: -4.5,
+      title: "Left/right cyclic swashplate tilt (deg)"
+    },
+    {
+      id: "rpm",
+      label: "RPM",
+      min: 0,
+      max: 1600,
+      step: 20,
+      initial: 480,
+      title: "Drive motor speed (set 0 to pause & inspect blade pitch)"
+    }
+  ],
+
+  // Audit poses across collective & cyclic extremes (no exploded pose)
+  auditPoses: [
+    {
+      name: "rest (θ=0°)",
+      theta: 0,
+      explode: 0,
+      params: { collective: 8.5, cyclicPitch: 6.5, cyclicRoll: -4.5, rpm: 480 }
+    },
+    {
+      name: "low-coll + fwd-pitch (θ=90°)",
+      theta: Math.PI * 0.5,
+      explode: 0,
+      params: { collective: 2.0, cyclicPitch: 10.0, cyclicRoll: 0, rpm: 0 }
+    },
+    {
+      name: "high-coll + aft-pitch (θ=180°)",
+      theta: Math.PI,
+      explode: 0,
+      params: { collective: 14.0, cyclicPitch: -10.0, cyclicRoll: 0, rpm: 0 }
+    },
+    {
+      name: "roll-left (θ=270°)",
+      theta: Math.PI * 1.5,
+      explode: 0,
+      params: { collective: 8.5, cyclicPitch: 0, cyclicRoll: -10.0, rpm: 480 }
+    },
+    {
+      name: "roll-right + max-coll",
+      theta: 0.65,
+      explode: 0,
+      params: { collective: 14.0, cyclicPitch: 8.0, cyclicRoll: 10.0, rpm: 1600 }
+    }
+  ],
+
+  // 8-state interactive contact sheet poses for scripts/drive.mjs
+  drivePoses: [
+    {
+      label: "1. REST · COLLECTIVE 8.5°",
+      pose: {
+        theta: 0.65,
+        explode: 0,
+        cutaway: true,
+        shader: true,
+        hud: true,
+        theme: "light",
+        params: { collective: 8.5, cyclicPitch: 6.5, cyclicRoll: -4.5, rpm: 480 }
+      }
+    },
+    {
+      label: "2. PAUSED · LOW COLL 2°",
+      pose: {
+        theta: 0.65,
+        explode: 0,
+        cutaway: true,
+        shader: false,
+        hud: true,
+        theme: "light",
+        params: { collective: 2.0, cyclicPitch: 0, cyclicRoll: 0, rpm: 0 }
+      }
+    },
+    {
+      label: "3. PAUSED · HIGH COLL 14°",
+      pose: {
+        theta: 0.65,
+        explode: 0,
+        cutaway: true,
+        shader: false,
+        hud: true,
+        theme: "light",
+        params: { collective: 14.0, cyclicPitch: 0, cyclicRoll: 0, rpm: 0 }
+      }
+    },
+    {
+      label: "4. CYCLIC FWD (+10° PITCH)",
+      pose: {
+        theta: 0.65,
+        explode: 0,
+        cutaway: true,
+        shader: false,
+        hud: true,
+        theme: "light",
+        params: { collective: 8.5, cyclicPitch: 10.0, cyclicRoll: 0, rpm: 0 }
+      }
+    },
+    {
+      label: "5. CYCLIC ROLL (-10° LEFT)",
+      pose: {
+        theta: 0.65,
+        explode: 0,
+        cutaway: true,
+        shader: false,
+        hud: true,
+        theme: "light",
+        params: { collective: 8.5, cyclicPitch: 0, cyclicRoll: -10.0, rpm: 0 }
+      }
+    },
+    {
+      label: "6. CUTAWAY OFF (C = 0)",
+      pose: {
+        theta: 0.65,
+        explode: 0,
+        cutaway: false,
+        shader: true,
+        hud: true,
+        theme: "light",
+        params: { collective: 8.5, cyclicPitch: 6.5, cyclicRoll: -4.5, rpm: 480 }
+      }
+    },
+    {
+      label: "7. DARK THEME",
+      pose: {
+        theta: 1.9,
+        explode: 0,
+        cutaway: true,
+        shader: true,
+        hud: true,
+        theme: "dark",
+        params: { collective: 11.5, cyclicPitch: -6.0, cyclicRoll: 6.0, rpm: 960 }
+      }
+    },
+    {
+      label: "8. BLUEPRINT THEME",
+      pose: {
+        theta: 3.1,
+        explode: 0,
+        cutaway: true,
+        shader: true,
+        hud: true,
+        theme: "blueprint",
+        params: { collective: 6.0, cyclicPitch: 7.5, cyclicRoll: -6.0, rpm: 480 }
+      }
+    }
+  ],
+
   // Kinematic defaults & camera framing
   initialTheta: 0.65,
-  initialRpm: 720,
+  initialRpm: 480,
   isoElevDeg: 30,
   isoAzimDeg: -36,
   initialZoom: 0.86,
@@ -35,9 +219,9 @@ export const SPEC = {
 };
 
 export const SERVO_ANGLES = [
-  -Math.PI / 2,              // Servo 0: Aft center
-  (5 * Math.PI) / 6,         // Servo 1: Forward-left
-  Math.PI / 6                // Servo 2: Forward-right
+  -Math.PI / 2,              // Servo 0: Aft cyclic pitch
+  (5 * Math.PI) / 6,         // Servo 1: Forward-left CCPM
+  Math.PI / 6                // Servo 2: Forward-right CCPM
 ];
 
 export const ANCHORS = {
@@ -58,49 +242,77 @@ export const ANCHORS = {
     SPEC.topSurfaceY,
     SPEC.mastZ + Math.sin(SERVO_ANGLES[2]) * SPEC.servoMountR
   ],
-  plaqueCenter: [-1.34, SPEC.topSurfaceY, SPEC.BASE_D * 0.5 - 0.50],
-  rulerCenter: [0.36, SPEC.topSurfaceY, SPEC.BASE_D * 0.5 - 0.44],
-  knobMount: [SPEC.BASE_W * 0.5 - 0.72, SPEC.topSurfaceY, SPEC.BASE_D * 0.5 - 0.62],
-  manifoldMount: [1.98, SPEC.topSurfaceY, -0.78],
-  motorMount: [1.34, SPEC.topSurfaceY, SPEC.mastZ],
-  gaugeMount: [-2.14, SPEC.topSurfaceY, 0.74]
+  plaqueCenter: [-1.40, SPEC.topSurfaceY, SPEC.BASE_D * 0.5 - 0.44],
+  rulerCenter: [0.15, SPEC.topSurfaceY, SPEC.BASE_D * 0.5 - 0.44],
+  cyclicMount: [1.76, SPEC.topSurfaceY, 1.06],
+  collectiveMount: [-1.78, SPEC.topSurfaceY, 0.68],
+  pitchScaleMount: [1.94, SPEC.topSurfaceY, -0.88],
+  motorMount: [1.34, SPEC.topSurfaceY, SPEC.mastZ]
 };
 
+function resolveControls(paramsOrRpm) {
+  if (typeof paramsOrRpm === "number") {
+    return {
+      collective: 8.5,
+      cyclicPitch: 6.5,
+      cyclicRoll: -4.5,
+      rpm: paramsOrRpm
+    };
+  }
+  const p = paramsOrRpm || {};
+  return {
+    collective: p.collective !== undefined ? p.collective : 8.5,
+    cyclicPitch: p.cyclicPitch !== undefined ? p.cyclicPitch : 6.5,
+    cyclicRoll: p.cyclicRoll !== undefined ? p.cyclicRoll : -4.5,
+    rpm: p.rpm !== undefined ? p.rpm : SPEC.initialRpm
+  };
+}
+
 /**
- * Computes deterministic swashplate cyclic tilt, collective lift, blade pitch,
- * and aerodynamic coning angle for a given shaft azimuth `theta` and input `rpm`.
+ * Computes swashplate collective lift, cyclic tilt around X and Z, blade pitch,
+ * and aerodynamic coning angle for a given shaft azimuth `theta` and control params.
  */
-export function getRotorState(theta, rpm = SPEC.initialRpm) {
-  const rpmNorm = Math.max(0, Math.min(1, rpm / 2400));
+export function getRotorState(theta, paramsOrRpm = SPEC.initialRpm) {
+  const { collective, cyclicPitch, cyclicRoll, rpm } = resolveControls(paramsOrRpm);
+  const rpmNorm = Math.max(0, Math.min(1, rpm / 1600));
 
-  // Collective pitch test sweep over 4*PI so 0..6*PI covers full min-to-max travel
-  const collNorm = 0.5 - 0.42 * Math.cos(theta * 0.5); // 0.08 .. 0.92
-  const collLift = (collNorm - 0.5) * 0.24;            // -0.10 .. +0.10 world units
+  const collNorm = Math.max(0, Math.min(1, (collective - 2.0) / 12.0));
+  const collLift = (collNorm - 0.5) * 0.24; // -0.12 .. +0.12 world units
 
-  // Cyclic tilt stays visibly angled (~9.5 deg) and slowly precesses in azimuth
-  const cyclicAzim = 0.55 + 0.35 * Math.sin(theta * 0.25);
-  const cyclicAmpRad = 0.165; // ~9.5 degrees swashplate tilt
-  const tiltX = Math.sin(cyclicAzim) * cyclicAmpRad;   // Pitch tilt around X
-  const tiltZ = -Math.cos(cyclicAzim) * cyclicAmpRad;  // Roll tilt around Z
+  // Positive cyclicPitch tilts +Y normal forward (+Z) -> rotation.x > 0
+  // Positive cyclicRoll tilts +Y normal right (+X) -> rotation.z < 0
+  const tiltX = (cyclicPitch * Math.PI) / 180;
+  const tiltZ = -(cyclicRoll * Math.PI) / 180;
+  const cyclicAmpRad = Math.hypot(tiltX, tiltZ);
+  const cyclicAzim = Math.atan2(tiltX, -tiltZ);
 
   const swashCenterY = SPEC.swashY0 + collLift;
+  const collPitchDeg = collective;
 
-  // Collective pitch (deg): 3.0° flat pitch -> 13.5° high collective
-  const collPitchDeg = 3.0 + collNorm * 10.5;
-
-  // Centrifugal + aerodynamic lift coning angle (deg): 2.2° .. 9.4°
-  const coningDeg = 2.2 + 3.0 * rpmNorm + 4.2 * collNorm;
+  // Aerodynamic coning angle increases with collective lift and centrifugal RPM
+  const coningDeg = 1.6 + 2.4 * rpmNorm + 4.4 * collNorm;
   const coningRad = (coningDeg * Math.PI) / 180;
 
-  // Phase label describing the active articulation regime
-  let phase = "LOW COLLECTIVE";
-  if (collNorm > 0.72) phase = "HIGH COLLECTIVE";
-  else if (Math.sin(theta * 0.5) > 0.25) phase = "COLLECTIVE CLIMB";
-  else if (Math.sin(theta * 0.5) < -0.25) phase = "COLLECTIVE FLARE";
+  let phase = "LEVEL HOVER";
+  if (Math.abs(cyclicPitch) > 3.0 || Math.abs(cyclicRoll) > 3.0) {
+    if (Math.abs(cyclicPitch) >= Math.abs(cyclicRoll)) {
+      phase = cyclicPitch > 0 ? "FORWARD CYCLIC" : "AFT CYCLIC";
+    } else {
+      phase = cyclicRoll > 0 ? "RIGHT CYCLIC" : "LEFT CYCLIC";
+    }
+  } else if (collPitchDeg > 10.5) {
+    phase = "HIGH COLLECTIVE";
+  } else if (collPitchDeg < 5.0) {
+    phase = "FLAT PITCH";
+  }
 
   const rotorRpm = rpm / SPEC.gearRatio;
 
   return {
+    collective,
+    cyclicPitch,
+    cyclicRoll,
+    rpm,
     rpmNorm,
     rotorRpm,
     collNorm,
@@ -119,29 +331,30 @@ export function getRotorState(theta, rpm = SPEC.initialRpm) {
 
 /**
  * Computes individual blade k (0, 1, 2) pitch angle (rad), flapping angle (rad),
- * and upper swashplate horn height offset at shaft rotation `theta`.
+ * and upper swashplate horn height offset matching swash.carrier rotation.
  */
-export function getBladeKinematics(theta, rpm, bladeIndex) {
-  const st = getRotorState(theta, rpm);
-  const psi = theta + (bladeIndex * 2 * Math.PI) / SPEC.numBlades;
-  const hornAzim = psi + SPEC.pitchHornPhase;
+export function getBladeKinematics(theta, paramsOrRpm, bladeIndex) {
+  const st = getRotorState(theta, paramsOrRpm);
+  const ry = theta + (bladeIndex * 2 * Math.PI) / SPEC.numBlades;
+  const hornAzim = -ry + SPEC.pitchHornPhase;
 
-  // Approximate swashplate horn vertical offset from tiltX (around X) and tiltZ (around Z)
   const hx = Math.cos(hornAzim) * SPEC.swashPitchR;
   const hz = Math.sin(hornAzim) * SPEC.swashPitchR;
-  const tiltOffsetY = hz * st.tiltX - hx * st.tiltZ;
 
-  // Mechanical pitch change from swashplate vertical motion around feathering horn
-  const cyclicPitchRad = Math.atan2(tiltOffsetY, SPEC.pitchHornZ * 2.1);
+  // Under THREE.Euler(tiltX, 0, tiltZ, "XZY"): y' = -z*sin(tiltX) + x*sin(tiltZ)
+  const tiltOffsetY = -hz * Math.sin(st.tiltX) + hx * Math.sin(st.tiltZ);
+
+  // Mechanical pitch change from swashplate vertical displacement at pitch horn
+  const cyclicPitchRad = Math.atan2(tiltOffsetY, SPEC.pitchHornZ * 1.45);
   const collPitchRad = (st.collPitchDeg * Math.PI) / 180;
   const totalPitchRad = collPitchRad + cyclicPitchRad;
 
-  // Blade aerodynamic flap responds ~90 deg after cyclic pitch (gyroscopic precession)
-  const flapCyclicRad = 0.022 * Math.sin(psi - st.cyclicAzim);
+  // Blade aerodynamic flap responds ~90 deg after cyclic pitch
+  const flapCyclicRad = 0.022 * Math.sin(ry - st.cyclicAzim);
   const flapAngleRad = st.coningRad + flapCyclicRad;
 
   return {
-    psi,
+    psi: ry,
     hornAzim,
     swashHornLocalY: tiltOffsetY,
     totalPitchRad,
@@ -151,12 +364,15 @@ export function getBladeKinematics(theta, rpm, bladeIndex) {
   };
 }
 
-export function formatReadout({ theta, effectiveRpm }) {
-  const st = getRotorState(theta, effectiveRpm);
+export function formatReadout({ theta, effectiveRpm, params }) {
+  const displayRpm = params?.rpm !== undefined ? params.rpm : effectiveRpm;
+  const ctrl = params ? { ...params, rpm: displayRpm } : displayRpm;
+  const st = getRotorState(theta, ctrl);
+  const b0 = getBladeKinematics(theta, ctrl, 0);
   const azimDeg = Math.round((((-theta * 180) / Math.PI) % 360 + 360) % 360);
   const rotorRpm = Math.round(st.rotorRpm);
   return {
-    readout: `ψ ${String(azimDeg).padStart(3, "0")}° · COLL ${st.collPitchDeg.toFixed(1)}° · CONE ${st.coningDeg.toFixed(1)}° · ${rotorRpm} rpm`,
+    readout: `ψ ${String(azimDeg).padStart(3, "0")}° · COLL ${st.collPitchDeg.toFixed(1)}° · CYC ${st.cyclicPitch >= 0 ? "+" : ""}${st.cyclicPitch.toFixed(1)}°/${st.cyclicRoll >= 0 ? "+" : ""}${st.cyclicRoll.toFixed(1)}° · B1 ${b0.totalPitchDeg.toFixed(1)}° · ${rotorRpm} rpm`,
     phase: st.phase
   };
 }

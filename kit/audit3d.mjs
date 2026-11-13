@@ -177,13 +177,16 @@ export function runModelAudit(model) {
  */
 export function runGeometryAudit(reg, stepModelFn, options = {}) {
   const errors = [];
-  const poses = options.poses || [
+  const allowExplode = options.features?.explode !== false;
+  const defaultPoses = [
     { name: "rest (θ=0°)", theta: 0, explode: 0 },
     { name: "quarter (θ=90°)", theta: Math.PI * 0.5, explode: 0 },
     { name: "half (θ=180°)", theta: Math.PI, explode: 0 },
     { name: "three-quarter (θ=270°)", theta: Math.PI * 1.5, explode: 0 },
     { name: "exploded (E=1)", theta: 0, explode: 1 }
-  ];
+  ].filter((p) => allowExplode || !p.explode);
+  const poses = Array.isArray(options.poses) && options.poses.length > 0 ? options.poses : defaultPoses;
+  const restPose = poses.find((p) => !p.explode) || poses[0];
 
   // 0. TONE HIERARCHY & MOUNT METADATA CHECK
   let litCount = 0;
@@ -205,7 +208,9 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
   }
 
   for (const pose of poses) {
-    stepModelFn(pose.theta, pose.explode);
+    const poseTheta = pose.theta ?? 0;
+    const poseExplode = pose.explode ?? 0;
+    stepModelFn(poseTheta, poseExplode, pose.params || {}, pose);
     reg.root.updateMatrixWorld(true);
 
     const boxes = new Map();
@@ -217,7 +222,7 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
     }
 
     // 1. SUPPORT / FLOATING CHECK (in rest pose)
-    if (pose.explode === 0 && pose.theta === 0) {
+    if (pose === restPose) {
       for (const [id, item] of reg.parts) {
         if (item.opts.detail) continue;
         const targetId = item.opts.mountOn;
@@ -241,7 +246,7 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
     }
 
     // 2. HOLLOW BORE RADIAL CLEARANCE CHECK (e.g. Rotor inside Epitrochoid Housing)
-    if (pose.explode === 0) {
+    if (!pose.explode) {
       const vWorld = new THREE.Vector3();
       const vLocal = new THREE.Vector3();
       const invMat = new THREE.Matrix4();
@@ -318,7 +323,7 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
     }
 
     // 4. TUBE-TO-SOLID PASS-THROUGH CHECK (in rest pose)
-    if (pose.explode === 0 && pose.theta === 0) {
+    if (pose === restPose) {
       const tubeIds = new Set(reg.tubes.map((t) => t.id));
       for (const tube of reg.tubes) {
         const pts = tube.curve.getSpacedPoints(40);
@@ -349,7 +354,7 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
   }
 
   // 5. TUBE / CABLE BEND RADIUS (KINK), TANGENCY, SLACK & TERMINAL CHECK
-  stepModelFn(0, 0);
+  stepModelFn(restPose?.theta ?? 0, 0, restPose?.params || {}, restPose);
   reg.root.updateMatrixWorld(true);
   const tubeSamples = new Map();
 

@@ -45,34 +45,34 @@ function buildHubYokeGeometry() {
   return geo;
 }
 
-function buildAirfoilBladeGeometry(spanLen, chord = 0.23, thickness = 0.044) {
-  // Cambered NACA-style cross-section in YZ, extruded along +X
+function buildAirfoilBladeGeometry(spanLen, chord = 0.26, thickness = 0.052) {
+  // Cambered NACA-style cross-section in XY; rotateY(+PI/2) maps -X_shape -> +Z_leading
   const shape = new THREE.Shape();
   const halfC = chord * 0.5;
   const steps = 20;
 
-  // Upper surface from leading edge (+halfC in z) to trailing edge (-halfC in z)
+  // Upper surface from leading edge (-halfC -> +Z_local) to trailing edge (+halfC -> -Z_local)
   for (let i = 0; i <= steps; i++) {
     const u = i / steps; // 0 = LE, 1 = TE
-    const z = halfC - u * chord;
+    const x = -halfC + u * chord;
     const yt = 5 * thickness * (
       0.2969 * Math.sqrt(u) - 0.126 * u - 0.3516 * u * u + 0.2843 * u * u * u - 0.1015 * u * u * u * u
     );
-    const camber = 0.012 * Math.sin(u * Math.PI);
+    const camber = 0.014 * Math.sin(u * Math.PI);
     const y = camber + yt;
-    if (i === 0) shape.moveTo(z, y);
-    else shape.lineTo(z, y);
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
   }
   // Lower surface back from TE to LE
   for (let i = steps - 1; i >= 0; i--) {
     const u = i / steps;
-    const z = halfC - u * chord;
+    const x = -halfC + u * chord;
     const yt = 5 * thickness * (
       0.2969 * Math.sqrt(u) - 0.126 * u - 0.3516 * u * u + 0.2843 * u * u * u - 0.1015 * u * u * u * u
     );
-    const camber = 0.012 * Math.sin(u * Math.PI);
+    const camber = 0.014 * Math.sin(u * Math.PI);
     const y = camber - yt * 0.72;
-    shape.lineTo(z, y);
+    shape.lineTo(x, y);
   }
   shape.closePath();
 
@@ -85,7 +85,7 @@ function buildAirfoilBladeGeometry(spanLen, chord = 0.23, thickness = 0.044) {
     bevelThickness: 0.008,
     curveSegments: 16
   });
-  // Extrude is along +Z_shape; rotateY(+PI/2) maps +Z_shape -> +X_span, +X_shape -> -Z_chord
+  // Extrude is along +Z_shape; rotateY(+PI/2) maps +Z_shape -> +X_span, -X_shape -> +Z_leading
   geo.rotateY(Math.PI / 2);
   return geo;
 }
@@ -95,7 +95,6 @@ export function buildSubject(reg, kit) {
 
   const hubAssembly = reg.group("hub.assembly", {
     pos: [0, 0, mastZ],
-    explode: [0, 0.66, 0],
     stage: "subject"
   });
 
@@ -133,7 +132,6 @@ export function buildSubject(reg, kit) {
     ramp: "brass",
     outline: "hi",
     crease: "lo",
-    explode: [0, 0.24, 0],
     mountOn: "hub.yoke",
     allowOverlap: ["mast.shaft"]
   });
@@ -149,15 +147,14 @@ export function buildSubject(reg, kit) {
 
   // 3. Three Articulated Rotor Blades (Flapping Hinge -> Feathering Cuff -> Pitch Horn -> Airfoil)
   const airfoilSpan = rotorR - featherR - 0.34;
-  const airfoilGeo = buildAirfoilBladeGeometry(airfoilSpan, 0.23, 0.046);
-  const tipCapGeo = buildAirfoilBladeGeometry(0.14, 0.21, 0.040);
+  const airfoilGeo = buildAirfoilBladeGeometry(airfoilSpan, 0.26, 0.052);
+  const tipCapGeo = buildAirfoilBladeGeometry(0.14, 0.23, 0.044);
 
   for (let k = 0; k < numBlades; k++) {
     const azimAngle = (k * 2 * Math.PI) / numBlades;
     const bladeAzimGroup = reg.group(`blade.azimuth.${k}`, {
       parent: hubSpinGroup,
       rot: [0, azimAngle, 0],
-      explode: [Math.cos(azimAngle) * 0.24, 0.10, -Math.sin(azimAngle) * 0.24],
       stage: "subject"
     });
 
@@ -271,10 +268,10 @@ export function buildSubject(reg, kit) {
       mountOn: `blade.airfoil.${k}`
     });
 
-    // Spanwise leading-edge spar seam line along blade
+    // Spanwise leading-edge spar seam line along blade (+Z leading side)
     const sparPts = [
-      new THREE.Vector3(0.22, 0.024, -0.055),
-      new THREE.Vector3(0.21 + airfoilSpan + 0.12, 0.022, -0.052)
+      new THREE.Vector3(0.22, 0.028, 0.062),
+      new THREE.Vector3(0.21 + airfoilSpan + 0.12, 0.025, 0.056)
     ];
     reg.detail(
       `blade.sparLine.${k}`,

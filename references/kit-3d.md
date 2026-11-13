@@ -86,6 +86,19 @@ Attaches decorative line segments, ring loops, screw slots, or shadow halos (`TH
 ### `reg.tag(id, text, x, y, z)`
 Registers an engraved monospace DOM label (`<div class="engraved-tag">`) projected every frame from the 3D world point `[x, y, z]`.
 
+### `reg.interactable(targetId, opts)`
+Registers a 3D group or part as directly draggable in the viewport via pointer raycasting (`runtime.mjs`). When the user hovers over its solid meshes, the cursor switches to `opts.cursor` (`"grab"` or `"move"`), and single-pointer dragging invokes `opts.onDrag` instead of orbiting the camera — even while rotation is paused.
+```js
+reg.interactable("swash.assembly", {
+  cursor: "grab",
+  hint: "Drag swashplate to tilt cyclic & lift collective",
+  onDrag: ({ dx, dy, worldDx, worldDy, state, setParam }) => {
+    setParam("collective", (state.params.collective ?? 8.5) - dy * 0.08);
+    setParam("cyclicRoll", (state.params.cyclicRoll ?? 0) + dx * 0.14);
+  }
+});
+```
+
 ---
 
 ## 2. Geometry Primitives (`kit/primitives.mjs`)
@@ -171,4 +184,21 @@ buildAndVerifyFigure({
   updateKinematics
 });
 ```
-`buildAndVerifyFigure` runs `runModelAudit` when `--test-model` or `--audit` is passed, runs `runGeometryAudit` across 5 poses when `--audit` is passed, and compiles the `kit/` engine + your 6 stage `.mjs` files into `dist/<slug>.html`.
+`buildAndVerifyFigure` runs `runModelAudit` when `--test-model` or `--audit` is passed, runs `runGeometryAudit` across `SPEC.auditPoses` (or the default poses, omitting `explode` when `SPEC.features.explode === false`) when `--audit` is passed, and compiles the `kit/` engine + your 6 stage `.mjs` files into `dist/<slug>.html`.
+
+---
+
+## 5. `SPEC` Declarative Configuration (`model.mjs`)
+
+`kit/runtime.mjs`, `kit/audit3d.mjs`, and `scripts/drive.mjs` read optional declarative fields on `SPEC`:
+- **`SPEC.features`**: `{ explode: true, cutaway: true, shader: true, crank: true }`. Set `explode: false` to hide the `APART` button, `<kbd>E</kbd> apart` hint, exploded audit pose, and `hero-exploded.png`.
+- **`SPEC.interactionHint`**: String prepended to the bottom-left interaction bar (e.g., `"Drag swashplate, stick, or collective lever"`).
+- **`SPEC.controls`**: Array of domain-specific sliders rendered in `#custom-sliders`, spring-smoothed in `runtime.mjs`, and passed to `updateKinematics` and `formatReadout` via `state.params` and top-level `state.<id>`:
+  ```js
+  controls: [
+    { id: "collective", label: "COLL", min: 2, max: 14, step: 0.2, initial: 8.5, title: "Collective pitch (deg)" },
+    { id: "rpm", label: "RPM", min: 0, max: 1600, step: 20, initial: 480, title: "Rotor drive RPM" }
+  ]
+  ```
+- **`SPEC.auditPoses`**: Optional array of `{ name, theta, explode, params }` poses verified by `runGeometryAudit`.
+- **`SPEC.drivePoses`**: Optional array of `{ label, view?, pose: { theta, explode, cutaway, shader, hud, theme, params } }` tiles captured by `scripts/drive.mjs` into `inspect-drive.png`.

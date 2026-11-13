@@ -78,21 +78,46 @@ export function buildAndVerifyFigure(config) {
     reg.setStage("shader");
     if (buildShader) buildShader(reg, kit);
 
-    const stepPoseFn = (theta, explode) => {
+    const defaultParams = {};
+    if (Array.isArray(model.SPEC?.controls)) {
+      for (const c of model.SPEC.controls) defaultParams[c.id] = c.initial;
+    }
+
+    const stepPoseFn = (theta, explode, poseParams = {}) => {
       reg.applyExplode(explode, true);
       if (updateKinematics) {
+        const mergedParams = Object.assign({}, defaultParams, poseParams);
+        const rpmVal =
+          mergedParams.rpm !== undefined
+            ? mergedParams.rpm
+            : model.SPEC?.initialRpm !== undefined
+              ? model.SPEC.initialRpm
+              : 720;
         updateKinematics(reg, {
           theta,
           explode,
-          rpm: model.SPEC?.initialRpm || 720,
-          effectiveRpm: model.SPEC?.initialRpm || 720,
+          rpm: rpmVal,
+          effectiveRpm: rpmVal,
           shaderEnv: 1.0,
-          cutaway: true
+          cutaway: model.SPEC?.features?.cutaway === false ? false : true,
+          params: mergedParams,
+          ...mergedParams
         });
       }
     };
 
-    const auditErrors = runGeometryAudit(reg, stepPoseFn);
+    const auditPoses = model.SPEC?.auditPoses;
+    const poseCount =
+      Array.isArray(auditPoses) && auditPoses.length > 0
+        ? auditPoses.length
+        : model.SPEC?.features?.explode === false
+          ? 4
+          : 5;
+
+    const auditErrors = runGeometryAudit(reg, stepPoseFn, {
+      features: model.SPEC?.features,
+      poses: auditPoses
+    });
     const elapsed = (performance.now() - t0).toFixed(1);
 
     if (auditErrors.length > 0) {
@@ -102,7 +127,7 @@ export function buildAndVerifyFigure(config) {
     }
 
     console.log(
-      `✓ 3D geometry audit passed · ${reg.parts.size} parts · ${reg.tubes.length} tubes · ${reg.joints.size} joints · 5 poses · 0 problems (${elapsed} ms)`
+      `✓ 3D geometry audit passed · ${reg.parts.size} parts · ${reg.tubes.length} tubes · ${reg.joints.size} joints · ${poseCount} poses · 0 problems (${elapsed} ms)`
     );
   }
 

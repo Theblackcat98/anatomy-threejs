@@ -15,7 +15,7 @@ Run the spatial audit in ~350 ms without launching a browser:
 node figures/<slug>/build.mjs --audit
 ```
 
-`runGeometryAudit()` instantiates your full Three.js scene in Node.js, steps `updateKinematics(reg, { theta })` across 5 poses (`0°, 72°, 144°, 216°, 288°`), updates all world matrices, and checks every registered part and tube.
+`runGeometryAudit()` instantiates your full Three.js scene in Node.js, steps `updateKinematics(reg, state)` across `SPEC.auditPoses` (or the default 5 poses `0°, 90°, 180°, 270°, exploded`; exploded pose is automatically omitted when `SPEC.features.explode === false`), updates all world matrices, and checks every registered part and tube.
 
 ### How to Fix Audit Errors
 
@@ -63,9 +63,9 @@ Automatically iterates through every anchor registered via `reg.anchor(id, ...)`
 
 ### 3. Full Interactive Drive Sheet & Mobile Check (`scripts/drive.mjs`)
 ```bash
-node scripts/drive.mjs figures/<slug>/dist/<slug>.html figures/<slug>/dist/
+node scripts/drive.mjs figures/<slug>/dist/<slug>.html --out figures/<slug>/dist/
 ```
 Programmatically exercises the compiled figure via `window.__ANATOMY_DEBUG__` and produces:
-- `inspect-drive.png`: 8-panel contact sheet covering `θ = 0° (INTAKE)`, `θ = 90° (COMPRESSION)`, `θ = 180° (IGNITION)`, `θ = 270° (EXHAUST)`, `EXPLODED (E = 1)`, `CUTAWAY OFF (C = 0)`, `DARK THEME`, and `BLUEPRINT THEME`.
-- `hero-light.png`, `hero-exploded.png`, `hero-dark.png`: High-resolution (`1400×920`) standalone captures.
+- `inspect-drive.png`: 8-panel contact sheet built from `SPEC.drivePoses` (or the default poses covering cycle angles, optional exploded view when `features.explode !== false`, cutaway toggle, dark theme, and blueprint theme).
+- `hero-light.png`, `hero-dark.png`, and `hero-exploded.png` (captured only when `SPEC.features.explode !== false`): High-resolution (`1400×920`) standalone captures.
 - `mobile-390.png`: Renders at `390×844` mobile viewport and verifies `scrolls sideways: no` and `console: clean`.

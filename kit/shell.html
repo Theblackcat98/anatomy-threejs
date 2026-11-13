@@ -255,6 +255,13 @@
       gap: 6px;
     }
 
+    .sliders-group {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
     .scheme-btn {
       display: inline-flex;
       align-items: center;
@@ -409,6 +416,10 @@
         scrollbar-width: none;
         padding-bottom: 2px;
       }
+      .sliders-group {
+        flex-wrap: nowrap;
+        flex-shrink: 0;
+      }
       .scheme-group::-webkit-scrollbar,
       .params-group::-webkit-scrollbar {
         display: none;
@@ -443,10 +454,10 @@
 
       <div class="corner bottom-left hud-detail">
         <span class="desktop-hint">
-          Drag orbit · Right-drag pan · Scroll zoom · <kbd>Shift</kbd>+Drag crank · <kbd>E</kbd> apart · <kbd>H</kbd> details · <kbd>R</kbd> iso
+          <span id="hint-interact"></span>Drag orbit · Right-drag pan · Scroll zoom · <span id="hint-crank"><kbd>Shift</kbd>+Drag crank · </span><span id="hint-explode"><kbd>E</kbd> apart · </span><kbd>H</kbd> details · <kbd>R</kbd> iso
         </span>
         <span class="mobile-hint">
-          1-finger orbit · 2-finger pan &amp; pinch zoom · Tap DETAILS to hide HUD
+          <span id="hint-interact-mobile"></span>1-finger orbit · 2-finger pan &amp; pinch zoom · Tap DETAILS to hide HUD
         </span>
       </div>
 
@@ -458,10 +469,12 @@
     <div class="controls-bar">
       <div class="scheme-group" id="scheme-buttons" aria-label="Anatomy color themes"></div>
       <div class="params-group">
-        <label class="slider-label" title="Eccentric shaft speed">
-          <span>RPM</span>
-          <input type="range" id="rpm-slider" min="0" max="2400" step="20" value="720" />
-        </label>
+        <div class="sliders-group" id="custom-sliders">
+          <label class="slider-label" title="Shaft speed">
+            <span>RPM</span>
+            <input type="range" id="rpm-slider" min="0" max="2400" step="20" value="720" />
+          </label>
+        </div>
         <button type="button" class="action-btn" id="crank-btn" title="1-finger drag cranks the engine shaft">CRANK</button>
         <button type="button" class="action-btn" id="slow-btn" title="Shortcut: S">SLOW 1×</button>
         <button type="button" class="action-btn" id="explode-btn" title="Shortcut: E">APART</button>
