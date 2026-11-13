@@ -1,0 +1,17 @@
+{
+  "name": "anatomy-threejs",
+  "version": "1.0.0",
+  "description": "Anatomy 3D — Agentic Three.js + GLSL technical figure engine & skill",
+  "type": "module",
+  "scripts": {
+    "build:wankel": "node figures/wankel-engine/build.mjs",
+    "test:wankel": "node figures/wankel-engine/build.mjs --test-model",
+    "audit:wankel": "node figures/wankel-engine/build.mjs --audit",
+    "inspect:wankel": "node scripts/inspect.mjs figures/wankel-engine/dist/wankel-engine.html",
+    "drive:wankel": "node scripts/drive.mjs figures/wankel-engine/dist/wankel-engine.html"
+  },
+  "dependencies": {
+    "three": "^0.128.0"
+  },
+  "license": "MIT"
+}

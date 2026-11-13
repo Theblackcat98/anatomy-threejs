@@ -1,0 +1,2302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Anatomy · Wankel Rotary Engine (Three.js Isometric)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --anatomy-bg: #f3f2ee;
+      --anatomy-card: #faf9f5;
+      --anatomy-paper: #faf9f5;
+      --anatomy-border: #dfddd5;
+      --anatomy-text: #181715;
+      --anatomy-muted: #78746c;
+      --anatomy-strong: #0c0b0a;
+      --anatomy-lit: #d97706;
+      --anatomy-pill-bg: #efede7;
+      --anatomy-pill-hover: #e4e1d8;
+      --anatomy-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      --anatomy-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--anatomy-bg);
+      color: var(--anatomy-text);
+      font-family: var(--anatomy-sans);
+      transition: background-color 0.25s ease, color 0.25s ease;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      height: 100dvh;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 1600px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .figure-card {
+      position: relative;
+      width: 100%;
+      flex: 1 1 auto;
+      min-height: 0;
+      background-color: var(--anatomy-card);
+      border: 1px solid var(--anatomy-border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 14px rgba(0, 0, 0, 0.04);
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+      outline: none;
+    }
+
+    .figure-card:focus-visible {
+      border-color: var(--anatomy-lit);
+    }
+
+    #canvas-host {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #canvas-host:active {
+      cursor: grabbing;
+    }
+
+    /* Floating HUD details (Corners, Engraved Tags, Caption) */
+    .hud-detail {
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    body.hud-hidden .figure-card .hud-detail {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transform: translateY(4px);
+    }
+
+    body.hud-hidden .caption-bar {
+      display: none;
+    }
+
+    .corner {
+      position: absolute;
+      z-index: 3;
+      pointer-events: none;
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      line-height: 1.45;
+      color: var(--anatomy-muted);
+      background-color: color-mix(in srgb, var(--anatomy-card) 78%, transparent);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .corner.top-left {
+      top: 12px;
+      left: 12px;
+      font-weight: 600;
+      color: var(--anatomy-text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .corner.top-right {
+      top: 12px;
+      right: 52px;
+      text-align: right;
+      text-transform: uppercase;
+    }
+
+    .corner.bottom-left {
+      bottom: 12px;
+      left: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      max-width: calc(100% - 24px);
+    }
+
+    .corner.bottom-right {
+      bottom: 12px;
+      right: 12px;
+      text-align: right;
+      color: var(--anatomy-text);
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    /* Quick floating button inside canvas to toggle HUD details at any time */
+    .hud-quick-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 4;
+      width: 32px;
+      height: 28px;
+      border-radius: 7px;
+      border: 1px solid var(--anatomy-border);
+      background-color: color-mix(in srgb, var(--anatomy-card) 85%, transparent);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: var(--anatomy-text);
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .hud-quick-btn:hover {
+      background-color: var(--anatomy-pill-bg);
+    }
+
+    .hud-quick-btn.active {
+      border-color: var(--anatomy-lit);
+      color: var(--anatomy-lit);
+    }
+
+    .accent-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--anatomy-lit);
+      flex-shrink: 0;
+      transition: background-color 0.25s ease;
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      font-family: var(--anatomy-mono);
+      font-size: 10px;
+      color: var(--anatomy-text);
+      background-color: var(--anatomy-pill-bg);
+      border: 1px solid var(--anatomy-border);
+      border-radius: 4px;
+      line-height: 1.3;
+    }
+
+    .engraved-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      overflow: hidden;
+    }
+
+    .engraved-tag {
+      position: absolute;
+      font-family: var(--anatomy-mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: var(--anatomy-muted);
+      opacity: 0.8;
+      transform: translate(-50%, -50%);
+      white-space: nowrap;
+    }
+
+    .controls-bar {
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background-color: var(--anatomy-card);
+      border: 1px solid var(--anatomy-border);
+      border-radius: 12px;
+      padding: 8px 12px;
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .scheme-group,
+    .params-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .scheme-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 9px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      background-color: var(--anatomy-pill-bg);
+      color: var(--anatomy-text);
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .scheme-btn:hover {
+      background-color: var(--anatomy-pill-hover);
+    }
+
+    .scheme-btn.active {
+      border-color: var(--anatomy-lit);
+      background-color: var(--anatomy-card);
+    }
+
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(128, 128, 128, 0.4);
+      flex-shrink: 0;
+    }
+
+    .slider-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+      color: var(--anatomy-muted);
+      margin-right: 2px;
+    }
+
+    input[type="range"] {
+      width: 82px;
+      accent-color: var(--anatomy-lit);
+      cursor: pointer;
+    }
+
+    .action-btn {
+      padding: 5px 9px;
+      border-radius: 7px;
+      border: 1px solid var(--anatomy-border);
+      background-color: transparent;
+      color: var(--anatomy-text);
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .action-btn:hover {
+      background-color: var(--anatomy-pill-bg);
+    }
+
+    .action-btn.active {
+      border-color: var(--anatomy-lit);
+      color: var(--anatomy-lit);
+      background-color: var(--anatomy-pill-bg);
+    }
+
+    .caption-bar {
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 4px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--anatomy-muted);
+    }
+
+    .caption-bar strong {
+      color: var(--anatomy-text);
+      font-weight: 600;
+    }
+
+    .legend-strip {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    .desktop-hint {
+      display: inline;
+    }
+    .mobile-hint {
+      display: none;
+    }
+
+    /* Mobile & Tablet Responsive Overrides */
+    @media (max-width: 768px) {
+      body {
+        padding: 6px;
+      }
+      .wrapper {
+        gap: 6px;
+      }
+      .desktop-hint {
+        display: none;
+      }
+      .mobile-hint {
+        display: inline;
+      }
+      .corner {
+        font-size: 9.5px;
+        padding: 3px 6px;
+      }
+      .corner.bottom-left {
+        bottom: 36px;
+      }
+      .corner.bottom-right {
+        bottom: 8px;
+        right: 8px;
+      }
+      .controls-bar {
+        padding: 7px 8px;
+        gap: 6px;
+      }
+      .scheme-group,
+      .params-group {
+        width: 100%;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+      }
+      .scheme-group::-webkit-scrollbar,
+      .params-group::-webkit-scrollbar {
+        display: none;
+      }
+      .caption-bar {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="figure-card" id="figure-card" tabindex="0" aria-label="Interactive Wankel rotary engine test rig">
+      <div id="canvas-host"></div>
+
+      <!-- Quick in-canvas toggle for floating details -->
+      <button type="button" class="hud-quick-btn active" id="hud-quick-btn" title="Toggle Floating Details (H)" aria-label="Toggle Floating Details">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </button>
+
+      <div class="engraved-layer hud-detail">
+        <div class="engraved-tag" id="tag-plate">13B · R 105 · e 15 · 34:51</div>
+        <div class="engraved-tag" id="tag-gauge">BAR</div>
+      </div>
+
+      <div class="corner top-left hud-detail">
+        <span class="accent-dot"></span>
+        <span>Fig 04 · Wankel Rotary Engine</span>
+      </div>
+      <div class="corner top-right hud-detail" id="phase-corner">CHAMBER A · INTAKE</div>
+
+      <div class="corner bottom-left hud-detail">
+        <span class="desktop-hint">
+          Drag orbit · Right-drag pan · Scroll zoom · <kbd>Shift</kbd>+Drag crank · <kbd>E</kbd> apart · <kbd>H</kbd> details · <kbd>R</kbd> iso
+        </span>
+        <span class="mobile-hint">
+          1-finger orbit · 2-finger pan &amp; pinch zoom · Tap DETAILS to hide HUD
+        </span>
+      </div>
+
+      <div class="corner bottom-right hud-detail" id="readout" aria-live="polite">
+        θ 000° · α 000° · 720 rpm · P 1.0 bar
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <div class="scheme-group" id="scheme-buttons" aria-label="Anatomy color themes"></div>
+      <div class="params-group">
+        <label class="slider-label" title="Eccentric shaft speed">
+          <span>RPM</span>
+          <input type="range" id="rpm-slider" min="0" max="2400" step="20" value="720" />
+        </label>
+        <button type="button" class="action-btn" id="crank-btn" title="1-finger drag cranks the engine shaft">CRANK</button>
+        <button type="button" class="action-btn" id="slow-btn" title="Shortcut: S">SLOW 1×</button>
+        <button type="button" class="action-btn" id="explode-btn" title="Shortcut: E">APART</button>
+        <button type="button" class="action-btn active" id="cutaway-btn" title="Shortcut: C">CUTAWAY</button>
+        <button type="button" class="action-btn active" id="shader-btn" title="Shortcut: I">SHADER</button>
+        <button type="button" class="action-btn active" id="hud-btn" title="Shortcut: H">DETAILS</button>
+        <button type="button" class="action-btn" id="reset-btn" title="Shortcut: R">RESET</button>
+      </div>
+    </div>
+
+    <div class="caption-bar hud-detail">
+      <div>
+        <strong>The object is the explanation.</strong> A 34-tooth fixed reaction gear inside a 51-tooth rotor bore locks the triangular rotor to <strong>⅓ eccentric shaft speed</strong>, sweeping three crescent chambers simultaneously through Intake, Compression, Ignition, and Exhaust.
+      </div>
+      <div class="legend-strip">
+        <span class="legend-item"><span class="legend-swatch" id="leg-lit"></span>Lit Rotor (1/3 ω)</span>
+        <span class="legend-item"><span class="legend-swatch" id="leg-intake"></span>Intake</span>
+        <span class="legend-item"><span class="legend-swatch" id="leg-comb"></span>Ignition</span>
+        <span class="legend-item"><span class="legend-swatch" id="leg-exh"></span>Exhaust</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      /* ==========================================================================
+       * 1. ANATOMY CANONICAL THEMES & TOKENS
+       * ========================================================================== */
+      const THEMES = [
+        {
+          id: "light",
+          name: "Light",
+          swatch: "#e4e1d8",
+          isDark: false,
+          css: {
+            bg: "#f3f2ee",
+            card: "#faf9f5",
+            border: "#dfddd5",
+            text: "#181715",
+            muted: "#78746c",
+            strong: "#0c0b0a",
+            lit: "#d97706",
+            pillBg: "#efede7",
+            pillHover: "#e4e1d8"
+          },
+          ramps: {
+            lo:  { top: "#f5f3ed", shades: ["#ebe8df", "#dedad0", "#cfcac0", "#b8b2a6"] },
+            mid: { top: "#fcfbf8", shades: ["#efede6", "#e0ddd3", "#cbc6ba", "#b0aaa0"] },
+            hi:  { top: "#ffffff", shades: ["#f4f2ec", "#e5e2d9", "#d0cbc0", "#b4aea2"] },
+            lit: { top: "#fff7ed", shades: ["#fed7aa", "#fb923c", "#ea580c", "#9a3412"] },
+            brass: { top: "#fef9c3", shades: ["#fde68a", "#eab308", "#ca8a04", "#854d0e"] },
+            copper: { top: "#ffedd5", shades: ["#fdba74", "#ea580c", "#c2410c", "#7c2d12"] }
+          },
+          lines: {
+            hi: "#141311",
+            mid: "#3b3833",
+            lo: "#78736a",
+            faint: "#b8b3a8",
+            lit: "#7c2d12",
+            dot: "#292724"
+          },
+          halo: "#d5d1c7",
+          haloOpacity: 0.42,
+          channels: {
+            intake: "#2563eb",
+            comp: "#7c3aed",
+            comb: "#ea580c",
+            exhaust: "#dc2626",
+            cavity: "#ece9e0"
+          }
+        },
+        {
+          id: "paper",
+          name: "Paper",
+          swatch: "#e8dec9",
+          isDark: false,
+          css: {
+            bg: "#ece5d5",
+            card: "#fbf7ee",
+            border: "#dcd2be",
+            text: "#231e18",
+            muted: "#7c7161",
+            strong: "#120f0b",
+            lit: "#b45309",
+            pillBg: "#efe7d6",
+            pillHover: "#e4d9c3"
+          },
+          ramps: {
+            lo:  { top: "#f4ede0", shades: ["#e8dec9", "#d9ccb4", "#c5b69c", "#ad9d82"] },
+            mid: { top: "#fcf9f2", shades: ["#eee5d3", "#dfd3bc", "#c9baa0", "#ae9e84"] },
+            hi:  { top: "#fffdf9", shades: ["#f3ebd9", "#e4d8c1", "#cebfa4", "#b2a287"] },
+            lit: { top: "#fef3c7", shades: ["#fcd34d", "#d97706", "#b45309", "#78350f"] },
+            brass: { top: "#fef08a", shades: ["#facc15", "#ca8a04", "#a16207", "#713f12"] },
+            copper: { top: "#fed7aa", shades: ["#fb923c", "#c2410c", "#9a3412", "#6c2710"] }
+          },
+          lines: {
+            hi: "#1e1913",
+            mid: "#463d31",
+            lo: "#7d7160",
+            faint: "#bfb39f",
+            lit: "#6c2710",
+            dot: "#2e271f"
+          },
+          halo: "#d4c8b2",
+          haloOpacity: 0.46,
+          channels: {
+            intake: "#1d4ed8",
+            comp: "#6d28d9",
+            comb: "#d97706",
+            exhaust: "#b91c1c",
+            cavity: "#e9dfc9"
+          }
+        },
+        {
+          id: "dark",
+          name: "Dark",
+          swatch: "#262a30",
+          isDark: true,
+          css: {
+            bg: "#0c0e10",
+            card: "#14171a",
+            border: "#262b31",
+            text: "#e6e4dd",
+            muted: "#889099",
+            strong: "#ffffff",
+            lit: "#38bdf8",
+            pillBg: "#1d2227",
+            pillHover: "#272d35"
+          },
+          ramps: {
+            lo:  { top: "#262b32", shades: ["#1f242a", "#1a1e23", "#15181c", "#101216"] },
+            mid: { top: "#383f48", shades: ["#2e343c", "#252a31", "#1d2127", "#15181d"] },
+            hi:  { top: "#4c5561", shades: ["#3f4752", "#323942", "#262c33", "#1b1f24"] },
+            lit: { top: "#e0f2fe", shades: ["#7dd3fc", "#38bdf8", "#0284c7", "#0369a1"] },
+            brass: { top: "#fef08a", shades: ["#eab308", "#ca8a04", "#854d0e", "#422006"] },
+            copper: { top: "#fdba74", shades: ["#ea580c", "#9a3412", "#7c2d12", "#431407"] }
+          },
+          lines: {
+            hi: "#f1efe9",
+            mid: "#a5acb6",
+            lo: "#5c6470",
+            faint: "#343a42",
+            lit: "#e0f2fe",
+            dot: "#d6d4ce"
+          },
+          halo: "#07080a",
+          haloOpacity: 0.78,
+          channels: {
+            intake: "#38bdf8",
+            comp: "#a855f7",
+            comb: "#fb923c",
+            exhaust: "#f87171",
+            cavity: "#0e1013"
+          }
+        },
+        {
+          id: "blueprint",
+          name: "Blueprint",
+          swatch: "#1b3b66",
+          isDark: true,
+          css: {
+            bg: "#081426",
+            card: "#0d1f3a",
+            border: "#1c3c6b",
+            text: "#e0f2fe",
+            muted: "#7da5d9",
+            strong: "#ffffff",
+            lit: "#fbbf24",
+            pillBg: "#132c52",
+            pillHover: "#1b3c6e"
+          },
+          ramps: {
+            lo:  { top: "#1b3a66", shades: ["#163157", "#122847", "#0e2038", "#0a1729"] },
+            mid: { top: "#274f87", shades: ["#204373", "#19365e", "#132a4a", "#0e1f38"] },
+            hi:  { top: "#3767ab", shades: ["#2c5691", "#224575", "#19355c", "#122645"] },
+            lit: { top: "#fef9c3", shades: ["#fde047", "#fbbf24", "#d97706", "#92400e"] },
+            brass: { top: "#fef08a", shades: ["#facc15", "#ca8a04", "#854d0e", "#422006"] },
+            copper: { top: "#fed7aa", shades: ["#fb923c", "#ea580c", "#9a3412", "#431407"] }
+          },
+          lines: {
+            hi: "#eff6ff",
+            mid: "#93c5fd",
+            lo: "#3b82f6",
+            faint: "#1e40af",
+            lit: "#fef08a",
+            dot: "#dbeafe"
+          },
+          halo: "#050d1a",
+          haloOpacity: 0.75,
+          channels: {
+            intake: "#38bdf8",
+            comp: "#818cf8",
+            comb: "#facc15",
+            exhaust: "#fb7185",
+            cavity: "#09172b"
+          }
+        },
+        {
+          id: "sepia",
+          name: "Sepia",
+          swatch: "#dfd3be",
+          isDark: false,
+          css: {
+            bg: "#e4dac8",
+            card: "#f4ece0",
+            border: "#d1c4ae",
+            text: "#2b2118",
+            muted: "#7a6a58",
+            strong: "#17110c",
+            lit: "#be123c",
+            pillBg: "#e8decb",
+            pillHover: "#ddd0b8"
+          },
+          ramps: {
+            lo:  { top: "#ece2d0", shades: ["#dfd2bc", "#cfc0a7", "#bca98e", "#a38f73"] },
+            mid: { top: "#f7f0e4", shades: ["#e8dcc8", "#d7c8b0", "#c2b095", "#a79478"] },
+            hi:  { top: "#fcf8f0", shades: ["#eee3d0", "#ded0b8", "#c8b69b", "#ad9a7e"] },
+            lit: { top: "#ffe4e6", shades: ["#fda4af", "#f43f5e", "#be123c", "#881337"] },
+            brass: { top: "#fef08a", shades: ["#eab308", "#ca8a04", "#a16207", "#713f12"] },
+            copper: { top: "#fed7aa", shades: ["#fb923c", "#c2410c", "#9a3412", "#7c2d12"] }
+          },
+          lines: {
+            hi: "#261c14",
+            mid: "#4f3e2e",
+            lo: "#806c58",
+            faint: "#bda992",
+            lit: "#881337",
+            dot: "#36281d"
+          },
+          halo: "#cbbba2",
+          haloOpacity: 0.48,
+          channels: {
+            intake: "#0369a1",
+            comp: "#6d28d9",
+            comb: "#e11d48",
+            exhaust: "#b91c1c",
+            cavity: "#e2d5c0"
+          }
+        }
+      ];
+
+      /* ==========================================================================
+       * 2. TRUE WANKEL ENGINE MODEL & SPRING SOLVER
+       * ========================================================================== */
+      const WANKEL = {
+        R: 1.33,
+        e: 0.19,
+        depth: 0.72,
+        stationaryTeeth: 34,
+        rotorTeeth: 51,
+        theta: 0.65,
+        rpm: 720,
+        slowModes: [1, 0.2, 0.05, 0],
+        slowLabels: ["SLOW 1×", "SLOW 1/5×", "SLOW 1/20×", "PAUSED"],
+        slowIndex: 0,
+        crankMode: false,
+        exploded: false,
+        cutaway: true,
+        shaderEnabled: true,
+        hudVisible: true
+      };
+
+      function createSpring(initial) {
+        return { at: initial, rate: 0 };
+      }
+
+      function stepSpring(held, want, dt, stiff, damping) {
+        const steps = Math.max(Math.ceil(dt * 120), 1);
+        const slice = dt / steps;
+        for (let i = 0; i < steps; i++) {
+          held.rate += ((want - held.at) * stiff - held.rate * damping) * slice;
+          held.at += held.rate * slice;
+        }
+        if (Math.abs(want - held.at) < 0.0005 && Math.abs(held.rate) < 0.0005) {
+          held.at = want;
+          held.rate = 0;
+        }
+      }
+
+      const explodeSpring = createSpring(0);
+      const rpmSpring = createSpring(WANKEL.rpm);
+      const shaderEnvSpring = createSpring(1);
+
+      function epitrochoidPoint(t, clearance) {
+        const R = WANKEL.R + (clearance || 0);
+        const e = WANKEL.e;
+        return [
+          e * Math.cos(3 * t) + R * Math.cos(t),
+          e * Math.sin(3 * t) + R * Math.sin(t)
+        ];
+      }
+
+      function getChamberState(theta, k) {
+        const alpha = theta / 3;
+        const flankAngle = alpha + (k * 2 * Math.PI) / 3 + Math.PI / 3;
+        const cyc = (((-flankAngle + Math.PI * 0.68) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        const deg = (cyc * 180) / Math.PI;
+        let phase = "INTAKE";
+        let pressure = 1.0;
+
+        if (deg < 95) {
+          phase = "INTAKE";
+          pressure = 0.95 + 0.1 * Math.sin((deg / 95) * Math.PI);
+        } else if (deg < 180) {
+          phase = "COMPRESSION";
+          const t = (deg - 95) / 85;
+          pressure = 1.0 + 8.5 * Math.pow(t, 2.1);
+        } else if (deg < 270) {
+          phase = "IGNITION · POWER";
+          const t = (deg - 180) / 90;
+          const ignitionPeak = Math.exp(-Math.pow((t - 0.14) / 0.18, 2));
+          pressure = 9.5 * (1 - 0.72 * t) + 24.5 * ignitionPeak;
+        } else {
+          phase = "EXHAUST";
+          const t = (deg - 270) / 90;
+          pressure = 1.05 + 2.4 * Math.exp(-t * 3.2);
+        }
+        return { cyc, deg, phase, pressure };
+      }
+
+      /* ==========================================================================
+       * 3. SCENE & RESPONSIVE ORTHOGRAPHIC CAMERA (Supports Pan + Pinch Zoom)
+       * ========================================================================== */
+      const host = document.getElementById("canvas-host");
+      const cardEl = document.getElementById("figure-card");
+      const readoutEl = document.getElementById("readout");
+      const phaseCornerEl = document.getElementById("phase-corner");
+      const tagPlateEl = document.getElementById("tag-plate");
+      const tagGaugeEl = document.getElementById("tag-gauge");
+
+      const scene = new THREE.Scene();
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      host.appendChild(renderer.domElement);
+
+      let zoomFactor = 1.08;
+      let panX = 0;
+      let panY = -0.06;
+      let targetPanX = 0;
+      let targetPanY = -0.06;
+
+      const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+      camera.position.set(0, 0, 18);
+      camera.lookAt(0, 0, 0);
+
+      const ISO_ELEV = (30 * Math.PI) / 180;
+      const ISO_AZIM = (-36 * Math.PI) / 180;
+      let rotX = ISO_ELEV;
+      let rotY = ISO_AZIM;
+      let targetRotX = ISO_ELEV;
+      let targetRotY = ISO_AZIM;
+
+      // Ensures the rig fills the card cleanly on both desktop landscape and mobile portrait
+      function updateCameraSize() {
+        const w = Math.max(host.clientWidth, 200);
+        const h = Math.max(host.clientHeight, 200);
+        const aspect = w / h;
+
+        const minVertSpan = 4.9;
+        const minHorizSpan = 6.7;
+
+        let halfH = (minVertSpan * 0.5) / zoomFactor;
+        let halfW = halfH * aspect;
+
+        if (halfW < (minHorizSpan * 0.5) / zoomFactor) {
+          halfW = (minHorizSpan * 0.5) / zoomFactor;
+          halfH = halfW / aspect;
+        }
+
+        camera.left = -halfW;
+        camera.right = halfW;
+        camera.top = halfH;
+        camera.bottom = -halfH;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h, false);
+      }
+
+      const worldGroup = new THREE.Group();
+      scene.add(worldGroup);
+
+      /* ==========================================================================
+       * 4. ANATOMY SHADER KIT (Top Cap + 4-Tone Side Facing + Thin Outlines + Creases)
+       * ========================================================================== */
+      const lightDir = new THREE.Vector3(0.52, 0.78, 0.48).normalize();
+      const anatomyMaterials = [];
+      const outlineMaterials = [];
+      const lineMaterials = {};
+      const dotMaterials = {};
+      let currentTheme = THEMES[0];
+
+      const celVertexShader = `
+        varying vec3 vWorldNormal;
+        void main() {
+          vWorldNormal = normalize(mat3(modelMatrix) * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `;
+
+      const celFragmentShader = `
+        uniform vec3 uLightDir;
+        uniform vec3 uTop;
+        uniform vec3 uShade0;
+        uniform vec3 uShade1;
+        uniform vec3 uShade2;
+        uniform vec3 uShade3;
+        uniform float uTopBias;
+        varying vec3 vWorldNormal;
+
+        float aaStep(float edge, float x) {
+          float w = clamp(fwidth(x) * 1.15, 0.015, 0.08);
+          return smoothstep(edge - w, edge + w, x);
+        }
+
+        void main() {
+          vec3 N = normalize(vWorldNormal);
+          float ndotl = dot(N, normalize(uLightDir));
+
+          vec3 sideCol = uShade0;
+          sideCol = mix(sideCol, uShade1, aaStep(-0.28, ndotl));
+          sideCol = mix(sideCol, uShade2, aaStep(0.14, ndotl));
+          sideCol = mix(sideCol, uShade3, aaStep(0.56, ndotl));
+
+          float upness = N.y + 0.18 * N.z;
+          float isTop = aaStep(uTopBias, upness);
+          vec3 col = mix(sideCol, uTop, isTop);
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `;
+
+      function createAnatomySolidMaterial(rampKey, topBias) {
+        const ramp = currentTheme.ramps[rampKey] || currentTheme.ramps.mid;
+        const mat = new THREE.ShaderMaterial({
+          uniforms: {
+            uLightDir: { value: lightDir },
+            uTop:    { value: new THREE.Color(ramp.top) },
+            uShade0: { value: new THREE.Color(ramp.shades[3]) },
+            uShade1: { value: new THREE.Color(ramp.shades[2]) },
+            uShade2: { value: new THREE.Color(ramp.shades[1]) },
+            uShade3: { value: new THREE.Color(ramp.shades[0]) },
+            uTopBias: { value: topBias !== undefined ? topBias : 0.62 }
+          },
+          vertexShader: celVertexShader,
+          fragmentShader: celFragmentShader,
+          polygonOffset: true,
+          polygonOffsetFactor: 1.5,
+          polygonOffsetUnits: 1.5
+        });
+        mat.userData.rampKey = rampKey;
+        anatomyMaterials.push(mat);
+        return mat;
+      }
+
+      function createOutlineMaterial(lineKey, thickness) {
+        const mat = new THREE.ShaderMaterial({
+          uniforms: {
+            uColor: { value: new THREE.Color(currentTheme.lines[lineKey] || currentTheme.lines.mid) },
+            uThickness: { value: thickness || 0.018 }
+          },
+          vertexShader: `
+            uniform float uThickness;
+            void main() {
+              vec3 displaced = position + normalize(normal) * uThickness;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 uColor;
+            void main() {
+              gl_FragColor = vec4(uColor, 1.0);
+            }
+          `,
+          side: THREE.BackSide
+        });
+        mat.userData.lineKey = lineKey;
+        outlineMaterials.push(mat);
+        return mat;
+      }
+
+      ["hi", "mid", "lo", "faint", "lit"].forEach((k) => {
+        lineMaterials[k] = new THREE.LineBasicMaterial({
+          color: new THREE.Color(currentTheme.lines[k]),
+          transparent: true,
+          opacity: k === "faint" ? 0.72 : 0.95
+        });
+      });
+
+      ["dot", "lit"].forEach((k) => {
+        dotMaterials[k] = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(currentTheme.lines[k === "dot" ? "dot" : "lit"])
+        });
+      });
+
+      function createAnatomyPart(geometry, options) {
+        const opts = Object.assign({
+          ramp: "mid",
+          outline: "mid",
+          crease: "faint",
+          creaseAngle: 28,
+          outlineWidth: 0.017,
+          topBias: 0.62,
+          noOutline: false,
+          noCrease: false
+        }, options || {});
+
+        const group = new THREE.Group();
+        const solidMat = createAnatomySolidMaterial(opts.ramp, opts.topBias);
+        const mesh = new THREE.Mesh(geometry, solidMat);
+        group.add(mesh);
+
+        if (!opts.noOutline) {
+          const outMat = createOutlineMaterial(opts.outline, opts.outlineWidth);
+          const outMesh = new THREE.Mesh(geometry, outMat);
+          group.add(outMesh);
+        }
+
+        if (!opts.noCrease) {
+          const edgesGeo = new THREE.EdgesGeometry(geometry, opts.creaseAngle);
+          const edges = new THREE.LineSegments(edgesGeo, lineMaterials[opts.crease]);
+          group.add(edges);
+        }
+
+        return group;
+      }
+
+      function makeRoundedRectShape(w, h, r) {
+        const shape = new THREE.Shape();
+        const hw = w * 0.5;
+        const hh = h * 0.5;
+        const cr = Math.min(r, hw, hh);
+        shape.moveTo(-hw + cr, -hh);
+        shape.lineTo(hw - cr, -hh);
+        shape.absarc(hw - cr, -hh + cr, cr, -Math.PI / 2, 0, false);
+        shape.lineTo(hw, hh - cr);
+        shape.absarc(hw - cr, hh - cr, cr, 0, Math.PI / 2, false);
+        shape.lineTo(-hw + cr, hh);
+        shape.absarc(-hw + cr, hh - cr, cr, Math.PI / 2, Math.PI, false);
+        shape.lineTo(-hw, -hh + cr);
+        shape.absarc(-hw + cr, -hh + cr, cr, Math.PI, Math.PI * 1.5, false);
+        return shape;
+      }
+
+      function makePlanOutline(w, d, r, y, toneKey) {
+        const shape = makeRoundedRectShape(w, d, r);
+        const pts2d = shape.getPoints(16);
+        const pts3d = pts2d.map((p) => new THREE.Vector3(p.x, y, p.y));
+        const geo = new THREE.BufferGeometry().setFromPoints(pts3d);
+        return new THREE.LineLoop(geo, lineMaterials[toneKey || "faint"]);
+      }
+
+      function makeRingLine(radius, segments, toneKey) {
+        const pts = [];
+        for (let i = 0; i <= segments; i++) {
+          const a = (i / segments) * Math.PI * 2;
+          pts.push(new THREE.Vector3(Math.cos(a) * radius, Math.sin(a) * radius, 0));
+        }
+        const geo = new THREE.BufferGeometry().setFromPoints(pts);
+        return new THREE.Line(geo, lineMaterials[toneKey || "lo"]);
+      }
+
+      function makeScrewDetail(x, y, z, radius, axis) {
+        const g = new THREE.Group();
+        g.position.set(x, y, z);
+        const ring = makeRingLine(radius, 20, "lo");
+        const dotGeo = new THREE.CircleGeometry(radius * 0.36, 12);
+        const dot = new THREE.Mesh(dotGeo, dotMaterials.dot);
+        dot.position.z = 0.002;
+        g.add(ring, dot);
+        if (axis === "y") {
+          g.rotation.x = -Math.PI / 2;
+        }
+        return g;
+      }
+
+      /* ==========================================================================
+       * 5. BUILD THE BENCHTOP RIG & WANKEL ENGINE
+       * ========================================================================== */
+      const baseGroup = new THREE.Group();
+      worldGroup.add(baseGroup);
+
+      const BASE_W = 5.4;
+      const BASE_D = 3.5;
+      const BASE_H = 0.24;
+      const BASE_Y = -1.78;
+
+      const haloShape = makeRoundedRectShape(BASE_W + 0.35, BASE_D + 0.35, 0.38);
+      const haloGeo = new THREE.ShapeGeometry(haloShape, 24);
+      haloGeo.rotateX(Math.PI / 2);
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(currentTheme.halo),
+        transparent: true,
+        opacity: currentTheme.haloOpacity,
+        depthWrite: false
+      });
+      const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+      haloMesh.position.set(0.08, BASE_Y - 0.24, 0.08);
+      baseGroup.add(haloMesh);
+
+      const baseShape = makeRoundedRectShape(BASE_W, BASE_D, 0.26);
+      const baseExtrudeGeo = new THREE.ExtrudeGeometry(baseShape, {
+        depth: BASE_H,
+        bevelEnabled: true,
+        bevelSegments: 2,
+        steps: 1,
+        bevelSize: 0.025,
+        bevelThickness: 0.025,
+        curveSegments: 16
+      });
+      baseExtrudeGeo.rotateX(Math.PI / 2);
+      const basePlate = createAnatomyPart(baseExtrudeGeo, {
+        ramp: "lo",
+        outline: "lo",
+        crease: "faint",
+        outlineWidth: 0.018
+      });
+      basePlate.position.set(0, BASE_Y + BASE_H, 0);
+      baseGroup.add(basePlate);
+
+      const topSurfaceY = BASE_Y + BASE_H + 0.028;
+      baseGroup.add(makePlanOutline(BASE_W - 0.32, BASE_D - 0.32, 0.16, topSurfaceY, "faint"));
+      baseGroup.add(makePlanOutline(BASE_W - 0.42, BASE_D - 0.42, 0.13, topSurfaceY, "faint"));
+
+      const cornerOffsets = [
+        [-BASE_W * 0.5 + 0.38, -BASE_D * 0.5 + 0.38],
+        [ BASE_W * 0.5 - 0.38, -BASE_D * 0.5 + 0.38],
+        [-BASE_W * 0.5 + 0.38,  BASE_D * 0.5 - 0.38],
+        [ BASE_W * 0.5 - 0.38,  BASE_D * 0.5 - 0.38]
+      ];
+      cornerOffsets.forEach(([cx, cz]) => {
+        const colGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.12, 24);
+        const colPart = createAnatomyPart(colGeo, { ramp: "mid", outline: "lo", crease: "faint" });
+        colPart.position.set(cx, BASE_Y - 0.06, cz);
+        baseGroup.add(colPart);
+
+        const padGeo = new THREE.CylinderGeometry(0.27, 0.25, 0.08, 24);
+        const padPart = createAnatomyPart(padGeo, { ramp: "lo", outline: "lo", crease: "faint" });
+        padPart.position.set(cx, BASE_Y - 0.16, cz);
+        baseGroup.add(padPart);
+
+        baseGroup.add(makeScrewDetail(cx, topSurfaceY + 0.002, cz, 0.095, "y"));
+      });
+
+      const rulerW = 3.2;
+      const rulerD = 0.26;
+      const rulerX = -0.55;
+      const rulerZ = BASE_D * 0.5 - 0.42;
+      const rulerGeo = new THREE.BoxGeometry(rulerW, 0.03, rulerD);
+      const rulerPart = createAnatomyPart(rulerGeo, { ramp: "mid", outline: "lo", crease: "faint" });
+      rulerPart.position.set(rulerX, topSurfaceY + 0.015, rulerZ);
+      baseGroup.add(rulerPart);
+
+      const minorPts = [];
+      const majorPts = [];
+      const tickCount = 40;
+      for (let i = 0; i <= tickCount; i++) {
+        const tx = rulerX - rulerW * 0.46 + (i / tickCount) * (rulerW * 0.92);
+        const ty = topSurfaceY + 0.032;
+        const zEdge = rulerZ - rulerD * 0.5;
+        const len = i % 5 === 0 ? 0.15 : 0.08;
+        const target = i % 5 === 0 ? majorPts : minorPts;
+        target.push(new THREE.Vector3(tx, ty, zEdge), new THREE.Vector3(tx, ty, zEdge + len));
+      }
+      baseGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(minorPts), lineMaterials.lo));
+      baseGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(majorPts), lineMaterials.mid));
+
+      const plaqueW = 1.32;
+      const plaqueD = 0.52;
+      const plaqueX = -BASE_W * 0.5 + 1.05;
+      const plaqueZ = -BASE_D * 0.5 + 0.65;
+      const plaqueGeo = new THREE.BoxGeometry(plaqueW, 0.035, plaqueD);
+      const plaquePart = createAnatomyPart(plaqueGeo, { ramp: "brass", outline: "mid", crease: "faint" });
+      plaquePart.position.set(plaqueX, topSurfaceY + 0.018, plaqueZ);
+      baseGroup.add(plaquePart);
+
+      const rulePts = [
+        new THREE.Vector3(plaqueX - 0.48, topSurfaceY + 0.038, plaqueZ - 0.11),
+        new THREE.Vector3(plaqueX + 0.48, topSurfaceY + 0.038, plaqueZ - 0.11),
+        new THREE.Vector3(plaqueX - 0.48, topSurfaceY + 0.038, plaqueZ + 0.02),
+        new THREE.Vector3(plaqueX + 0.35, topSurfaceY + 0.038, plaqueZ + 0.02),
+        new THREE.Vector3(plaqueX - 0.48, topSurfaceY + 0.038, plaqueZ + 0.13),
+        new THREE.Vector3(plaqueX + 0.22, topSurfaceY + 0.038, plaqueZ + 0.13)
+      ];
+      baseGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(rulePts), lineMaterials.lo));
+
+      [[-0.56, -0.18], [0.56, -0.18], [-0.56, 0.18], [0.56, 0.18]].forEach(([rx, rz]) => {
+        const rDot = new THREE.Mesh(new THREE.CircleGeometry(0.022, 10), dotMaterials.dot);
+        rDot.rotation.x = -Math.PI / 2;
+        rDot.position.set(plaqueX + rx, topSurfaceY + 0.039, plaqueZ + rz);
+        baseGroup.add(rDot);
+      });
+
+      const knobBaseX = BASE_W * 0.5 - 0.85;
+      const knobBaseZ = BASE_D * 0.5 - 0.58;
+      const bossGeo = new THREE.CylinderGeometry(0.32, 0.35, 0.1, 28);
+      const bossPart = createAnatomyPart(bossGeo, { ramp: "mid", outline: "lo", crease: "faint" });
+      bossPart.position.set(knobBaseX, topSurfaceY + 0.05, knobBaseZ);
+      baseGroup.add(bossPart);
+
+      const throttleKnobGroup = new THREE.Group();
+      throttleKnobGroup.position.set(knobBaseX, topSurfaceY + 0.22, knobBaseZ);
+      baseGroup.add(throttleKnobGroup);
+
+      const drumGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.24, 32);
+      const drumPart = createAnatomyPart(drumGeo, { ramp: "hi", outline: "mid", crease: "lo" });
+      throttleKnobGroup.add(drumPart);
+
+      const knurlPts = [];
+      const knurlCount = 28;
+      for (let i = 0; i < knurlCount; i++) {
+        const a = (i / knurlCount) * Math.PI * 2;
+        const kx = Math.cos(a) * 0.253;
+        const kz = Math.sin(a) * 0.253;
+        knurlPts.push(new THREE.Vector3(kx, -0.09, kz), new THREE.Vector3(kx, 0.09, kz));
+      }
+      knurlPts.push(new THREE.Vector3(0, 0.123, 0.07), new THREE.Vector3(0, 0.123, 0.23));
+      throttleKnobGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(knurlPts), lineMaterials.lo));
+      throttleKnobGroup.add(makeScrewDetail(0, 0.123, 0, 0.07, "y"));
+
+      function makePedestal(zPos) {
+        const pedGroup = new THREE.Group();
+        pedGroup.position.set(0, 0, zPos);
+
+        const flangeGeo = new THREE.BoxGeometry(1.75, 0.11, 0.42);
+        const flange = createAnatomyPart(flangeGeo, { ramp: "mid", outline: "lo", crease: "faint" });
+        flange.position.set(0, topSurfaceY + 0.055, 0);
+        pedGroup.add(flange);
+
+        [-0.72, -0.35, 0.35, 0.72].forEach((bx) => {
+          pedGroup.add(makeScrewDetail(bx, topSurfaceY + 0.112, 0, 0.048, "y"));
+        });
+
+        const colShape = new THREE.Shape();
+        colShape.moveTo(-0.58, topSurfaceY + 0.11);
+        colShape.lineTo(0.58, topSurfaceY + 0.11);
+        colShape.lineTo(0.34, -0.18);
+        colShape.lineTo(-0.34, -0.18);
+        colShape.closePath();
+
+        const colGeo = new THREE.ExtrudeGeometry(colShape, {
+          depth: 0.22,
+          bevelEnabled: false
+        });
+        colGeo.translate(0, 0, -0.11);
+        const col = createAnatomyPart(colGeo, { ramp: "mid", outline: "mid", crease: "lo" });
+        pedGroup.add(col);
+
+        const saddleGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.28, 28);
+        saddleGeo.rotateX(Math.PI / 2);
+        const saddle = createAnatomyPart(saddleGeo, { ramp: "mid", outline: "mid", crease: "lo" });
+        pedGroup.add(saddle);
+
+        return pedGroup;
+      }
+
+      baseGroup.add(makePedestal(-0.98), makePedestal(0.98));
+
+      const statorGroup = new THREE.Group();
+      worldGroup.add(statorGroup);
+
+      function buildEpitrochoidHousingGeometry(thickness) {
+        const outerShape = new THREE.Shape();
+        const segs = 128;
+        for (let i = 0; i <= segs; i++) {
+          const t = (i / segs) * Math.PI * 2;
+          const [ex, ey] = epitrochoidPoint(t, 0.42);
+          if (i === 0) outerShape.moveTo(ex, ey);
+          else outerShape.lineTo(ex, ey);
+        }
+
+        const borePath = new THREE.Path();
+        for (let i = 0; i <= segs; i++) {
+          const t = (i / segs) * Math.PI * 2;
+          const [bx, by] = epitrochoidPoint(t, 0.018);
+          if (i === 0) borePath.moveTo(bx, by);
+          else borePath.lineTo(bx, by);
+        }
+        outerShape.holes.push(borePath);
+
+        for (let k = 0; k < 16; k++) {
+          const t = (k / 16) * Math.PI * 2 + 0.1;
+          const deg = ((t * 180) / Math.PI) % 360;
+          if ((deg > 130 && deg < 165) || (deg > 195 && deg < 230) || (deg > 335 || deg < 25)) continue;
+          const [cx, cy] = epitrochoidPoint(t, 0.22);
+          const hole = new THREE.Path();
+          hole.absarc(cx, cy, 0.055, 0, Math.PI * 2, false);
+          outerShape.holes.push(hole);
+        }
+
+        const geo = new THREE.ExtrudeGeometry(outerShape, {
+          depth: thickness,
+          bevelEnabled: true,
+          bevelSegments: 1,
+          steps: 1,
+          bevelSize: 0.015,
+          bevelThickness: 0.015,
+          curveSegments: 64
+        });
+        geo.translate(0, 0, -thickness * 0.5);
+        return geo;
+      }
+
+      const housingGeo = buildEpitrochoidHousingGeometry(WANKEL.depth);
+      const housingPart = createAnatomyPart(housingGeo, {
+        ramp: "mid",
+        outline: "hi",
+        crease: "lo",
+        creaseAngle: 22,
+        outlineWidth: 0.02
+      });
+      statorGroup.add(housingPart);
+
+      [-0.22, 0, 0.22].forEach((fz) => {
+        const finPts = [];
+        const segs = 96;
+        for (let i = 0; i <= segs; i++) {
+          const t = (i / segs) * Math.PI * 2;
+          const [fx, fy] = epitrochoidPoint(t, 0.435);
+          finPts.push(new THREE.Vector3(fx, fy, fz));
+        }
+        const finLoop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(finPts), lineMaterials.lo);
+        statorGroup.add(finLoop);
+      });
+
+      const tieRodAngles = [0.38, 1.05, 1.95, 2.88, 3.4, 4.32, 5.22, 5.9];
+      const tieBoltPositions = tieRodAngles.map((t) => epitrochoidPoint(t, 0.29));
+
+      const intakeGroup = new THREE.Group();
+      const [inX, inY] = epitrochoidPoint(2.42, 0.42);
+      intakeGroup.position.set(inX - 0.28, inY + 0.24, 0);
+      intakeGroup.rotation.z = -0.68;
+
+      const intakeTubeGeo = new THREE.CylinderGeometry(0.22, 0.2, 0.62, 24);
+      intakeGroup.add(createAnatomyPart(intakeTubeGeo, { ramp: "mid", outline: "mid", crease: "lo" }));
+
+      const intakeFlangeGeo = new THREE.BoxGeometry(0.64, 0.09, 0.62);
+      const intakeFlange = createAnatomyPart(intakeFlangeGeo, { ramp: "hi", outline: "mid", crease: "lo" });
+      intakeFlange.position.set(0, 0.31, 0);
+      intakeGroup.add(intakeFlange);
+
+      const intakeBore = new THREE.Mesh(new THREE.CircleGeometry(0.16, 20), dotMaterials.dot);
+      intakeBore.rotation.x = -Math.PI / 2;
+      intakeBore.position.set(0, 0.358, 0);
+      intakeGroup.add(intakeBore);
+      statorGroup.add(intakeGroup);
+
+      const exhaustGroup = new THREE.Group();
+      const [exX, exY] = epitrochoidPoint(3.86, 0.42);
+      exhaustGroup.position.set(exX - 0.3, exY - 0.22, 0);
+      exhaustGroup.rotation.z = -2.42;
+
+      const exhTubeGeo = new THREE.CylinderGeometry(0.21, 0.19, 0.66, 24);
+      exhaustGroup.add(createAnatomyPart(exhTubeGeo, { ramp: "lo", outline: "mid", crease: "lo" }));
+
+      const exhCollarGeo = new THREE.CylinderGeometry(0.26, 0.26, 0.18, 24);
+      const exhCollar = createAnatomyPart(exhCollarGeo, { ramp: "copper", outline: "mid", crease: "lo" });
+      exhCollar.position.set(0, 0.12, 0);
+      exhaustGroup.add(exhCollar);
+
+      const exhFlangeGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.08, 24);
+      const exhFlange = createAnatomyPart(exhFlangeGeo, { ramp: "mid", outline: "mid", crease: "lo" });
+      exhFlange.position.set(0, 0.33, 0);
+      exhaustGroup.add(exhFlange);
+      statorGroup.add(exhaustGroup);
+
+      const sparkPlugTips = [];
+      function makeSparkPlug(angleParam, yOffset, label) {
+        const spGroup = new THREE.Group();
+        const [wx, wy] = epitrochoidPoint(angleParam, 0.38);
+        spGroup.position.set(wx + 0.05, wy + yOffset, 0);
+        spGroup.rotation.z = -Math.PI / 2 + angleParam * 0.35;
+
+        const hexGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.18, 6);
+        const hexPart = createAnatomyPart(hexGeo, { ramp: "mid", outline: "mid", crease: "lo" });
+        hexPart.position.y = 0.09;
+        spGroup.add(hexPart);
+
+        const insGeo = new THREE.CylinderGeometry(0.1, 0.105, 0.34, 20);
+        const insPart = createAnatomyPart(insGeo, { ramp: "hi", outline: "mid", crease: "faint" });
+        insPart.position.y = 0.35;
+        spGroup.add(insPart);
+
+        [0.26, 0.35, 0.44].forEach((ry) => {
+          const rLoop = makeRingLine(0.104, 20, "lo");
+          rLoop.rotation.x = Math.PI / 2;
+          rLoop.position.y = ry;
+          spGroup.add(rLoop);
+        });
+
+        const termGeo = new THREE.CylinderGeometry(0.048, 0.048, 0.11, 16);
+        const termPart = createAnatomyPart(termGeo, { ramp: "brass", outline: "mid", crease: "faint" });
+        termPart.position.y = 0.56;
+        spGroup.add(termPart);
+
+        const bootGeo = new THREE.CylinderGeometry(0.075, 0.065, 0.12, 16);
+        const bootPart = createAnatomyPart(bootGeo, { ramp: "lo", outline: "lo", crease: "faint" });
+        bootPart.position.y = 0.62;
+        spGroup.add(bootPart);
+
+        statorGroup.add(spGroup);
+
+        spGroup.updateMatrixWorld(true);
+        const tipWorld = new THREE.Vector3(0, 0.68, 0).applyMatrix4(spGroup.matrixWorld);
+        sparkPlugTips.push({ pos: tipWorld, label });
+      }
+
+      makeSparkPlug(-0.28, -0.05, "Leading");
+      makeSparkPlug(0.28, 0.05, "Trailing");
+
+      const coilBoxX = 2.02;
+      const coilBoxZ = -0.52;
+      const coilBoxGeo = new THREE.BoxGeometry(0.68, 0.46, 0.58);
+      const coilBox = createAnatomyPart(coilBoxGeo, { ramp: "lo", outline: "mid", crease: "lo" });
+      coilBox.position.set(coilBoxX, topSurfaceY + 0.23, coilBoxZ);
+      baseGroup.add(coilBox);
+
+      sparkPlugTips.forEach((plug, idx) => {
+        const towerX = coilBoxX - 0.12 + idx * 0.24;
+        const towerY = topSurfaceY + 0.51;
+        const towerZ = coilBoxZ + (idx === 0 ? 0.12 : -0.12);
+
+        const towerGeo = new THREE.CylinderGeometry(0.065, 0.08, 0.14, 16);
+        const tower = createAnatomyPart(towerGeo, { ramp: "copper", outline: "mid", crease: "faint" });
+        tower.position.set(towerX, towerY, towerZ);
+        baseGroup.add(tower);
+
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(towerX, towerY + 0.07, towerZ),
+          new THREE.Vector3(towerX + 0.18, towerY + 0.45 + idx * 0.15, towerZ * 0.5),
+          new THREE.Vector3(plug.pos.x + 0.26, plug.pos.y, plug.pos.z),
+          new THREE.Vector3(plug.pos.x, plug.pos.y, plug.pos.z)
+        ]);
+        const cableGeo = new THREE.TubeGeometry(curve, 32, 0.032, 12, false);
+        const cablePart = createAnatomyPart(cableGeo, {
+          ramp: idx === 0 ? "copper" : "mid",
+          outline: "lo",
+          noCrease: true,
+          outlineWidth: 0.012
+        });
+        baseGroup.add(cablePart);
+      });
+
+      const gaugeX = -2.18;
+      const gaugeZ = -0.35;
+      const postGeo = new THREE.CylinderGeometry(0.075, 0.09, 1.45, 20);
+      const postPart = createAnatomyPart(postGeo, { ramp: "mid", outline: "mid", crease: "lo" });
+      postPart.position.set(gaugeX, topSurfaceY + 0.72, gaugeZ);
+      baseGroup.add(postPart);
+
+      const postCollarGeo = new THREE.CylinderGeometry(0.18, 0.2, 0.12, 24);
+      const postCollar = createAnatomyPart(postCollarGeo, { ramp: "lo", outline: "lo", crease: "faint" });
+      postCollar.position.set(gaugeX, topSurfaceY + 0.06, gaugeZ);
+      baseGroup.add(postCollar);
+
+      const gaugeHeadGroup = new THREE.Group();
+      gaugeHeadGroup.position.set(gaugeX, topSurfaceY + 1.58, gaugeZ);
+      baseGroup.add(gaugeHeadGroup);
+
+      const bezelGeo = new THREE.CylinderGeometry(0.46, 0.46, 0.18, 36);
+      bezelGeo.rotateX(Math.PI / 2);
+      const bezelPart = createAnatomyPart(bezelGeo, { ramp: "hi", outline: "mid", crease: "lo" });
+      gaugeHeadGroup.add(bezelPart);
+
+      const dialTickPts = [];
+      for (let i = 0; i <= 20; i++) {
+        const a = (-Math.PI * 0.75) + (i / 20) * (Math.PI * 1.5);
+        const rOuter = 0.37;
+        const rInner = i % 5 === 0 ? 0.27 : 0.31;
+        dialTickPts.push(
+          new THREE.Vector3(Math.sin(a) * rInner, Math.cos(a) * rInner, 0.095),
+          new THREE.Vector3(Math.sin(a) * rOuter, Math.cos(a) * rOuter, 0.095)
+        );
+      }
+      gaugeHeadGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(dialTickPts), lineMaterials.mid));
+      const innerDialRing = makeRingLine(0.38, 32, "lo");
+      innerDialRing.position.z = 0.094;
+      gaugeHeadGroup.add(innerDialRing);
+
+      const needleGroup = new THREE.Group();
+      needleGroup.position.z = 0.1;
+      const needlePts = [
+        new THREE.Vector3(0, -0.07, 0),
+        new THREE.Vector3(0, 0.33, 0)
+      ];
+      const needleLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(needlePts), lineMaterials.lit);
+      const needleCap = new THREE.Mesh(new THREE.CircleGeometry(0.045, 16), dotMaterials.lit);
+      needleCap.position.z = 0.002;
+      needleGroup.add(needleLine, needleCap);
+      gaugeHeadGroup.add(needleGroup);
+
+      const capCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(gaugeX, topSurfaceY + 1.12, gaugeZ),
+        new THREE.Vector3(gaugeX + 0.35, topSurfaceY + 1.12, gaugeZ),
+        new THREE.Vector3(-1.35, 0.85, -0.18)
+      ]);
+      const capTubeGeo = new THREE.TubeGeometry(capCurve, 24, 0.024, 10, false);
+      baseGroup.add(createAnatomyPart(capTubeGeo, { ramp: "brass", outline: "lo", noCrease: true, outlineWidth: 0.01 }));
+
+      const rearPlateGroup = new THREE.Group();
+      worldGroup.add(rearPlateGroup);
+
+      function buildRearEndPlateGeometry() {
+        const shape = new THREE.Shape();
+        const segs = 96;
+        for (let i = 0; i <= segs; i++) {
+          const t = (i / segs) * Math.PI * 2;
+          const [px, py] = epitrochoidPoint(t, 0.40);
+          if (i === 0) shape.moveTo(px, py);
+          else shape.lineTo(px, py);
+        }
+        const hole = new THREE.Path();
+        hole.absarc(0, 0, 0.25, 0, Math.PI * 2, false);
+        shape.holes.push(hole);
+
+        const geo = new THREE.ExtrudeGeometry(shape, {
+          depth: 0.16,
+          bevelEnabled: true,
+          bevelSegments: 1,
+          steps: 1,
+          bevelSize: 0.012,
+          bevelThickness: 0.012,
+          curveSegments: 48
+        });
+        geo.translate(0, 0, -0.08);
+        return geo;
+      }
+
+      const rearPlatePart = createAnatomyPart(buildRearEndPlateGeometry(), {
+        ramp: "lo",
+        outline: "mid",
+        crease: "lo"
+      });
+      rearPlatePart.position.z = -WANKEL.depth * 0.5 - 0.09;
+      rearPlateGroup.add(rearPlatePart);
+
+      function buildExternalGearGeometry(pitchR, teeth, toothDepth, width) {
+        const shape = new THREE.Shape();
+        const stepsPerTooth = 4;
+        const total = teeth * stepsPerTooth;
+        for (let i = 0; i <= total; i++) {
+          const a = (i / total) * Math.PI * 2;
+          const phase = ((i % stepsPerTooth) / stepsPerTooth);
+          const r = (phase < 0.45) ? (pitchR + toothDepth * 0.5) : (pitchR - toothDepth * 0.5);
+          const x = Math.cos(a) * r;
+          const y = Math.sin(a) * r;
+          if (i === 0) shape.moveTo(x, y);
+          else shape.lineTo(x, y);
+        }
+        const bore = new THREE.Path();
+        bore.absarc(0, 0, pitchR * 0.56, 0, Math.PI * 2, false);
+        shape.holes.push(bore);
+
+        const geo = new THREE.ExtrudeGeometry(shape, {
+          depth: width,
+          bevelEnabled: false,
+          curveSegments: total
+        });
+        geo.translate(0, 0, -width * 0.5);
+        return geo;
+      }
+
+      const STAT_PITCH_R = 2 * WANKEL.e;
+      const statGearGeo = buildExternalGearGeometry(STAT_PITCH_R, WANKEL.stationaryTeeth, 0.036, 0.34);
+      const statGearPart = createAnatomyPart(statGearGeo, {
+        ramp: "brass",
+        outline: "mid",
+        crease: "lo",
+        creaseAngle: 35
+      });
+      statGearPart.position.z = -WANKEL.depth * 0.25;
+      rearPlateGroup.add(statGearPart);
+
+      const chamberShaderMat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        uniforms: {
+          uTheta: { value: WANKEL.theta },
+          uR: { value: WANKEL.R },
+          uE: { value: WANKEL.e },
+          uEnvelope: { value: 1.0 },
+          uIsDark: { value: 0.0 },
+          uCavity: { value: new THREE.Color(currentTheme.channels.cavity) },
+          uColIntake: { value: new THREE.Color(currentTheme.channels.intake) },
+          uColComp: { value: new THREE.Color(currentTheme.channels.comp) },
+          uColComb: { value: new THREE.Color(currentTheme.channels.comb) },
+          uColExh: { value: new THREE.Color(currentTheme.channels.exhaust) }
+        },
+        vertexShader: `
+          varying vec2 vLocalXY;
+          void main() {
+            vLocalXY = position.xy;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform float uTheta;
+          uniform float uR;
+          uniform float uE;
+          uniform float uEnvelope;
+          uniform float uIsDark;
+          uniform vec3 uCavity;
+          uniform vec3 uColIntake;
+          uniform vec3 uColComp;
+          uniform vec3 uColComb;
+          uniform vec3 uColExh;
+          varying vec2 vLocalXY;
+
+          const float PI = 3.14159265359;
+
+          void main() {
+            vec2 p = vLocalXY;
+            float t = atan(p.y, p.x);
+            for (int iter = 0; iter < 2; iter++) {
+              vec2 ep = vec2(uE * cos(3.0 * t) + uR * cos(t), uE * sin(3.0 * t) + uR * sin(t));
+              float err = atan(p.y, p.x) - atan(ep.y, ep.x);
+              t += err * 0.65;
+            }
+            vec2 wallPt = vec2(uE * cos(3.0 * t) + uR * cos(t), uE * sin(3.0 * t) + uR * sin(t));
+            float rWall = length(wallPt);
+            float rPt = length(p);
+
+            if (rPt > rWall + 0.01) discard;
+
+            vec2 rotorCenter = vec2(uE * cos(uTheta), uE * sin(uTheta));
+            vec2 rel = p - rotorCenter;
+            float alpha = uTheta / 3.0;
+            float c = cos(-alpha);
+            float s = sin(-alpha);
+            vec2 rotLocal = vec2(c * rel.x - s * rel.y, s * rel.x + c * rel.y);
+
+            float angLocal = mod(atan(rotLocal.y, rotLocal.x) + 2.0 * PI, 2.0 * PI);
+            float sector = floor(angLocal / (2.0 * PI / 3.0));
+            float flankWorldAngle = alpha + sector * (2.0 * PI / 3.0) + PI / 3.0;
+
+            float cyc = mod(-flankWorldAngle + PI * 0.68 + 8.0 * PI, 2.0 * PI);
+            float phaseNorm = cyc / (2.0 * PI);
+
+            float wIntake = smoothstep(0.0, 0.06, phaseNorm) * (1.0 - smoothstep(0.22, 0.30, phaseNorm));
+            float wComp   = smoothstep(0.22, 0.30, phaseNorm) * (1.0 - smoothstep(0.47, 0.53, phaseNorm));
+            float wComb   = smoothstep(0.47, 0.52, phaseNorm) * (1.0 - smoothstep(0.72, 0.80, phaseNorm));
+            float wExh    = smoothstep(0.72, 0.80, phaseNorm) * (1.0 - smoothstep(0.94, 1.0, phaseNorm));
+
+            float sparkPulse = exp(-pow((phaseNorm - 0.54) / 0.045, 2.0));
+
+            vec3 gasCol = uColIntake * wIntake
+                        + uColComp * wComp
+                        + uColComb * (wComb + sparkPulse * 0.65)
+                        + uColExh * wExh;
+
+            float radialNorm = clamp(rPt / rWall, 0.0, 1.0);
+            float wave = 0.82 + 0.18 * sin(radialNorm * 18.0 - uTheta * 2.0);
+            float rimFade = smoothstep(1.0, 0.92, radialNorm) * smoothstep(0.35, 0.55, radialNorm);
+
+            float intensity = (wIntake * 0.42 + wComp * 0.55 + wComb * 0.82 + sparkPulse * 0.45 + wExh * 0.48) * wave * rimFade * uEnvelope;
+
+            vec3 finalCol = mix(uCavity, gasCol, clamp(intensity, 0.0, 0.92));
+            if (uIsDark > 0.5 && sparkPulse > 0.1) {
+              finalCol = mix(finalCol, vec3(1.0, 0.97, 0.86), sparkPulse * 0.45 * uEnvelope);
+            }
+
+            gl_FragColor = vec4(finalCol, 0.95);
+          }
+        `
+      });
+
+      const chamberPlaneGeo = new THREE.PlaneGeometry(3.4, 3.4);
+      const chamberPlane = new THREE.Mesh(chamberPlaneGeo, chamberShaderMat);
+      chamberPlane.position.z = -WANKEL.depth * 0.46;
+      statorGroup.add(chamberPlane);
+
+      const rotorOrbitGroup = new THREE.Group();
+      worldGroup.add(rotorOrbitGroup);
+
+      const rotorSpinGroup = new THREE.Group();
+      rotorOrbitGroup.add(rotorSpinGroup);
+
+      function buildWankelRotorGeometry() {
+        const R = WANKEL.R - 0.025;
+        const bow = 0.255;
+        const shape = new THREE.Shape();
+        const segsPerSide = 44;
+
+        for (let k = 0; k < 3; k++) {
+          const a0 = (k * 2 * Math.PI) / 3;
+          const a1 = ((k + 1) * 2 * Math.PI) / 3;
+          const midA = a0 + Math.PI / 3;
+
+          const p0 = [R * Math.cos(a0), R * Math.sin(a0)];
+          const p1 = [R * Math.cos(a1), R * Math.sin(a1)];
+          const normal = [Math.cos(midA), Math.sin(midA)];
+
+          for (let s = 0; s < segsPerSide; s++) {
+            const u = s / segsPerSide;
+            const lx = p0[0] * (1 - u) + p1[0] * u;
+            const ly = p0[1] * (1 - u) + p1[1] * u;
+            const arcOffset = Math.sin(u * Math.PI) * bow;
+            const pocket = (u > 0.30 && u < 0.70)
+              ? -0.042 * Math.pow(Math.sin(((u - 0.30) / 0.40) * Math.PI), 1.6)
+              : 0;
+            const px = lx + normal[0] * (arcOffset + pocket);
+            const py = ly + normal[1] * (arcOffset + pocket);
+            if (k === 0 && s === 0) shape.moveTo(px, py);
+            else shape.lineTo(px, py);
+          }
+        }
+        shape.closePath();
+
+        const boreR = 3 * WANKEL.e + 0.035;
+        const borePath = new THREE.Path();
+        borePath.absarc(0, 0, boreR, 0, Math.PI * 2, false);
+        shape.holes.push(borePath);
+
+        for (let k = 0; k < 3; k++) {
+          const a = (k * 2 * Math.PI) / 3;
+          const [hx, hy] = [0.84 * Math.cos(a), 0.84 * Math.sin(a)];
+          const pHole = new THREE.Path();
+          pHole.absarc(hx, hy, 0.13, 0, Math.PI * 2, false);
+          shape.holes.push(pHole);
+        }
+
+        const geo = new THREE.ExtrudeGeometry(shape, {
+          depth: WANKEL.depth - 0.04,
+          bevelEnabled: true,
+          bevelSegments: 2,
+          steps: 1,
+          bevelSize: 0.015,
+          bevelThickness: 0.015,
+          curveSegments: 64
+        });
+        geo.translate(0, 0, -(WANKEL.depth - 0.04) * 0.5);
+        return geo;
+      }
+
+      const rotorBody = createAnatomyPart(buildWankelRotorGeometry(), {
+        ramp: "lit",
+        outline: "lit",
+        crease: "lit",
+        creaseAngle: 24,
+        outlineWidth: 0.022,
+        topBias: 0.55
+      });
+      rotorSpinGroup.add(rotorBody);
+
+      function buildInternalGearRingGeometry() {
+        const outerR = 3 * WANKEL.e + 0.042;
+        const pitchR = 3 * WANKEL.e;
+        const toothDepth = 0.034;
+        const teeth = WANKEL.rotorTeeth;
+        const stepsPerTooth = 4;
+        const total = teeth * stepsPerTooth;
+
+        const shape = new THREE.Shape();
+        shape.absarc(0, 0, outerR, 0, Math.PI * 2, false);
+
+        const gearHole = new THREE.Path();
+        for (let i = 0; i <= total; i++) {
+          const a = (i / total) * Math.PI * 2;
+          const phase = (i % stepsPerTooth) / stepsPerTooth;
+          const r = phase < 0.45 ? pitchR - toothDepth * 0.5 : pitchR + toothDepth * 0.5;
+          const x = Math.cos(a) * r;
+          const y = Math.sin(a) * r;
+          if (i === 0) gearHole.moveTo(x, y);
+          else gearHole.lineTo(x, y);
+        }
+        shape.holes.push(gearHole);
+
+        const geo = new THREE.ExtrudeGeometry(shape, {
+          depth: WANKEL.depth * 0.48,
+          bevelEnabled: false,
+          curveSegments: total
+        });
+        geo.translate(0, 0, -WANKEL.depth * 0.46);
+        return geo;
+      }
+
+      const internalGearPart = createAnatomyPart(buildInternalGearRingGeometry(), {
+        ramp: "hi",
+        outline: "lit",
+        crease: "lo",
+        creaseAngle: 35,
+        outlineWidth: 0.012
+      });
+      rotorSpinGroup.add(internalGearPart);
+
+      const sideSealPts = [];
+      for (let k = 0; k < 3; k++) {
+        const a0 = (k * 2 * Math.PI) / 3;
+        const a1 = ((k + 1) * 2 * Math.PI) / 3;
+
+        const bladeGroup = new THREE.Group();
+        bladeGroup.position.set(Math.cos(a0) * (WANKEL.R - 0.02), Math.sin(a0) * (WANKEL.R - 0.02), 0);
+        bladeGroup.rotation.z = a0;
+
+        const bladeGeo = new THREE.BoxGeometry(0.085, 0.042, WANKEL.depth - 0.01);
+        const bladePart = createAnatomyPart(bladeGeo, {
+          ramp: "hi",
+          outline: "hi",
+          crease: "lo",
+          outlineWidth: 0.014
+        });
+        bladeGroup.add(bladePart);
+
+        const cPin = makeScrewDetail(
+          Math.cos(a0) * (WANKEL.R - 0.14),
+          Math.sin(a0) * (WANKEL.R - 0.14),
+          WANKEL.depth * 0.5 + 0.004,
+          0.052,
+          "z"
+        );
+        rotorSpinGroup.add(bladeGroup, cPin);
+
+        const midA = a0 + Math.PI / 3;
+        const p0 = [(WANKEL.R - 0.14) * Math.cos(a0), (WANKEL.R - 0.14) * Math.sin(a0)];
+        const p1 = [(WANKEL.R - 0.14) * Math.cos(a1), (WANKEL.R - 0.14) * Math.sin(a1)];
+        const normal = [Math.cos(midA), Math.sin(midA)];
+        for (let s = 0; s < 24; s++) {
+          const u0 = s / 24;
+          const u1 = (s + 1) / 24;
+          const x0 = p0[0] * (1 - u0) + p1[0] * u0 + normal[0] * Math.sin(u0 * Math.PI) * 0.21;
+          const y0 = p0[1] * (1 - u0) + p1[1] * u0 + normal[1] * Math.sin(u0 * Math.PI) * 0.21;
+          const x1 = p0[0] * (1 - u1) + p1[0] * u1 + normal[0] * Math.sin(u1 * Math.PI) * 0.21;
+          const y1 = p0[1] * (1 - u1) + p1[1] * u1 + normal[1] * Math.sin(u1 * Math.PI) * 0.21;
+          sideSealPts.push(
+            new THREE.Vector3(x0, y0, WANKEL.depth * 0.5 + 0.003),
+            new THREE.Vector3(x1, y1, WANKEL.depth * 0.5 + 0.003)
+          );
+        }
+      }
+      rotorSpinGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(sideSealPts), lineMaterials.lit));
+
+      const shaftAssemblyGroup = new THREE.Group();
+      worldGroup.add(shaftAssemblyGroup);
+
+      const shaftSpinGroup = new THREE.Group();
+      shaftAssemblyGroup.add(shaftSpinGroup);
+
+      const mainShaftGeo = new THREE.CylinderGeometry(0.18, 0.18, 2.45, 28);
+      mainShaftGeo.rotateX(Math.PI / 2);
+      shaftSpinGroup.add(createAnatomyPart(mainShaftGeo, { ramp: "hi", outline: "hi", crease: "lo" }));
+
+      const journalRadius = 3 * WANKEL.e - 0.195;
+      const journalGeo = new THREE.CylinderGeometry(journalRadius, journalRadius, WANKEL.depth * 0.62, 32);
+      journalGeo.rotateX(Math.PI / 2);
+      const journalPart = createAnatomyPart(journalGeo, { ramp: "brass", outline: "hi", crease: "lo" });
+      journalPart.position.set(WANKEL.e, 0, 0.06);
+      shaftSpinGroup.add(journalPart);
+
+      const oilHole = new THREE.Mesh(new THREE.CircleGeometry(0.055, 16), dotMaterials.dot);
+      oilHole.position.set(WANKEL.e + 0.12, 0, WANKEL.depth * 0.37 + 0.003);
+      shaftSpinGroup.add(oilHole);
+
+      function buildCounterweightGeometry() {
+        const shape = new THREE.Shape();
+        shape.absarc(0, 0, 0.58, Math.PI * 0.55, Math.PI * 1.45, false);
+        shape.absarc(0, 0, 0.23, Math.PI * 1.45, Math.PI * 0.55, true);
+        shape.closePath();
+        const geo = new THREE.ExtrudeGeometry(shape, {
+          depth: 0.13,
+          bevelEnabled: true,
+          bevelSegments: 1,
+          steps: 1,
+          bevelSize: 0.01,
+          bevelThickness: 0.01,
+          curveSegments: 28
+        });
+        geo.translate(0, 0, -0.065);
+        return geo;
+      }
+
+      const rearWeightPart = createAnatomyPart(buildCounterweightGeometry(), {
+        ramp: "lo",
+        outline: "mid",
+        crease: "lo"
+      });
+      rearWeightPart.position.z = -WANKEL.depth * 0.5 - 0.25;
+      shaftSpinGroup.add(rearWeightPart);
+
+      const frontWeightPart = createAnatomyPart(buildCounterweightGeometry(), {
+        ramp: "mid",
+        outline: "mid",
+        crease: "lo"
+      });
+      frontWeightPart.position.z = WANKEL.depth * 0.5 + 0.28;
+      shaftSpinGroup.add(frontWeightPart);
+
+      const pulleyGroup = new THREE.Group();
+      pulleyGroup.position.z = 1.18;
+      shaftSpinGroup.add(pulleyGroup);
+
+      const pulleyGeo = new THREE.CylinderGeometry(0.46, 0.46, 0.14, 36);
+      pulleyGeo.rotateX(Math.PI / 2);
+      pulleyGroup.add(createAnatomyPart(pulleyGeo, { ramp: "hi", outline: "mid", crease: "lo" }));
+
+      const hubNutGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.19, 6);
+      hubNutGeo.rotateX(Math.PI / 2);
+      pulleyGroup.add(createAnatomyPart(hubNutGeo, { ramp: "brass", outline: "mid", crease: "lo" }));
+
+      const pulleyMinorPts = [];
+      const pulleyMajorPts = [];
+      for (let i = 0; i < 36; i++) {
+        const a = (i / 36) * Math.PI * 2;
+        const rOut = 0.43;
+        const rIn = i % 3 === 0 ? 0.32 : 0.37;
+        const target = i % 3 === 0 ? pulleyMajorPts : pulleyMinorPts;
+        target.push(
+          new THREE.Vector3(Math.cos(a) * rIn, Math.sin(a) * rIn, 0.073),
+          new THREE.Vector3(Math.cos(a) * rOut, Math.sin(a) * rOut, 0.073)
+        );
+      }
+      pulleyGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pulleyMinorPts), lineMaterials.lo));
+      pulleyGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pulleyMajorPts), lineMaterials.hi));
+
+      const frontCoverGroup = new THREE.Group();
+      worldGroup.add(frontCoverGroup);
+
+      function buildFrontCoverRingGeometry() {
+        const shape = new THREE.Shape();
+        const segs = 96;
+        for (let i = 0; i <= segs; i++) {
+          const t = (i / segs) * Math.PI * 2;
+          const [px, py] = epitrochoidPoint(t, 0.40);
+          if (i === 0) shape.moveTo(px, py);
+          else shape.lineTo(px, py);
+        }
+        const windowHole = new THREE.Path();
+        for (let i = 0; i <= segs; i++) {
+          const t = (i / segs) * Math.PI * 2;
+          const [wx, wy] = epitrochoidPoint(t, 0.14);
+          if (i === 0) windowHole.moveTo(wx, wy);
+          else windowHole.lineTo(wx, wy);
+        }
+        shape.holes.push(windowHole);
+
+        const geo = new THREE.ExtrudeGeometry(shape, {
+          depth: 0.12,
+          bevelEnabled: true,
+          bevelSegments: 1,
+          steps: 1,
+          bevelSize: 0.01,
+          bevelThickness: 0.01,
+          curveSegments: 48
+        });
+        geo.translate(0, 0, -0.06);
+        return geo;
+      }
+
+      const frontCoverPart = createAnatomyPart(buildFrontCoverRingGeometry(), {
+        ramp: "mid",
+        outline: "mid",
+        crease: "lo"
+      });
+      frontCoverPart.position.z = WANKEL.depth * 0.5 + 0.07;
+      frontCoverGroup.add(frontCoverPart);
+
+      const tieBoltsGroup = new THREE.Group();
+      worldGroup.add(tieBoltsGroup);
+
+      tieBoltPositions.forEach(([bx, by]) => {
+        const rodGeo = new THREE.CylinderGeometry(0.036, 0.036, WANKEL.depth + 0.44, 12);
+        rodGeo.rotateX(Math.PI / 2);
+        const rodPart = createAnatomyPart(rodGeo, { ramp: "mid", outline: "lo", noCrease: true, outlineWidth: 0.01 });
+        rodPart.position.set(bx, by, 0);
+        statorGroup.add(rodPart);
+
+        const nutGeo = new THREE.CylinderGeometry(0.072, 0.072, 0.07, 6);
+        nutGeo.rotateX(Math.PI / 2);
+        const nutPart = createAnatomyPart(nutGeo, { ramp: "hi", outline: "mid", crease: "lo", outlineWidth: 0.012 });
+        nutPart.position.set(bx, by, WANKEL.depth * 0.5 + 0.16);
+        tieBoltsGroup.add(nutPart);
+      });
+
+      /* ==========================================================================
+       * 6. THEME APPLICATION & UI CONTROLS
+       * ========================================================================== */
+      const schemeButtonsEl = document.getElementById("scheme-buttons");
+      const rpmSlider = document.getElementById("rpm-slider");
+      const crankBtn = document.getElementById("crank-btn");
+      const slowBtn = document.getElementById("slow-btn");
+      const explodeBtn = document.getElementById("explode-btn");
+      const cutawayBtn = document.getElementById("cutaway-btn");
+      const shaderBtn = document.getElementById("shader-btn");
+      const hudBtn = document.getElementById("hud-btn");
+      const hudQuickBtn = document.getElementById("hud-quick-btn");
+      const resetBtn = document.getElementById("reset-btn");
+
+      function applyTheme(theme) {
+        currentTheme = theme;
+        const root = document.documentElement.style;
+        root.setProperty("--anatomy-bg", theme.css.bg);
+        root.setProperty("--anatomy-card", theme.css.card);
+        root.setProperty("--anatomy-paper", theme.css.card);
+        root.setProperty("--anatomy-border", theme.css.border);
+        root.setProperty("--anatomy-text", theme.css.text);
+        root.setProperty("--anatomy-muted", theme.css.muted);
+        root.setProperty("--anatomy-strong", theme.css.strong);
+        root.setProperty("--anatomy-lit", theme.css.lit);
+        root.setProperty("--anatomy-pill-bg", theme.css.pillBg);
+        root.setProperty("--anatomy-pill-hover", theme.css.pillHover);
+
+        anatomyMaterials.forEach((mat) => {
+          const ramp = theme.ramps[mat.userData.rampKey] || theme.ramps.mid;
+          mat.uniforms.uTop.value.set(ramp.top);
+          mat.uniforms.uShade0.value.set(ramp.shades[3]);
+          mat.uniforms.uShade1.value.set(ramp.shades[2]);
+          mat.uniforms.uShade2.value.set(ramp.shades[1]);
+          mat.uniforms.uShade3.value.set(ramp.shades[0]);
+        });
+
+        outlineMaterials.forEach((mat) => {
+          const col = theme.lines[mat.userData.lineKey] || theme.lines.mid;
+          mat.uniforms.uColor.value.set(col);
+        });
+
+        Object.keys(lineMaterials).forEach((k) => {
+          lineMaterials[k].color.set(theme.lines[k]);
+        });
+        dotMaterials.dot.color.set(theme.lines.dot);
+        dotMaterials.lit.color.set(theme.lines.lit);
+
+        haloMat.color.set(theme.halo);
+        haloMat.opacity = theme.haloOpacity;
+
+        chamberShaderMat.uniforms.uIsDark.value = theme.isDark ? 1.0 : 0.0;
+        chamberShaderMat.uniforms.uCavity.value.set(theme.channels.cavity);
+        chamberShaderMat.uniforms.uColIntake.value.set(theme.channels.intake);
+        chamberShaderMat.uniforms.uColComp.value.set(theme.channels.comp);
+        chamberShaderMat.uniforms.uColComb.value.set(theme.channels.comb);
+        chamberShaderMat.uniforms.uColExh.value.set(theme.channels.exhaust);
+
+        document.getElementById("leg-lit").style.backgroundColor = theme.css.lit;
+        document.getElementById("leg-intake").style.backgroundColor = theme.channels.intake;
+        document.getElementById("leg-comb").style.backgroundColor = theme.channels.comb;
+        document.getElementById("leg-exh").style.backgroundColor = theme.channels.exhaust;
+
+        Array.from(schemeButtonsEl.children).forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.id === theme.id);
+        });
+      }
+
+      THEMES.forEach((t) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "scheme-btn";
+        btn.dataset.id = t.id;
+        btn.innerHTML = `<span class="swatch" style="background:${t.swatch}"></span>${t.name}`;
+        btn.addEventListener("click", () => applyTheme(t));
+        schemeButtonsEl.appendChild(btn);
+      });
+
+      function toggleCrankMode() {
+        WANKEL.crankMode = !WANKEL.crankMode;
+        crankBtn.classList.toggle("active", WANKEL.crankMode);
+      }
+
+      function toggleExplode() {
+        WANKEL.exploded = !WANKEL.exploded;
+        explodeBtn.classList.toggle("active", WANKEL.exploded);
+      }
+
+      function cycleSlowMode() {
+        WANKEL.slowIndex = (WANKEL.slowIndex + 1) % WANKEL.slowModes.length;
+        slowBtn.textContent = WANKEL.slowLabels[WANKEL.slowIndex];
+        slowBtn.classList.toggle("active", WANKEL.slowIndex > 0);
+      }
+
+      function toggleCutaway() {
+        WANKEL.cutaway = !WANKEL.cutaway;
+        cutawayBtn.classList.toggle("active", WANKEL.cutaway);
+        frontWeightPart.visible = !WANKEL.cutaway || WANKEL.exploded;
+        pulleyGroup.visible = !WANKEL.cutaway || WANKEL.exploded;
+      }
+
+      function toggleShader() {
+        WANKEL.shaderEnabled = !WANKEL.shaderEnabled;
+        shaderBtn.classList.toggle("active", WANKEL.shaderEnabled);
+      }
+
+      function toggleHud() {
+        WANKEL.hudVisible = !WANKEL.hudVisible;
+        document.body.classList.toggle("hud-hidden", !WANKEL.hudVisible);
+        hudBtn.classList.toggle("active", WANKEL.hudVisible);
+        hudQuickBtn.classList.toggle("active", WANKEL.hudVisible);
+        // Resize canvas after caption bar hides/shows
+        requestAnimationFrame(updateCameraSize);
+      }
+
+      function resetIsoView() {
+        targetRotX = ISO_ELEV;
+        targetRotY = ISO_AZIM;
+        targetPanX = 0;
+        targetPanY = -0.06;
+        zoomFactor = 1.08;
+        updateCameraSize();
+      }
+
+      rpmSlider.addEventListener("input", (e) => {
+        WANKEL.rpm = parseFloat(e.target.value);
+      });
+      crankBtn.addEventListener("click", toggleCrankMode);
+      slowBtn.addEventListener("click", cycleSlowMode);
+      explodeBtn.addEventListener("click", toggleExplode);
+      cutawayBtn.addEventListener("click", toggleCutaway);
+      shaderBtn.addEventListener("click", toggleShader);
+      hudBtn.addEventListener("click", toggleHud);
+      hudQuickBtn.addEventListener("click", toggleHud);
+      resetBtn.addEventListener("click", resetIsoView);
+
+      /* ==========================================================================
+       * 7. MOBILE MULTI-TOUCH (1-FINGER ORBIT/CRANK, 2-FINGER PAN + PINCH ZOOM)
+       * ========================================================================== */
+      const activePointers = new Map();
+      let lastSingleX = 0;
+      let lastSingleY = 0;
+      let lastMidX = 0;
+      let lastMidY = 0;
+      let lastPinchDist = 0;
+      let isMousePan = false;
+
+      host.addEventListener("contextmenu", (e) => e.preventDefault());
+
+      function syncTwoFingerMetrics() {
+        const pts = Array.from(activePointers.values());
+        if (pts.length >= 2) {
+          lastMidX = (pts[0].x + pts[1].x) * 0.5;
+          lastMidY = (pts[0].y + pts[1].y) * 0.5;
+          lastPinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        }
+      }
+
+      host.addEventListener("pointerdown", (e) => {
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        host.setPointerCapture(e.pointerId);
+        cardEl.focus();
+
+        if (activePointers.size === 1) {
+          lastSingleX = e.clientX;
+          lastSingleY = e.clientY;
+          isMousePan = (e.button === 2 || e.button === 1);
+        } else if (activePointers.size === 2) {
+          syncTwoFingerMetrics();
+        }
+      });
+
+      host.addEventListener("pointermove", (e) => {
+        if (!activePointers.has(e.pointerId)) return;
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        const w = Math.max(host.clientWidth, 1);
+        const h = Math.max(host.clientHeight, 1);
+        const worldPerPixelX = (camera.right - camera.left) / w;
+        const worldPerPixelY = (camera.top - camera.bottom) / h;
+
+        if (activePointers.size === 1) {
+          const dx = e.clientX - lastSingleX;
+          const dy = e.clientY - lastSingleY;
+          lastSingleX = e.clientX;
+          lastSingleY = e.clientY;
+
+          if (isMousePan) {
+            targetPanX += dx * worldPerPixelX;
+            targetPanY -= dy * worldPerPixelY;
+          } else if (e.shiftKey || WANKEL.crankMode || WANKEL.slowModes[WANKEL.slowIndex] === 0) {
+            WANKEL.theta -= dx * 0.024;
+          } else {
+            targetRotY += dx * 0.0085;
+            targetRotX = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.46, targetRotX + dy * 0.0085));
+          }
+        } else if (activePointers.size >= 2) {
+          const pts = Array.from(activePointers.values());
+          const midX = (pts[0].x + pts[1].x) * 0.5;
+          const midY = (pts[0].y + pts[1].y) * 0.5;
+          const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+
+          // 2-Finger Pan
+          const midDx = midX - lastMidX;
+          const midDy = midY - lastMidY;
+          targetPanX += midDx * worldPerPixelX;
+          targetPanY -= midDy * worldPerPixelY;
+
+          // 2-Finger Pinch Zoom
+          if (lastPinchDist > 12 && dist > 12) {
+            const scale = dist / lastPinchDist;
+            zoomFactor = Math.max(0.45, Math.min(3.5, zoomFactor * scale));
+            updateCameraSize();
+          }
+
+          lastMidX = midX;
+          lastMidY = midY;
+          lastPinchDist = dist;
+        }
+      });
+
+      function onPointerRelease(e) {
+        activePointers.delete(e.pointerId);
+        if (host.hasPointerCapture(e.pointerId)) {
+          host.releasePointerCapture(e.pointerId);
+        }
+        if (activePointers.size === 1) {
+          const remaining = activePointers.values().next().value;
+          lastSingleX = remaining.x;
+          lastSingleY = remaining.y;
+          isMousePan = false;
+        } else if (activePointers.size >= 2) {
+          syncTwoFingerMetrics();
+        }
+      }
+
+      host.addEventListener("pointerup", onPointerRelease);
+      host.addEventListener("pointercancel", onPointerRelease);
+
+      host.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        zoomFactor = Math.max(0.45, Math.min(3.5, zoomFactor - e.deltaY * 0.0012));
+        updateCameraSize();
+      }, { passive: false });
+
+      window.addEventListener("keydown", (e) => {
+        if (e.target.tagName === "INPUT") return;
+        const k = e.key.toLowerCase();
+        if (k === "e") toggleExplode();
+        else if (k === "s") cycleSlowMode();
+        else if (k === "c") toggleCutaway();
+        else if (k === "i") toggleShader();
+        else if (k === "h") toggleHud();
+        else if (k === "r") resetIsoView();
+        else if (e.key === "ArrowRight") WANKEL.theta -= 0.12;
+        else if (e.key === "ArrowLeft") WANKEL.theta += 0.12;
+      });
+
+      window.addEventListener("resize", updateCameraSize);
+
+      const tempProjVec = new THREE.Vector3();
+      function placeEngravedTag(el, localX, localY, localZ) {
+        if (!WANKEL.hudVisible) return;
+        tempProjVec.set(localX, localY, localZ);
+        tempProjVec.applyMatrix4(worldGroup.matrixWorld);
+        tempProjVec.project(camera);
+        const w = host.clientWidth || 760;
+        const h = host.clientHeight || 475;
+        const px = (tempProjVec.x * 0.5 + 0.5) * w;
+        const py = (-tempProjVec.y * 0.5 + 0.5) * h;
+        el.style.left = `${px.toFixed(1)}px`;
+        el.style.top = `${py.toFixed(1)}px`;
+      }
+
+      /* ==========================================================================
+       * 8. MAIN ANIMATION & KINEMATIC UPDATE LOOP
+       * ========================================================================== */
+      applyTheme(THEMES[0]);
+      frontWeightPart.visible = false;
+      pulleyGroup.visible = false;
+      updateCameraSize();
+
+      let lastTime = performance.now();
+
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const dt = Math.min((now - lastTime) * 0.001, 0.05);
+        lastTime = now;
+
+        // Smooth camera orbit & pan interpolation
+        rotX += (targetRotX - rotX) * 0.2;
+        rotY += (targetRotY - rotY) * 0.2;
+        panX += (targetPanX - panX) * 0.22;
+        panY += (targetPanY - panY) * 0.22;
+
+        worldGroup.position.set(panX, panY, 0);
+        worldGroup.rotation.order = "XYZ";
+        worldGroup.rotation.x = rotX;
+        worldGroup.rotation.y = rotY;
+        worldGroup.updateMatrixWorld(true);
+
+        // Step physical springs
+        stepSpring(explodeSpring, WANKEL.exploded ? 1.0 : 0.0, dt, 150, 19);
+        stepSpring(rpmSpring, WANKEL.rpm, dt, 110, 16);
+        stepSpring(shaderEnvSpring, WANKEL.shaderEnabled ? 1.0 : 0.0, dt, 140, 18);
+
+        // Advance eccentric shaft angle theta
+        const speedMult = WANKEL.slowModes[WANKEL.slowIndex];
+        const effectiveRpm = rpmSpring.at * speedMult;
+        const isUserCranking = activePointers.size === 1 && (WANKEL.crankMode || speedMult === 0);
+        if (!isUserCranking) {
+          const omegaShaft = (effectiveRpm * Math.PI * 2) / 60;
+          WANKEL.theta -= omegaShaft * dt * 0.12;
+        }
+
+        const theta = WANKEL.theta;
+        const alpha = theta / 3;
+
+        // 1. Update Rotor Orbit & Rotor Spin (exact 1:3 ratio)
+        rotorOrbitGroup.position.x = WANKEL.e * Math.cos(theta);
+        rotorOrbitGroup.position.y = WANKEL.e * Math.sin(theta);
+        rotorSpinGroup.rotation.z = alpha;
+
+        // 2. Update Eccentric Shaft & Counterweight rotation
+        shaftSpinGroup.rotation.z = theta;
+
+        // 3. Update Exploded View Axial Separations
+        const ex = explodeSpring.at;
+        rearPlateGroup.position.z = -ex * 0.95;
+        rotorOrbitGroup.position.z = ex * 0.25;
+        shaftAssemblyGroup.position.z = ex * 0.68;
+        frontCoverGroup.position.z = ex * 1.12;
+        tieBoltsGroup.position.z = ex * 1.38;
+        frontWeightPart.visible = !WANKEL.cutaway || ex > 0.08;
+        pulleyGroup.visible = !WANKEL.cutaway || ex > 0.08;
+
+        // 4. Update Throttle Knob rotation
+        throttleKnobGroup.rotation.y = -((rpmSpring.at / 2400) * Math.PI * 1.5);
+
+        // 5. Update Chamber State, Bourdon Gauge Needle, & Shader Uniforms
+        const chA = getChamberState(theta, 0);
+        const gaugeAngle = (Math.PI * 0.72) - Math.min(chA.pressure / 32, 1.0) * (Math.PI * 1.44);
+        needleGroup.rotation.z = gaugeAngle;
+
+        chamberShaderMat.uniforms.uTheta.value = theta;
+        chamberShaderMat.uniforms.uEnvelope.value = shaderEnvSpring.at;
+
+        // 6. Update Live Readout & Phase Corner when HUD is visible
+        if (WANKEL.hudVisible) {
+          const shaftDeg = Math.round(((( -theta * 180) / Math.PI) % 360 + 360) % 360);
+          const rotorDeg = Math.round(((( -alpha * 180) / Math.PI) % 360 + 360) % 360);
+          const dispRpm = Math.round(effectiveRpm);
+
+          readoutEl.textContent =
+            `θ ${String(shaftDeg).padStart(3, "0")}° · α ${String(rotorDeg).padStart(3, "0")}° · ${dispRpm} rpm · P ${chA.pressure.toFixed(1)} bar`;
+          phaseCornerEl.textContent = `CHAMBER A · ${chA.phase}`;
+
+          placeEngravedTag(tagPlateEl, plaqueX, topSurfaceY + 0.05, plaqueZ);
+          placeEngravedTag(tagGaugeEl, gaugeX, topSurfaceY + 1.38, gaugeZ + 0.11);
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>
