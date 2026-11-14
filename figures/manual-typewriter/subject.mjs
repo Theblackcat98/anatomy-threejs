@@ -76,7 +76,7 @@ export function buildSubject(reg, kit) {
     rodGeometry.translate(0, length * 0.5, 0);
     reg.part(`typebar.rod.${id}`, rodGeometry, {
       parent: swing,
-      ramp: id === Math.floor(TYPEBAR_SLOTS.length / 2) ? "lit" : "brass",
+      ramp: id === Math.floor(TYPEBAR_SLOTS.length / 2) ? "lit" : "hi",
       outline: "lo",
       crease: "faint",
       noCrease: true,

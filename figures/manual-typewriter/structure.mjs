@@ -144,5 +144,4 @@ export function buildStructure(reg, kit) {
   reg.anchor("ribbon.path.center", 0, SPEC.platenY, SPEC.ribbonZ, baseGroup, { dir: [0, 0, 1] });
   reg.anchor("paper.path.front", 0, SPEC.platenY, SPEC.paperFrontZ, baseGroup, { dir: [0, 0, 1] });
   reg.anchor("base.top", 0, SPEC.topSurfaceY, 0, baseGroup);
-  reg.anchor("plaque.center", ...ANCHORS.plaqueCenter, baseGroup);
 }

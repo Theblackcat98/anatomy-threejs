@@ -20,7 +20,6 @@ buildAndVerifyFigure({
     initialPhase: "READY · TYPEBARS AT REST",
     initialReadout: "COLUMN 00/32 · LEFT MARGIN",
     engravedTagsHtml: [
-      `<div class="engraved-tag" id="tag-plate">NO. 5 · QWERTY · ESCAPEMENT</div>`,
       `<div class="engraved-tag" id="tag-paper">TYPE · FEED · RETURN</div>`
     ].join("\n        "),
     captionHtml: `<strong>The object is the explanation.</strong> Forty-five key actions pull individual pivoting typebars with paired type slugs into the ribbon and paper. The escapement meters the carriage one character at a time. <strong>SPACE</strong> feeds without printing; <strong>RETURN</strong> releases the rack and advances the paper.`,

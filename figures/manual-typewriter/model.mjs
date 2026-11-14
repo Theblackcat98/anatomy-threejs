@@ -177,7 +177,7 @@ export const SPEC = {
     }
   ],
   cameraViews: [
-    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.92, pan: [0, -0.15] },
+    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.86, pan: [0, -0.32] },
     { id: "keys", label: "KEYBOARD", elev: 58, azim: -18, zoom: 1.06, pan: [0, 0.02] },
     { id: "typebars", label: "TYPEBARS", elev: 24, azim: -8, zoom: 1.12, pan: [0, 0.10] },
     { id: "side", label: "CARRIAGE", elev: 18, azim: -82, zoom: 1.02, pan: [0, 0.02] }
@@ -201,8 +201,8 @@ export const SPEC = {
   ],
   isoElevDeg: 30,
   isoAzimDeg: -36,
-  initialZoom: 0.92,
-  initialPanY: -0.15,
+  initialZoom: 0.86,
+  initialPanY: -0.32,
   minVertSpan: 5.7,
   minHorizSpan: 6.1,
   BASE_W: 5.00,
@@ -242,8 +242,7 @@ export const ANCHORS = {
   platenCenter: [0, SPEC.platenY, SPEC.platenZ],
   carriageLeft: [-1.62, SPEC.platenY, SPEC.platenZ],
   carriageRight: [1.62, SPEC.platenY, SPEC.platenZ],
-  returnMount: [SPEC.carriageStartX - 1.48, 1.62, -0.35],
-  plaqueCenter: [-1.18, SPEC.topSurfaceY + 0.03, 1.45]
+  returnMount: [SPEC.carriageStartX - 1.48, 1.62, -0.35]
 };
 
 export function getTypewriterState(params = {}, triggers = {}) {

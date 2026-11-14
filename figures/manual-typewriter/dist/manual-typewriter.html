@@ -527,7 +527,6 @@
       </button>
 
       <div class="engraved-layer hud-detail" id="engraved-layer">
-        <div class="engraved-tag" id="tag-plate">NO. 5 · QWERTY · ESCAPEMENT</div>
         <div class="engraved-tag" id="tag-paper">TYPE · FEED · RETURN</div>
       </div>
 
@@ -3440,7 +3439,7 @@ const SPEC = {
     }
   ],
   cameraViews: [
-    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.92, pan: [0, -0.15] },
+    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.86, pan: [0, -0.32] },
     { id: "keys", label: "KEYBOARD", elev: 58, azim: -18, zoom: 1.06, pan: [0, 0.02] },
     { id: "typebars", label: "TYPEBARS", elev: 24, azim: -8, zoom: 1.12, pan: [0, 0.10] },
     { id: "side", label: "CARRIAGE", elev: 18, azim: -82, zoom: 1.02, pan: [0, 0.02] }
@@ -3464,8 +3463,8 @@ const SPEC = {
   ],
   isoElevDeg: 30,
   isoAzimDeg: -36,
-  initialZoom: 0.92,
-  initialPanY: -0.15,
+  initialZoom: 0.86,
+  initialPanY: -0.32,
   minVertSpan: 5.7,
   minHorizSpan: 6.1,
   BASE_W: 5.00,
@@ -3504,8 +3503,7 @@ const ANCHORS = {
   platenCenter: [0, SPEC.platenY, SPEC.platenZ],
   carriageLeft: [-1.62, SPEC.platenY, SPEC.platenZ],
   carriageRight: [1.62, SPEC.platenY, SPEC.platenZ],
-  returnMount: [SPEC.carriageStartX - 1.48, 1.62, -0.35],
-  plaqueCenter: [-1.18, SPEC.topSurfaceY + 0.03, 1.45]
+  returnMount: [SPEC.carriageStartX - 1.48, 1.62, -0.35]
 };
 function getTypewriterState(params = {}, triggers = {}) {
   const column = Math.max(0, Math.min(SPEC.maxColumn, Number(params.column ?? 0)));
@@ -3593,26 +3591,8 @@ function buildBase(reg, kit) {
   ];
   reg.detail("base.datum.marks", new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(markPts), kit.lineMaterials.lo), { parent: baseGroup });
 
-  // Small brass maker’s plaque on the visible front shoulder.
-  reg.part("base.plaque", new THREE.BoxGeometry(1.22, 0.035, 0.36), {
-    parent: baseGroup,
-    pos: [ANCHORS.plaqueCenter[0], topSurfaceY + 0.018, ANCHORS.plaqueCenter[2]],
-    ramp: "brass",
-    outline: "mid",
-    crease: "faint",
-    mountOn: "base.plate"
-  });
-  [[-0.52, -0.13], [0.52, -0.13], [-0.52, 0.13], [0.52, 0.13]].forEach(([dx, dz], i) => {
-    const rivet = new THREE.Mesh(new THREE.CircleGeometry(0.022, 12), kit.dotMaterials.dot);
-    rivet.rotation.x = -Math.PI / 2;
-    rivet.position.set(ANCHORS.plaqueCenter[0] + dx, topSurfaceY + 0.039, ANCHORS.plaqueCenter[2] + dz);
-    reg.detail(`base.plaque.rivet.${i}`, rivet, { parent: baseGroup });
-  });
-  reg.tag("tag-plate", "NO. 5 · QWERTY · ESCAPEMENT", ...ANCHORS.plaqueCenter);
-
   reg.anchor("base.top", ...ANCHORS.baseTop, baseGroup);
   reg.anchor("case.floor", ...ANCHORS.caseFloor, baseGroup);
-  reg.anchor("plaque.center", ...ANCHORS.plaqueCenter, baseGroup);
 }
 
 
@@ -3759,7 +3739,6 @@ function buildStructure(reg, kit) {
   reg.anchor("ribbon.path.center", 0, SPEC.platenY, SPEC.ribbonZ, baseGroup, { dir: [0, 0, 1] });
   reg.anchor("paper.path.front", 0, SPEC.platenY, SPEC.paperFrontZ, baseGroup, { dir: [0, 0, 1] });
   reg.anchor("base.top", 0, SPEC.topSurfaceY, 0, baseGroup);
-  reg.anchor("plaque.center", ...ANCHORS.plaqueCenter, baseGroup);
 }
 
 
@@ -3840,7 +3819,7 @@ function buildSubject(reg, kit) {
     rodGeometry.translate(0, length * 0.5, 0);
     reg.part(`typebar.rod.${id}`, rodGeometry, {
       parent: swing,
-      ramp: id === Math.floor(TYPEBAR_SLOTS.length / 2) ? "lit" : "brass",
+      ramp: id === Math.floor(TYPEBAR_SLOTS.length / 2) ? "lit" : "hi",
       outline: "lo",
       crease: "faint",
       noCrease: true,
@@ -3962,7 +3941,7 @@ function keyLegendMaterial(primary, secondary = "") {
     ctx.fillText(primary, 64, 51);
   }
   const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.encoding = THREE.sRGBEncoding;
   return new THREE.MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false, side: THREE.DoubleSide });
 }
 
@@ -4043,6 +4022,7 @@ function addLink(reg, id, parent, start, end, radius, opts = {}) {
     ramp: opts.ramp || "hi",
     outline: "lo",
     crease: "faint",
+    outlineWidth: 0.004,
     noCrease: true,
     mountOn: opts.mountOn || "case.keyboard.deck",
     allowOverlap: opts.allowOverlap || [],
@@ -4148,7 +4128,7 @@ function createPaperMesh(reg, carriage) {
   paperCanvas.width = 768;
   paperCanvas.height = 512;
   paperTexture = new THREE.CanvasTexture(paperCanvas);
-  paperTexture.colorSpace = THREE.SRGBColorSpace;
+  paperTexture.encoding = THREE.sRGBEncoding;
   paperTexture.anisotropy = 4;
   drawPaper();
   const paperGroup = reg.group("paper.wrap", { parent: carriage, stage: "mechanism" });
@@ -4468,11 +4448,13 @@ function buildMechanism(reg, kit) {
 
     const selectedSlot = TYPEBAR_SLOTS.find((slot) => slot.keyIndex === index);
     const swing = reg.groups.get(`typebar.swing.${selectedSlot.slotIndex}`)?.group;
-    const startLocal = keyboard.localToWorld(new THREE.Vector3(key.x, -0.055, key.z - 0.38));
-    const endLocal = swing ? swing.localToWorld(new THREE.Vector3(0, -0.16, 0)) : new THREE.Vector3(selectedSlot.barX, 0.94, SPEC.basketZ + 0.1);
+    // Links are children of baseGroup: world-space endpoints must be brought
+    // back into that same frame, including the viewport's orbit transform.
+    const startLocal = baseGroup.worldToLocal(keyboard.localToWorld(new THREE.Vector3(key.x, -0.055, key.z - 0.38)));
+    const endLocal = swing ? baseGroup.worldToLocal(swing.localToWorld(new THREE.Vector3(0, -0.16, 0))) : new THREE.Vector3(selectedSlot.barX, 0.94, SPEC.basketZ + 0.1);
     const actionLink = addLink(reg, `keyboard.action.link.${key.id}`, baseGroup, startLocal, endLocal, 0.008, {
       mountOn: "case.keyboard.deck",
-      ramp: "brass",
+      ramp: "mid",
       allowOverlap: [`typebar.tail.${selectedSlot.slotIndex}`]
     });
     actionLink.userData.keyIndex = index;
@@ -4720,12 +4702,12 @@ function updateKinematics(reg, state) {
     const swing = reg.groups.get(`typebar.swing.${slot.slotIndex}`)?.group;
     const link = reg.parts.get(`keyboard.action.link.${key.id}`)?.group;
     if (!keyboard || !swing || !link) return;
-    const start = keyboard.localToWorld(new THREE.Vector3(key.x, -0.055, key.z - 0.38));
-    const end = swing.localToWorld(new THREE.Vector3(0, -0.16, 0));
+    const start = baseGroup.worldToLocal(keyboard.localToWorld(new THREE.Vector3(key.x, -0.055, key.z - 0.38)));
+    const end = baseGroup.worldToLocal(swing.localToWorld(new THREE.Vector3(0, -0.16, 0)));
     const delta = end.clone().sub(start);
     link.position.copy(start.add(end).multiplyScalar(0.5));
     link.quaternion.setFromUnitVectors(MECHANISM_UP, delta.clone().normalize());
-    link.scale.y = Math.max(0.2, delta.length() / (link.userData.baseLength || delta.length()));
+    link.scale.y = delta.length() / (link.userData.baseLength || delta.length());
   });
 
   const lift = reg.groups.get("ribbon.lift")?.group;

@@ -69,24 +69,6 @@ export function buildBase(reg, kit) {
   ];
   reg.detail("base.datum.marks", new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(markPts), kit.lineMaterials.lo), { parent: baseGroup });
 
-  // Small brass maker’s plaque on the visible front shoulder.
-  reg.part("base.plaque", new THREE.BoxGeometry(1.22, 0.035, 0.36), {
-    parent: baseGroup,
-    pos: [ANCHORS.plaqueCenter[0], topSurfaceY + 0.018, ANCHORS.plaqueCenter[2]],
-    ramp: "brass",
-    outline: "mid",
-    crease: "faint",
-    mountOn: "base.plate"
-  });
-  [[-0.52, -0.13], [0.52, -0.13], [-0.52, 0.13], [0.52, 0.13]].forEach(([dx, dz], i) => {
-    const rivet = new THREE.Mesh(new THREE.CircleGeometry(0.022, 12), kit.dotMaterials.dot);
-    rivet.rotation.x = -Math.PI / 2;
-    rivet.position.set(ANCHORS.plaqueCenter[0] + dx, topSurfaceY + 0.039, ANCHORS.plaqueCenter[2] + dz);
-    reg.detail(`base.plaque.rivet.${i}`, rivet, { parent: baseGroup });
-  });
-  reg.tag("tag-plate", "NO. 5 · QWERTY · ESCAPEMENT", ...ANCHORS.plaqueCenter);
-
   reg.anchor("base.top", ...ANCHORS.baseTop, baseGroup);
   reg.anchor("case.floor", ...ANCHORS.caseFloor, baseGroup);
-  reg.anchor("plaque.center", ...ANCHORS.plaqueCenter, baseGroup);
 }

@@ -46,7 +46,7 @@ function keyLegendMaterial(primary, secondary = "") {
     ctx.fillText(primary, 64, 51);
   }
   const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.encoding = THREE.sRGBEncoding;
   return new THREE.MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false, side: THREE.DoubleSide });
 }
 
@@ -127,6 +127,7 @@ function addLink(reg, id, parent, start, end, radius, opts = {}) {
     ramp: opts.ramp || "hi",
     outline: "lo",
     crease: "faint",
+    outlineWidth: 0.004,
     noCrease: true,
     mountOn: opts.mountOn || "case.keyboard.deck",
     allowOverlap: opts.allowOverlap || [],
@@ -232,7 +233,7 @@ function createPaperMesh(reg, carriage) {
   paperCanvas.width = 768;
   paperCanvas.height = 512;
   paperTexture = new THREE.CanvasTexture(paperCanvas);
-  paperTexture.colorSpace = THREE.SRGBColorSpace;
+  paperTexture.encoding = THREE.sRGBEncoding;
   paperTexture.anisotropy = 4;
   drawPaper();
   const paperGroup = reg.group("paper.wrap", { parent: carriage, stage: "mechanism" });
@@ -553,11 +554,13 @@ export function buildMechanism(reg, kit) {
 
     const selectedSlot = TYPEBAR_SLOTS.find((slot) => slot.keyIndex === index);
     const swing = reg.groups.get(`typebar.swing.${selectedSlot.slotIndex}`)?.group;
-    const startLocal = keyboard.localToWorld(new THREE.Vector3(key.x, -0.055, key.z - 0.38));
-    const endLocal = swing ? swing.localToWorld(new THREE.Vector3(0, -0.16, 0)) : new THREE.Vector3(selectedSlot.barX, 0.94, SPEC.basketZ + 0.1);
+    // Links are children of baseGroup: world-space endpoints must be brought
+    // back into that same frame, including the viewport's orbit transform.
+    const startLocal = baseGroup.worldToLocal(keyboard.localToWorld(new THREE.Vector3(key.x, -0.055, key.z - 0.38)));
+    const endLocal = swing ? baseGroup.worldToLocal(swing.localToWorld(new THREE.Vector3(0, -0.16, 0))) : new THREE.Vector3(selectedSlot.barX, 0.94, SPEC.basketZ + 0.1);
     const actionLink = addLink(reg, `keyboard.action.link.${key.id}`, baseGroup, startLocal, endLocal, 0.008, {
       mountOn: "case.keyboard.deck",
-      ramp: "brass",
+      ramp: "mid",
       allowOverlap: [`typebar.tail.${selectedSlot.slotIndex}`]
     });
     actionLink.userData.keyIndex = index;
@@ -806,12 +809,12 @@ export function updateKinematics(reg, state) {
     const swing = reg.groups.get(`typebar.swing.${slot.slotIndex}`)?.group;
     const link = reg.parts.get(`keyboard.action.link.${key.id}`)?.group;
     if (!keyboard || !swing || !link) return;
-    const start = keyboard.localToWorld(new THREE.Vector3(key.x, -0.055, key.z - 0.38));
-    const end = swing.localToWorld(new THREE.Vector3(0, -0.16, 0));
+    const start = baseGroup.worldToLocal(keyboard.localToWorld(new THREE.Vector3(key.x, -0.055, key.z - 0.38)));
+    const end = baseGroup.worldToLocal(swing.localToWorld(new THREE.Vector3(0, -0.16, 0)));
     const delta = end.clone().sub(start);
     link.position.copy(start.add(end).multiplyScalar(0.5));
     link.quaternion.setFromUnitVectors(MECHANISM_UP, delta.clone().normalize());
-    link.scale.y = Math.max(0.2, delta.length() / (link.userData.baseLength || delta.length()));
+    link.scale.y = delta.length() / (link.userData.baseLength || delta.length());
   });
 
   const lift = reg.groups.get("ribbon.lift")?.group;
