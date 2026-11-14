@@ -32,6 +32,14 @@
     <td><sub><b><a href="figures/helicopter-swashplate/">helicopter-swashplate</a></b> (Light): grab and drag the swashplate, cyclic stick, or collective lever directly in 3D while watching all three blades feather and the protractor needle track Blade 1.</sub></td>
     <td><sub><b><a href="figures/helicopter-swashplate/">helicopter-swashplate</a></b> (Dark): 5 switchable themes (<code>Light</code>, <code>Paper</code>, <code>Dark</code>, <code>Blueprint</code>, <code>Sepia</code>) with theme-aware GLSL shader palettes.</sub></td>
   </tr>
+  <tr>
+    <td width="50%"><img src=".github/assets/typewriter-hero-light.webp" alt="Manual Type-Bar Typewriter in Light theme showing a QWERTY keyboard, raised typebars, ink ribbon, platen, paper, and escapement."></td>
+    <td width="50%"><img src=".github/assets/typewriter-hero-dark.webp" alt="Manual Type-Bar Typewriter in Dark theme showing the typebar mechanism, ribbon, platen, keyboard, and carriage."></td>
+  </tr>
+  <tr>
+    <td><sub><b><a href="figures/manual-typewriter/">manual-typewriter</a></b> (Light): type, space, feed, and return controls drive a seven-typebar mechanism and carriage.</sub></td>
+    <td><sub><b><a href="figures/manual-typewriter/">manual-typewriter</a></b> (Dark): 5 switchable themes with live paper and carriage readouts.</sub></td>
+  </tr>
 </table>
 
 ---
@@ -153,6 +161,11 @@ Every output bundle in `figures/<slug>/dist/<slug>.html` is self-contained and c
 - **Direct 3D Interaction & Controls**: Grab and drag the **swashplate assembly**, **2-axis cyclic gimbal stick**, or **collective quadrant lever** directly in the viewport (or tune `COLL`, `PITCH`, `ROLL`, and `RPM` sliders) while watching the **semi-circular Blade 1 pitch protractor needle** and all three airfoils feather smoothly—even paused at `0 rpm`. Includes a 4:1 cutaway bevel gearbox, three 120° CCPM servo pushrods, routed Bowden conduits, anti-rotation scissors, pitch links, and a coning-tracked GLSL swept rotor-disc blur shader.
 - **Verification**: Passes Stage 1 model test (`11 anchors`), Tier-1 3D audit (`119 parts · 3 tubes · 32 joints · 5 poses · 0 problems`), `inspect.mjs --ortho` / `--joints`, `drive.mjs` (`8 poses`, no `hero-exploded.png`, `scrolls sideways: no`), and headless CDP pointer-drag verification on `swash.assembly`.
 
+### 3. [`figures/manual-typewriter/`](figures/manual-typewriter/) — Manual Type-Bar Typewriter
+- **Mechanics**: Seven pivoting typebars strike an ink ribbon against paper on a moving platen; visible QWERTY keys, spool feeds, escapement, carriage rails, and return lever complete the machine.
+- **Direct interaction**: Drag the `K` key to type, the space bar to advance without printing, the return lever to reset the carriage, or the carriage itself to inspect line travel. The paper readout and FEED slider track the current column.
+- **Verification**: Passes Stage 1 model test (`9 anchors`), Tier-1 audit (`125 parts · 25 joints · 5 poses · 0 problems`), orthographic and joint inspection, and the 8-pose interactive drive; the 390px mobile check reports no sideways page scroll and the browser console is clean.
+
 ### Verification Outputs (`inspect.mjs` & `drive.mjs`)
 
 Every figure is verified with headless Chrome CDP across orthographic elevations (`--ortho`), zoomed joint reticle crops (`--joints`), and an 8-state interactive drive sheet (`drive.mjs`):
@@ -213,5 +226,6 @@ anatomy-threejs/
 │   └── drive.mjs                 # Hero stills, 8-state drive sheet & 390px mobile layout check
 └── figures/
     ├── wankel-engine/            # Enclosed cutaway reference with axial explode & RPM control
-    └── helicopter-swashplate/    # Open articulated linkage reference with direct 3D dragging
+    ├── helicopter-swashplate/    # Open articulated linkage reference with direct 3D dragging
+    └── manual-typewriter/       # Sequence-driven typebars, ribbon, paper, and carriage
 ```
