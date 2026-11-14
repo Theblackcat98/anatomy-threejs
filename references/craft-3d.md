@@ -1,6 +1,30 @@
 # 3D Craft & Visual Grammar (`references/craft-3d.md`)
 
-An Anatomy Three.js figure explains a technical system by turning it into a tangible, precision-machined bench-top apparatus rendered in an orthographic isometric projection with quantized cel shading, inverted-hull silhouettes, and sharp crease lines.
+An Anatomy Three.js figure explains a technical system by turning it into a tangible, precision-built 3D object or apparatus rendered in an orthographic isometric projection with quantized cel shading, optical glass and semantic channel materials, inverted-hull silhouettes, and sharp crease lines.
+
+---
+
+## 0. Stage 0 Metaphor Exploration & Archetypes
+
+Do not squeeze every prompt into a generic cast-iron tabletop plate with a single rotary knob. In Stage 0:
+1. For abstract, algorithmic, software, biological, or open-ended prompts, propose **2–3 distinct physical metaphors** that translate the concept into concrete geometry and motion.
+2. Select the matching **`SPEC.archetype`** for Stage 2 (`base.mjs`) and Stage 3 (`structure.mjs`):
+
+| `SPEC.archetype` | Grounding Hardware (`base.mjs`) | Best Used For |
+| :--- | :--- | :--- |
+| `"bench"` *(default)* | Beveled `buildSlabGeometry` bedplate, 4 turned feet, perimeter groove, front ruler, `brass` plaque | Engines, gearboxes, turbines, laboratory test rigs |
+| `"gantry"` / `"test-stand"` | Launch pad slab, flame trench/blast deck, or structural steel pier footings + optional `makeDatumGrid` | Static-fire rocket stands, cranes, wind tunnels, vertical rigs |
+| `"cabinet"` / `"enclosure"` | Leveling feet + hollow front-cutaway shell (`buildEnclosureBoxGeometry`) | Synthesizers, CRT/oscilloscopes, pin-tumbler locks, cameras, racks |
+| `"section"` / `"diorama"` | Terrain/masonry/fluid tank slab rim + `makeDatumGrid` underneath | Wave tanks, geological strata, optical paths, architecture |
+| `"free-space"` | Minimal spatial reference (`makeGimbalDatumRing` and/or `makeDatumGrid`) | Satellites, orbital mechanics, zero-g mechanisms, molecular lattices |
+
+3. Select **`SPEC.simulationMode`**:
+   - `"continuous"`: Rotary/periodic loop driven by `RPM` / `theta` (`CRANK` + `SLOW` shown).
+   - `"sequence"`: Discrete steps (`SPEC.steps` + `STEP` button) and one-shot events (`SPEC.triggers` + `burst()`/`settle()` envelopes). Hides `RPM` / `CRANK` / `SLOW` unless opted in.
+   - `"timeline"`: Scrubbable `0..1` `TIME` curve (`theta = timeline * 2π`).
+   - `"sandbox"`: Sits calmly at rest until the reader drags 3D parts directly or fires impulse triggers (`PLUCK`, `DROP`, `PULSE`).
+4. Optionally provide **`tourAt(clock, state)`** (or `SPEC.tour`) to demonstrate the apparatus automatically while idle (`1.6s` on load, resuming `3.6s` after user input stops).
+5. Optionally add **`SPEC.cameraViews`** bookmarks (rendered as header pill buttons + digit keys `1`–`9`) and **`SPEC.section`** (`{ axis, min, max, initial }` live 3D clipping plane on `clippable: true` shells).
 
 ---
 
@@ -27,16 +51,25 @@ All geometry lives in a right-handed Three.js coordinate system (`+X` right, `+Y
 
 Every 3D part registered with `reg.part(id, geometry, { ramp, outline, crease })` uses `kit/shaders.mjs` to quantize diffuse lighting into four discrete flat bands (`c0` shadow, `c1` lower-mid, `c2` upper-mid, `c3` highlight) plus a warm top-cap blend (`cTop`) for upward-facing normals ($n_y > 0.35$).
 
-Never invent custom colors on solid meshes. Assign every part to one of the six semantic ramps according to its role in the explanation:
+Never invent ad-hoc inline colors on solid meshes. Assign parts from the curated theme ramps (which adapt coherently across all 5 themes):
 
 | Ramp | Visual Weight | Role in the Apparatus | Examples |
 | :--- | :--- | :--- | :--- |
-| `lo` | Receding dark neutral | Heavy datum bedplate, rear endplate, cast exhaust manifold, ignition coil box, rubber boots, foot pads | `base.plate`, `rear.plate`, `coil.box`, `plug.*.boot` |
-| `mid` | Structural body neutral | Main cutaway housing, bearing pedestals, intake manifold, gauge post, spark hex nuts, tie rods | `stator.housing`, `pedestal.*`, `gauge.post` |
-| `hi` | Crisp light neutral | Primary shafts, control knob drum, gauge bezel, ceramic insulators, timing pulley, flange plates | `shaft.main`, `knob.drum`, `gauge.bezel`, `plug.*.insulator` |
-| `lit` | Saturated accent (Amber/Blue) | **The Hero Subject** — the single moving assembly the viewer's eye should lock onto first | `rotor.body`, `rotor.apexSeal.*` |
-| `brass` | Warm machined brass | Precision reaction/internal gears, eccentric bearing journal, capillary tubes, specification plaque | `rear.statGear`, `rotor.internalGear`, `shaft.journal`, `base.plaque` |
-| `copper` | Warm copper/bronze | High-voltage coil towers, primary spark cable, exhaust heat collar | `coil.tower.*`, `cable.spark.leading`, `stator.exhaust.collar` |
+| `lo` | Receding dark neutral | Datum plates, rear endplates, manifolds, coil/chassis boxes, rubber boots, foot pads | `base.plate`, `rear.plate`, `coil.box` |
+| `mid` | Structural body neutral | Main cutaway housings, cabinets, pedestals, frames, valve bodies | `stator.housing`, `pedestal.*`, `cabinet.shell` |
+| `hi` | Crisp light neutral | Primary shafts, sliding carriages, bezels, ceramic insulators, precision levers | `shaft.main`, `knob.drum`, `gauge.bezel` |
+| `lit` | Saturated accent (Amber/Blue) | Primary hero working assembly (or primary active channel in `"multi-channel"` mode) | `rotor.body`, `rotor.apexSeal.*` |
+| `brass` | Warm machined brass | Precision gears, pins, bearing journals, specification plaques | `rear.statGear`, `rotor.internalGear`, `base.plaque` |
+| `copper` | Warm copper/bronze | Conductors, coils, heat exchangers, primary tubing | `coil.tower.*`, `cable.spark.leading` |
+| `glass` | Translucent Fresnel cel glass | Optical lenses, vacuum chambers, viewing domes, fluid manometers | `chamber.dome`, `optic.prism` |
+| `intake` / `channelA` | Semantic channel A solid ramp | Cool input/low-pressure/intake channel flow (theme-harmonized) | `pipe.intake`, `stage.decode` |
+| `comp` / `channelB` | Semantic channel B solid ramp | Compression / second computational or thermodynamic stage | `valve.comp`, `stage.execute` |
+| `comb` / `channelC` | Semantic channel C solid ramp | Ignition / high-energy / active state stage | `chamber.comb`, `stage.alu` |
+| `exhaust` / `channelD` | Semantic channel D solid ramp | Exhaust / thermal rejection / output channel | `manifold.exhaust`, `stage.writeback` |
+
+### `SPEC.toneMode`
+- **`"single-lit"` *(default)***: Reserves `ramp: "lit"` for the hero assembly in `stage: "subject"` (plus optional `detail: true` accent needles/dots).
+- **`"multi-channel"`**: Set on diagrams comparing simultaneous pipelines, fluid circuits, optical beams, or computational stages so `lit`, `glass`, and channel ramps (`intake`/`channelA..D`) can appear across `structure`, `subject`, and `mechanism`.
 
 ### Outline & Crease Hierarchy
 - **`outline: "hi"` (`outlineWidth: 0.018–0.020`)**: Use on the hero subject (`rotor.body`), primary housing (`stator.housing`), and main shaft (`shaft.main`).
@@ -48,41 +81,36 @@ Never invent custom colors on solid meshes. Assign every part to one of the six 
 
 ## 3. Physical Parts Vocabulary
 
-Every figure should read as a complete bench-top instrument composed of five physical layers:
+Compose each figure from clear physical layers matched to its `SPEC.archetype`:
 
-1. **Instrument Bedplate (`base.mjs`)**:
-   - Beveled heavy slab (`buildSlabGeometry` with `radius: 0.26, bevel: true, bevelSize: 0.025, bevelThickness: 0.025`).
-   - Remember that `ExtrudeGeometry` adds `bevelThickness` to both top and bottom along the extrusion axis (`Y`). Always set `topSurfaceY = BASE_Y + BASE_H + bevelThickness` (`-2.12 + 0.24 + 0.025 = -1.855`) so parts mounted at `topSurfaceY` rest flush on the top face rather than sinking into the bevel.
-   - Four turned corner feet (`collar` + `pad`) with counterbored socket screws (`makeScrewDetail`) on the top corners above each foot.
-   - Dual inset perimeter grooves (`makePlanOutline`), a graduated ruler strip (`makeRulerTicks`), and a riveted `brass` plaque (`base.plaque`) with an engraved specification tag.
+1. **Base / Grounding Layer (`base.mjs`)**:
+   - **`"bench"`**: Beveled heavy slab (`buildSlabGeometry` with `radius: 0.26, bevel: true, bevelSize: 0.025, bevelThickness: 0.025`, `topSurfaceY = BASE_Y + BASE_H + bevelThickness`), 4 turned corner feet + counterbored screws (`makeScrewDetail`), perimeter grooves (`makePlanOutline`), ruler (`makeRulerTicks`), and riveted `brass` plaque.
+   - **`"gantry"` / `"test-stand"`**: Flame trench pad, concrete deck, hold-down ring, and structural baseplates.
+   - **`"cabinet"` / `"enclosure"`**: Leveling feet + recessed chassis floor / `buildEnclosureBoxGeometry` mounting plinth.
+   - **`"section"` / `"diorama"`**: Cutaway terrain/fluid tray rim + optional `makeDatumGrid`.
+   - **`"free-space"`**: `makeGimbalDatumRing` and/or `makeDatumGrid` so orbital/molecular machines float cleanly without tabletop slab clutter.
 
 2. **Load-Bearing Structure (`structure.mjs`)**:
-   - Flanged pedestals (`pedestal.rear`, `pedestal.front`) bolted to the bedplate with 4 socket screws each, tapered web columns, and cylindrical bearing saddles.
-   - Cutaway housing (`stator.housing`) with water-jacket passages, perimeter cooling fin loops (`THREE.LineLoop`), and perimeter tie rods (`stator.tieRod.*`) + hex nuts (`tieBolts.nut.*`).
-   - Radially outward-pointing intake/exhaust manifolds with flanged ports and dark bore circles (`kit.dotMaterials.dot`).
+   - Pedestals, frames, cabinet shells, optical chambers (`ramp: "glass"`), and cutaway housings.
+   - Pass `cutawayHide: true` on removable front shells, and/or pass **`clippable: true`** alongside `SPEC.section` so users can slice smoothly through housings and inspect cross-hatched interior section cuts in real time.
+   - Register port anchors with outward normals (`{ dir: [dx, dy, dz] }`) for downstream conduits.
 
 3. **Hero Moving Subject (`subject.mjs`)**:
-   - High-contrast `lit` body (`rotor.body`) with machined lightening pockets, combustion bathtub depressions on each flank, dual face oil-seal grooves, and `lit` apex seal bars (`rotor.apexSeal.*`).
-   - Precision `brass` internal gear (`rotor.internalGear`) meshing visibly with the stationary `brass` phasing gear (`rear.statGear`).
+   - High-contrast hero bodies and multi-stage hierarchical kinematic groups (`orbit -> spin`, `azimuth -> flap -> pitch`, gimbal rings).
+   - Pass `insideBoreOf` and `boreClearanceFn` for parts running inside bores so `audit3d.mjs` proves zero collision.
 
-4. **Domain-Authentic Operator Controls, Telemetry & Direct 3D Manipulation (`mechanism.mjs`)**:
-   - **Never copy another figure's controls or instruments.** Choose physical hardware that genuinely belongs to the machine being explained:
-     - *Rotary / throttle / micrometer*: knurled drum (`makeKnurlLines`), Vernier micrometer barrel, or stepped cam detent.
-     - *2-axis directional / cyclic*: gimballed control stick with spherical boot (`cyclic.stick` + `cyclic.grip`), X/Y cross-slide stage, or tilting cradle.
-     - *Pitch / travel / valve*: notched quadrant lever with graduated degree arc (`collective.quadrant`), rack-and-pinion slide, or screw-jack handwheel.
-     - *Telemetry readout*: curved blade-pitch protractor arc (`pitchScale.arc`), fluid manometer column, linear vernier gauge, or Bourdon pressure dial (use a pressure gauge **only** when pressure is actually being measured).
-   - **Direct 3D Manipulation (`reg.interactable`)**: Always ask what the reader expects to grab directly on screen. Register the primary moving control element (`swash.assembly`, `cyclic.group`, `collective.group`, sliding carriage, etc.) with `reg.interactable` so dragging it in 3D drives `setParam(...)` immediately — including while rotation is paused.
-   - Smooth 3D `CatmullRomCurve3` conduits, pushrods, or cables (`reg.tube`) connecting registered 3D port anchors.
-   - Coaxial drive shafts, gears, and front-side shrouds (`cutawayHide: true` when `features.cutaway` is `true`).
+4. **Domain-Authentic Operator Controls, Screens, Triggers & Direct 3D Interaction (`mechanism.mjs`)**:
+   - **Never clone unrelated stock controls.** Build hardware that genuinely drives the concept: rotary dials, 2-axis gimbal sticks, quadrant levers, sliding tumblers, wave plungers, or diegetic CRT/telemetry screens (`reg.screen`).
+   - **Direct 3D Manipulation (`reg.interactable`)**: Always register key 3D levers, tumblers, rotors, or sliders so dragging them directly in the viewport drives `setParam(...)`, `fireTrigger(...)`, or `applyStep(...)`.
+   - **Sequence / Sandbox Dynamics**: Use `burst(age, rise, fall)`, `settle(held, want, dt, seconds)`, and `smooth(a, b, x)` from `kit/runtime.mjs` with `SPEC.triggers` / `SPEC.steps`, plus optional `tourAt(clock, state)` for automatic idle showcase tours.
 
 5. **Confined Physical Medium Shader (`shader.mjs`)**:
-   - Custom GLSL shader (`THREE.ShaderMaterial`) restricted strictly to the active physical medium (gas, fluid, plasma, rotor wake) inside the active zone.
-   - Solid metal parts must **always** use `kit.createAnatomyPart`; never apply a custom plasma/glow shader to solid metal geometry.
+   - Custom GLSL shader (`THREE.ShaderMaterial`) restricted strictly to the active physical medium (gas, fluid, plasma, rotor wake, wave field) inside its containment boundary.
 
 6. **When to Enable or Disable View Modes (`SPEC.features`)**:
-   - `explode: true` — use **only** for enclosed concentric assemblies with stacked axial layers (engines, transmissions, multi-layer valves) where separating layers reveals hidden internal fit.
-   - `explode: false` — use for open-frame mechanisms, articulated linkages, swashplates, or optical/fluid benches where separating parts disconnects joints without adding clarity. Hides the `APART` button and `<kbd>E</kbd> apart` hint automatically.
-   - `cutaway: true` — use when a casing conceals moving internals; set `false` when the apparatus is naturally open.
+   - `explode`: Enable **only** for enclosed concentric assemblies where pulling layers apart reveals hidden fit (`false` hides `APART` / `E`).
+   - `cutaway`: Enable when an outer shell conceals moving internals; set `false` for open-frame mechanisms.
+   - `crank` / `slow` / `rpm`: Auto-disabled in `"sequence"`, `"timeline"`, and `"sandbox"` modes unless explicitly opted in.
 
 ---
 

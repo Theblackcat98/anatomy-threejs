@@ -255,6 +255,7 @@ export function buildSubject(reg, kit) {
     outline: "hi",
     crease: "lo",
     outlineWidth: 0.018,
+    clippable: true,
     mountOn: "gimbal.ring",
     allowOverlap: [
       "powerhead.hgmCollar",
@@ -370,6 +371,7 @@ export function buildSubject(reg, kit) {
     outline: "hi",
     crease: "lo",
     outlineWidth: 0.017,
+    clippable: true,
     mountOn: "powerhead.duct.L",
     allowOverlap: ["hpftp.rotor.shaft", "hpftp.preburner", "hpftp.bottomCap"]
   });
@@ -433,6 +435,7 @@ export function buildSubject(reg, kit) {
     outline: "hi",
     crease: "lo",
     outlineWidth: 0.017,
+    clippable: true,
     mountOn: "powerhead.duct.R",
     allowOverlap: ["hpotp.rotor.shaft", "hpotp.preburner", "hpotp.bottomCap"]
   });
@@ -567,6 +570,7 @@ export function buildSubject(reg, kit) {
     outline: "hi",
     crease: "lo",
     outlineWidth: 0.018,
+    clippable: true,
     mountOn: "powerhead.hgmCollar",
     allowOverlap: ["mcc.liner.back", "mcc.liner.front", "nozzle.upper.back", "nozzle.upper.front", "mcc.manifold.top"]
   });
@@ -612,6 +616,7 @@ export function buildSubject(reg, kit) {
     outline: "hi",
     crease: "lo",
     outlineWidth: 0.019,
+    clippable: true,
     mountOn: "mcc.jacket.back",
     allowOverlap: ["mcc.liner.back", "nozzle.lower"]
   });
@@ -633,6 +638,7 @@ export function buildSubject(reg, kit) {
     outline: "hi",
     crease: "lo",
     outlineWidth: 0.020,
+    clippable: true,
     mountOn: "nozzle.upper.back",
     allowOverlap: ["nozzle.upper.front"]
   });

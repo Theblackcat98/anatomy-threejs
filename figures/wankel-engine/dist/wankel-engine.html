@@ -255,6 +255,82 @@
       gap: 6px;
     }
 
+    .views-group {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 3px 5px;
+      border-radius: 8px;
+      border: 1px solid var(--anatomy-border);
+      background-color: color-mix(in srgb, var(--anatomy-card) 82%, transparent);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      max-width: calc(100% - 260px);
+    }
+
+    .views-group:empty,
+    .triggers-group:empty {
+      display: none;
+    }
+
+    .triggers-group {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .view-pill {
+      padding: 3px 7px;
+      border-radius: 5px;
+      border: 1px solid transparent;
+      background-color: transparent;
+      color: var(--anatomy-muted);
+      font-family: var(--anatomy-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .view-pill:hover {
+      background-color: var(--anatomy-pill-bg);
+      color: var(--anatomy-text);
+    }
+
+    .view-pill.active {
+      border-color: var(--anatomy-lit);
+      background-color: var(--anatomy-pill-bg);
+      color: var(--anatomy-lit);
+    }
+
+    .action-btn.trigger-btn {
+      border-color: color-mix(in srgb, var(--anatomy-lit) 55%, var(--anatomy-border));
+      color: var(--anatomy-text);
+      font-weight: 600;
+    }
+
+    .action-btn.trigger-btn:hover {
+      border-color: var(--anatomy-lit);
+      color: var(--anatomy-lit);
+      background-color: var(--anatomy-pill-bg);
+    }
+
+    .action-btn.trigger-btn.armed {
+      border-color: var(--anatomy-lit);
+      background-color: color-mix(in srgb, var(--anatomy-lit) 16%, transparent);
+      color: var(--anatomy-lit);
+    }
+
     .sliders-group {
       display: inline-flex;
       flex-wrap: wrap;
@@ -397,6 +473,14 @@
         font-size: 9.5px;
         padding: 3px 6px;
       }
+      .corner.top-left,
+      .corner.top-right {
+        max-width: 44%;
+      }
+      .views-group {
+        top: 42px;
+        max-width: calc(100% - 24px);
+      }
       .corner.bottom-left {
         bottom: 36px;
       }
@@ -451,6 +535,7 @@
         <span class="accent-dot"></span>
         <span>Fig 04 · Wankel Rotary Engine</span>
       </div>
+      <div class="views-group hud-detail" id="camera-views-group" aria-label="Camera views"></div>
       <div class="corner top-right hud-detail" id="phase-corner">CHAMBER A · INTAKE</div>
 
       <div class="corner bottom-left hud-detail">
@@ -470,8 +555,9 @@
     <div class="controls-bar">
       <div class="scheme-group" id="scheme-buttons" aria-label="Anatomy color themes"></div>
       <div class="params-group">
+        <div class="triggers-group" id="triggers-group"></div>
         <div class="sliders-group" id="custom-sliders">
-          <label class="slider-label" title="Shaft speed">
+          <label class="slider-label" id="rpm-slider-wrap" title="Shaft speed">
             <span>RPM</span>
             <input type="range" id="rpm-slider" min="0" max="2400" step="20" value="720" />
           </label>
@@ -541,7 +627,8 @@ const THEMES = [
       comb: "#ea580c",
       exhaust: "#dc2626",
       cavity: "#ece9e0"
-    }
+    },
+    glass: { top: "#ffffff", rim: "#0284c7", tint: "#e0f2fe", opacity: 0.32 }
   },
   {
     id: "paper",
@@ -583,7 +670,8 @@ const THEMES = [
       comb: "#d97706",
       exhaust: "#b91c1c",
       cavity: "#e9dfc9"
-    }
+    },
+    glass: { top: "#fffaf0", rim: "#b45309", tint: "#fef3c7", opacity: 0.32 }
   },
   {
     id: "dark",
@@ -625,7 +713,8 @@ const THEMES = [
       comb: "#fb923c",
       exhaust: "#f87171",
       cavity: "#0e1013"
-    }
+    },
+    glass: { top: "#e0f2fe", rim: "#38bdf8", tint: "#0c4a6e", opacity: 0.36 }
   },
   {
     id: "blueprint",
@@ -667,7 +756,8 @@ const THEMES = [
       comb: "#facc15",
       exhaust: "#fb7185",
       cavity: "#09172b"
-    }
+    },
+    glass: { top: "#ffffff", rim: "#93c5fd", tint: "#1e40af", opacity: 0.34 }
   },
   {
     id: "sepia",
@@ -709,14 +799,50 @@ const THEMES = [
       comb: "#e11d48",
       exhaust: "#b91c1c",
       cavity: "#e2d5c0"
-    }
+    },
+    glass: { top: "#fffbeb", rim: "#b45309", tint: "#fde68a", opacity: 0.34 }
   }
 ];
+
+const CHANNEL_RAMP_ALIASES = {
+  channelA: "intake",
+  channelB: "comp",
+  channelC: "comb",
+  channelD: "exhaust"
+};
+
+function deriveChannelRamp(hexColor, isDark) {
+  const base = new THREE.Color(hexColor);
+  const white = new THREE.Color(isDark ? "#e2e8f0" : "#ffffff");
+  const black = new THREE.Color("#090b0f");
+  const mixHex = (target, amt) => "#" + base.clone().lerp(target, amt).getHexString();
+  return {
+    top: mixHex(white, isDark ? 0.42 : 0.62),
+    shades: [
+      mixHex(white, isDark ? 0.18 : 0.28),
+      "#" + base.getHexString(),
+      mixHex(black, 0.25),
+      mixHex(black, 0.48)
+    ]
+  };
+}
+
+function resolveThemeRamp(theme, rampKey) {
+  const canonical = CHANNEL_RAMP_ALIASES[rampKey] || rampKey;
+  if (theme.ramps[canonical]) return theme.ramps[canonical];
+  if (theme.channels && theme.channels[canonical]) {
+    return deriveChannelRamp(theme.channels[canonical], Boolean(theme.isDark));
+  }
+  return theme.ramps.mid;
+}
 const CEL_VERTEX_SHADER = `
   varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
   void main() {
     vWorldNormal = normalize(mat3(modelMatrix) * normal);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
   }
 `;
 const CEL_FRAGMENT_SHADER = `
@@ -727,7 +853,11 @@ const CEL_FRAGMENT_SHADER = `
   uniform vec3 uShade2;
   uniform vec3 uShade3;
   uniform float uTopBias;
+  uniform vec4 uSectionPlane;
+  uniform float uSectionEnabled;
+  uniform float uClippedPart;
   varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
 
   float aaStep(float edge, float x) {
     float w = clamp(fwidth(x) * 1.15, 0.015, 0.08);
@@ -735,6 +865,18 @@ const CEL_FRAGMENT_SHADER = `
   }
 
   void main() {
+    if (uSectionEnabled > 0.5 && uClippedPart > 0.5) {
+      float secDist = dot(vWorldPos, uSectionPlane.xyz) + uSectionPlane.w;
+      if (secDist < 0.0) discard;
+    }
+
+    if (!gl_FrontFacing) {
+      float hatch = step(0.54, fract((vWorldPos.x * 1.15 + vWorldPos.y * 1.35 + vWorldPos.z * 0.9) * 12.0));
+      vec3 cutCol = mix(uShade0 * 0.86, uShade1, hatch * 0.65);
+      gl_FragColor = vec4(cutCol, 1.0);
+      return;
+    }
+
     vec3 N = normalize(vWorldNormal);
     float ndotl = dot(N, normalize(uLightDir));
 
@@ -750,15 +892,69 @@ const CEL_FRAGMENT_SHADER = `
     gl_FragColor = vec4(col, 1.0);
   }
 `;
+const GLASS_VERTEX_SHADER = `
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
+  varying vec3 vViewDir;
+  void main() {
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    vViewDir = normalize(cameraPosition - wp.xyz);
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+const GLASS_FRAGMENT_SHADER = `
+  uniform vec3 uLightDir;
+  uniform vec3 uTop;
+  uniform vec3 uRim;
+  uniform vec3 uTint;
+  uniform float uOpacity;
+  uniform vec4 uSectionPlane;
+  uniform float uSectionEnabled;
+  uniform float uClippedPart;
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
+  varying vec3 vViewDir;
+
+  void main() {
+    if (uSectionEnabled > 0.5 && uClippedPart > 0.5) {
+      float secDist = dot(vWorldPos, uSectionPlane.xyz) + uSectionPlane.w;
+      if (secDist < 0.0) discard;
+    }
+
+    vec3 N = normalize(vWorldNormal);
+    if (!gl_FrontFacing) N = -N;
+    vec3 V = normalize(vViewDir);
+    vec3 L = normalize(uLightDir);
+
+    float ndotv = abs(dot(N, V));
+    float fresnel = pow(clamp(1.0 - ndotv, 0.0, 1.0), 2.0);
+    vec3 H = normalize(L + V);
+    float specBand = smoothstep(0.90, 0.96, max(dot(N, H), 0.0));
+    float topBand = smoothstep(0.68, 0.82, N.y + 0.15 * N.z) * 0.28;
+
+    vec3 col = mix(uTint, uRim, smoothstep(0.22, 0.65, fresnel));
+    col = mix(col, uTop, clamp(specBand * 0.72 + topBand, 0.0, 0.85));
+    float alpha = clamp(uOpacity + fresnel * 0.44 + specBand * 0.35, 0.06, 0.90);
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
 function createShaderKit(initialTheme = THEMES[0]) {
   let currentTheme = initialTheme;
   const lightDir = new THREE.Vector3(0.52, 0.78, 0.48).normalize();
   const anatomyMaterials = [];
   const outlineMaterials = [];
+  const glassMaterials = [];
   const haloMaterials = [];
+  const clippableLineMaterials = [];
   const themeListeners = [];
   const lineMaterials = {};
   const dotMaterials = {};
+
+  let activeSectionPlane = null;
+  const sectionPlaneVec4 = new THREE.Vector4(0, 0, -1, 999);
+  let sectionEnabledVal = 0.0;
 
   ["hi", "mid", "lo", "faint", "lit"].forEach((k) => {
     lineMaterials[k] = new THREE.LineBasicMaterial({
@@ -774,8 +970,8 @@ function createShaderKit(initialTheme = THEMES[0]) {
     });
   });
 
-  function createAnatomySolidMaterial(rampKey = "mid", topBias = 0.62) {
-    const ramp = currentTheme.ramps[rampKey] || currentTheme.ramps.mid;
+  function createAnatomySolidMaterial(rampKey = "mid", topBias = 0.62, clippable = false) {
+    const ramp = resolveThemeRamp(currentTheme, rampKey);
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         uLightDir: { value: lightDir },
@@ -784,41 +980,88 @@ function createShaderKit(initialTheme = THEMES[0]) {
         uShade1: { value: new THREE.Color(ramp.shades[2]) },
         uShade2: { value: new THREE.Color(ramp.shades[1]) },
         uShade3: { value: new THREE.Color(ramp.shades[0]) },
-        uTopBias: { value: topBias }
+        uTopBias: { value: topBias },
+        uSectionPlane: { value: sectionPlaneVec4 },
+        uSectionEnabled: { value: sectionEnabledVal },
+        uClippedPart: { value: clippable ? 1.0 : 0.0 }
       },
       vertexShader: CEL_VERTEX_SHADER,
       fragmentShader: CEL_FRAGMENT_SHADER,
+      side: clippable && sectionEnabledVal > 0.5 ? THREE.DoubleSide : THREE.FrontSide,
       polygonOffset: true,
       polygonOffsetFactor: 1.5,
       polygonOffsetUnits: 1.5
     });
     mat.userData.rampKey = rampKey;
+    mat.userData.clippable = Boolean(clippable);
     anatomyMaterials.push(mat);
     return mat;
   }
 
-  function createOutlineMaterial(lineKey = "mid", thickness = 0.018) {
+  function createGlassMaterial(opts = {}) {
+    const gTheme = currentTheme.glass || { top: "#ffffff", rim: "#38bdf8", tint: "#bae6fd", opacity: 0.34 };
+    const clippable = Boolean(opts.clippable);
+    const customOpacity = typeof opts.opacity === "number" ? opts.opacity : null;
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uLightDir: { value: lightDir },
+        uTop: { value: new THREE.Color(gTheme.top) },
+        uRim: { value: new THREE.Color(gTheme.rim) },
+        uTint: { value: new THREE.Color(gTheme.tint) },
+        uOpacity: { value: customOpacity !== null ? customOpacity : gTheme.opacity },
+        uSectionPlane: { value: sectionPlaneVec4 },
+        uSectionEnabled: { value: sectionEnabledVal },
+        uClippedPart: { value: clippable ? 1.0 : 0.0 }
+      },
+      vertexShader: GLASS_VERTEX_SHADER,
+      fragmentShader: GLASS_FRAGMENT_SHADER,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    mat.userData.customOpacity = customOpacity;
+    mat.userData.clippable = clippable;
+    glassMaterials.push(mat);
+    return mat;
+  }
+
+  function createOutlineMaterial(lineKey = "mid", thickness = 0.018, clippable = false) {
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         uColor: { value: new THREE.Color(currentTheme.lines[lineKey] || currentTheme.lines.mid) },
-        uThickness: { value: thickness }
+        uThickness: { value: thickness },
+        uSectionPlane: { value: sectionPlaneVec4 },
+        uSectionEnabled: { value: sectionEnabledVal },
+        uClippedPart: { value: clippable ? 1.0 : 0.0 }
       },
       vertexShader: `
         uniform float uThickness;
+        varying vec3 vWorldPos;
         void main() {
           vec3 displaced = position + normalize(normal) * uThickness;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+          vec4 wp = modelMatrix * vec4(displaced, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
         }
       `,
       fragmentShader: `
         uniform vec3 uColor;
+        uniform vec4 uSectionPlane;
+        uniform float uSectionEnabled;
+        uniform float uClippedPart;
+        varying vec3 vWorldPos;
         void main() {
+          if (uSectionEnabled > 0.5 && uClippedPart > 0.5) {
+            float secDist = dot(vWorldPos, uSectionPlane.xyz) + uSectionPlane.w;
+            if (secDist < 0.0) discard;
+          }
           gl_FragColor = vec4(uColor, 1.0);
         }
       `,
       side: THREE.BackSide
     });
     mat.userData.lineKey = lineKey;
+    mat.userData.clippable = Boolean(clippable);
     outlineMaterials.push(mat);
     return mat;
   }
@@ -835,25 +1078,33 @@ function createShaderKit(initialTheme = THEMES[0]) {
   }
 
   function createAnatomyPart(geometry, options = {}) {
+    const isGlass = options.ramp === "glass";
     const opts = Object.assign({
       ramp: "mid",
-      outline: "mid",
+      outline: isGlass ? "lo" : "mid",
       crease: "faint",
       creaseAngle: 28,
-      outlineWidth: 0.017,
+      outlineWidth: isGlass ? 0.009 : 0.017,
       topBias: 0.62,
       noOutline: false,
-      noCrease: false
+      noCrease: false,
+      clippable: false,
+      opacity: undefined
     }, options);
 
     const group = new THREE.Group();
-    const solidMat = createAnatomySolidMaterial(opts.ramp, opts.topBias);
+    const solidMat = isGlass
+      ? createGlassMaterial({ opacity: opts.opacity, clippable: opts.clippable })
+      : createAnatomySolidMaterial(opts.ramp, opts.topBias, opts.clippable);
     const mesh = new THREE.Mesh(geometry, solidMat);
     mesh.name = "solid";
+    if (isGlass) {
+      mesh.renderOrder = 2;
+    }
     group.add(mesh);
 
     if (!opts.noOutline) {
-      const outMat = createOutlineMaterial(opts.outline, opts.outlineWidth);
+      const outMat = createOutlineMaterial(opts.outline, opts.outlineWidth, opts.clippable);
       const outMesh = new THREE.Mesh(geometry, outMat);
       outMesh.name = "outline";
       group.add(outMesh);
@@ -861,12 +1112,47 @@ function createShaderKit(initialTheme = THEMES[0]) {
 
     if (!opts.noCrease) {
       const edgesGeo = new THREE.EdgesGeometry(geometry, opts.creaseAngle);
-      const edges = new THREE.LineSegments(edgesGeo, lineMaterials[opts.crease] || lineMaterials.faint);
+      let creaseMat = lineMaterials[opts.crease] || lineMaterials.faint;
+      if (opts.clippable) {
+        creaseMat = creaseMat.clone();
+        creaseMat.userData.lineKey = opts.crease in lineMaterials ? opts.crease : "faint";
+        creaseMat.clippingPlanes = activeSectionPlane ? [activeSectionPlane] : [];
+        clippableLineMaterials.push(creaseMat);
+      }
+      const edges = new THREE.LineSegments(edgesGeo, creaseMat);
       edges.name = "crease";
       group.add(edges);
     }
 
     return group;
+  }
+
+  function setSectionPlane(planeOrNull) {
+    activeSectionPlane = planeOrNull || null;
+    sectionEnabledVal = activeSectionPlane ? 1.0 : 0.0;
+    if (activeSectionPlane) {
+      sectionPlaneVec4.set(
+        activeSectionPlane.normal.x,
+        activeSectionPlane.normal.y,
+        activeSectionPlane.normal.z,
+        activeSectionPlane.constant
+      );
+    }
+    anatomyMaterials.forEach((mat) => {
+      mat.uniforms.uSectionEnabled.value = sectionEnabledVal;
+      if (mat.userData.clippable) {
+        mat.side = activeSectionPlane ? THREE.DoubleSide : THREE.FrontSide;
+      }
+    });
+    glassMaterials.forEach((mat) => {
+      mat.uniforms.uSectionEnabled.value = sectionEnabledVal;
+    });
+    outlineMaterials.forEach((mat) => {
+      mat.uniforms.uSectionEnabled.value = sectionEnabledVal;
+    });
+    clippableLineMaterials.forEach((mat) => {
+      mat.clippingPlanes = activeSectionPlane ? [activeSectionPlane] : [];
+    });
   }
 
   function onThemeChange(fn) {
@@ -880,12 +1166,22 @@ function createShaderKit(initialTheme = THEMES[0]) {
     currentTheme = theme;
 
     anatomyMaterials.forEach((mat) => {
-      const ramp = theme.ramps[mat.userData.rampKey] || theme.ramps.mid;
+      const ramp = resolveThemeRamp(theme, mat.userData.rampKey);
       mat.uniforms.uTop.value.set(ramp.top);
       mat.uniforms.uShade0.value.set(ramp.shades[3]);
       mat.uniforms.uShade1.value.set(ramp.shades[2]);
       mat.uniforms.uShade2.value.set(ramp.shades[1]);
       mat.uniforms.uShade3.value.set(ramp.shades[0]);
+    });
+
+    const gTheme = theme.glass || { top: "#ffffff", rim: "#38bdf8", tint: "#bae6fd", opacity: 0.34 };
+    glassMaterials.forEach((mat) => {
+      mat.uniforms.uTop.value.set(gTheme.top);
+      mat.uniforms.uRim.value.set(gTheme.rim);
+      mat.uniforms.uTint.value.set(gTheme.tint);
+      if (mat.userData.customOpacity === null) {
+        mat.uniforms.uOpacity.value = gTheme.opacity;
+      }
     });
 
     outlineMaterials.forEach((mat) => {
@@ -895,6 +1191,10 @@ function createShaderKit(initialTheme = THEMES[0]) {
 
     Object.keys(lineMaterials).forEach((k) => {
       lineMaterials[k].color.set(theme.lines[k]);
+    });
+    clippableLineMaterials.forEach((mat) => {
+      const lk = mat.userData.lineKey || "faint";
+      mat.color.set(theme.lines[lk] || theme.lines.faint);
     });
     dotMaterials.dot.color.set(theme.lines.dot);
     dotMaterials.lit.color.set(theme.lines.lit);
@@ -915,9 +1215,11 @@ function createShaderKit(initialTheme = THEMES[0]) {
     lineMaterials,
     dotMaterials,
     createAnatomySolidMaterial,
+    createGlassMaterial,
     createOutlineMaterial,
     createHaloMaterial,
     createAnatomyPart,
+    setSectionPlane,
     onThemeChange,
     applyTheme
   };
@@ -1119,6 +1421,159 @@ function makeHaloMesh(w, d, r, pos, kit) {
   return haloMesh;
 }
 
+/**
+ * Orthographic blueprint datum grid + perimeter frame for non-bench archetypes
+ * ("free-space", "section", "diorama").
+ */
+function makeDatumGrid(width, depth, divisionsX = 8, divisionsZ = 6, y = 0, kit, toneKey = "faint") {
+  const g = new THREE.Group();
+  const hw = width * 0.5;
+  const hd = depth * 0.5;
+  const gridPts = [];
+  const tickPts = [];
+
+  for (let i = 0; i <= divisionsX; i++) {
+    const x = -hw + (i / divisionsX) * width;
+    const target = i === 0 || i === divisionsX ? tickPts : gridPts;
+    target.push(new THREE.Vector3(x, y, -hd), new THREE.Vector3(x, y, hd));
+  }
+  for (let j = 0; j <= divisionsZ; j++) {
+    const z = -hd + (j / divisionsZ) * depth;
+    const target = j === 0 || j === divisionsZ ? tickPts : gridPts;
+    target.push(new THREE.Vector3(-hw, y, z), new THREE.Vector3(hw, y, z));
+  }
+
+  const c = 0.14;
+  tickPts.push(
+    new THREE.Vector3(-c, y + 0.001, 0), new THREE.Vector3(c, y + 0.001, 0),
+    new THREE.Vector3(0, y + 0.001, -c), new THREE.Vector3(0, y + 0.001, c)
+  );
+
+  g.add(
+    new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(gridPts),
+      kit.lineMaterials[toneKey] || kit.lineMaterials.faint
+    ),
+    new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(tickPts),
+      kit.lineMaterials.lo
+    )
+  );
+  return g;
+}
+
+/**
+ * Graduated 3-axis / azimuthal gimbal datum ring for "free-space" or aerospace figures.
+ */
+function makeGimbalDatumRing(radius, y = 0, kit, toneKey = "lo") {
+  const g = new THREE.Group();
+  g.position.set(0, y, 0);
+
+  const eqPts = [];
+  const tickPts = [];
+  const majorPts = [];
+  const segs = 72;
+  for (let i = 0; i <= segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    eqPts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+  }
+  for (let deg = 0; deg < 360; deg += 10) {
+    const a = (deg * Math.PI) / 180;
+    const isMajor = deg % 30 === 0;
+    const r0 = radius - (isMajor ? 0.14 : 0.07);
+    const target = isMajor ? majorPts : tickPts;
+    target.push(
+      new THREE.Vector3(Math.cos(a) * r0, 0, Math.sin(a) * r0),
+      new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius)
+    );
+  }
+
+  const meridPts = [];
+  for (let i = 0; i <= segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    const rM = radius * 1.03;
+    meridPts.push(new THREE.Vector3(Math.cos(a) * rM, Math.sin(a) * rM, 0));
+  }
+
+  g.add(
+    new THREE.Line(new THREE.BufferGeometry().setFromPoints(eqPts), kit.lineMaterials[toneKey] || kit.lineMaterials.lo),
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(tickPts), kit.lineMaterials.faint),
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(majorPts), kit.lineMaterials.mid),
+    new THREE.Line(new THREE.BufferGeometry().setFromPoints(meridPts), kit.lineMaterials.faint)
+  );
+  return g;
+}
+
+/**
+ * Builds an open-front hollow cabinet/chassis shell BufferGeometry for "cabinet" / "enclosure" archetypes.
+ * Centered on X and Z; Y runs from 0..height (or -height/2..+height/2 when centerY = true).
+ */
+function buildEnclosureBoxGeometry(width, height, depth, wallThickness = 0.12, opts = {}) {
+  const { openTop = false, centerY = true } = opts;
+  const hw = width * 0.5;
+  const hd = depth * 0.5;
+  const t = Math.min(wallThickness, hw * 0.45, height * 0.35, hd * 0.45);
+  const y0 = centerY ? -height * 0.5 : 0;
+  const y1 = centerY ? height * 0.5 : height;
+  const iy0 = y0 + t;
+  const iy1 = openTop ? y1 : y1 - t;
+  const iz0 = -hd + t;
+
+  const positions = [];
+  const pushTri = (a, b, c) => {
+    positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+  };
+  // Quad with outward normal when vertices [p0, p1, p2, p3] are ordered CCW from outside
+  const pushQuad = (p0, p1, p2, p3) => {
+    pushTri(p0, p1, p2);
+    pushTri(p0, p2, p3);
+  };
+
+  // Outer left (-X)
+  pushQuad([-hw, y0, -hd], [-hw, y0, hd], [-hw, y1, hd], [-hw, y1, -hd]);
+  // Outer right (+X)
+  pushQuad([hw, y0, hd], [hw, y0, -hd], [hw, y1, -hd], [hw, y1, hd]);
+  // Outer back (-Z)
+  pushQuad([hw, y0, -hd], [-hw, y0, -hd], [-hw, y1, -hd], [hw, y1, -hd]);
+  // Outer bottom (-Y)
+  pushQuad([-hw, y0, -hd], [hw, y0, -hd], [hw, y0, hd], [-hw, y0, hd]);
+
+  // Inner bottom (+Y)
+  pushQuad([-hw + t, iy0, hd], [hw - t, iy0, hd], [hw - t, iy0, iz0], [-hw + t, iy0, iz0]);
+  // Inner back (+Z)
+  pushQuad([-hw + t, iy0, iz0], [hw - t, iy0, iz0], [hw - t, iy1, iz0], [-hw + t, iy1, iz0]);
+  // Inner left (+X)
+  pushQuad([-hw + t, iy0, hd], [-hw + t, iy0, iz0], [-hw + t, iy1, iz0], [-hw + t, iy1, hd]);
+  // Inner right (-X)
+  pushQuad([hw - t, iy0, iz0], [hw - t, iy0, hd], [hw - t, iy1, hd], [hw - t, iy1, iz0]);
+
+  if (!openTop) {
+    // Outer top (+Y)
+    pushQuad([-hw, y1, hd], [hw, y1, hd], [hw, y1, -hd], [-hw, y1, -hd]);
+    // Inner top (-Y)
+    pushQuad([-hw + t, iy1, iz0], [hw - t, iy1, iz0], [hw - t, iy1, hd], [-hw + t, iy1, hd]);
+    // Front rim (+Z): 4 strips around opening
+    pushQuad([-hw, y0, hd], [hw, y0, hd], [hw, iy0, hd], [-hw, iy0, hd]); // bottom rim
+    pushQuad([-hw, iy1, hd], [hw, iy1, hd], [hw, y1, hd], [-hw, y1, hd]); // top rim
+    pushQuad([-hw, iy0, hd], [-hw + t, iy0, hd], [-hw + t, iy1, hd], [-hw, iy1, hd]); // left post
+    pushQuad([hw - t, iy0, hd], [hw, iy0, hd], [hw, iy1, hd], [hw - t, iy1, hd]); // right post
+  } else {
+    // Front U-rim (+Z)
+    pushQuad([-hw, y0, hd], [hw, y0, hd], [hw, iy0, hd], [-hw, iy0, hd]); // bottom rim
+    pushQuad([-hw, iy0, hd], [-hw + t, iy0, hd], [-hw + t, y1, hd], [-hw, y1, hd]); // left post
+    pushQuad([hw - t, iy0, hd], [hw, iy0, hd], [hw, y1, hd], [hw - t, y1, hd]); // right post
+    // Open top U-rim (+Y)
+    pushQuad([-hw, y1, hd], [-hw + t, y1, hd], [-hw + t, y1, iz0], [-hw, y1, iz0]); // top left lip
+    pushQuad([hw - t, y1, hd], [hw, y1, hd], [hw, y1, iz0], [hw - t, y1, iz0]); // top right lip
+    pushQuad([-hw, y1, iz0], [hw, y1, iz0], [hw, y1, -hd], [-hw, y1, -hd]); // top back lip
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
 
 /* --- kit/registry.mjs --- */
 class Recorder3D {
@@ -1130,6 +1585,7 @@ class Recorder3D {
     this.joints = new Map();     // id -> THREE.Object3D (named anchor points)
     this.groups = new Map();     // id -> { id, group, opts }
     this.tags = new Map();       // id -> { id, text, pos }
+    this.screens = new Map();    // id -> { id, group, mesh, canvas, ctx, texture, draw }
     this.interactables = [];     // { id, object3d, cursor, hint, onDrag }
     this.currentStage = "base";  // 'base' | 'structure' | 'subject' | 'mechanism' | 'shader'
   }
@@ -1216,14 +1672,16 @@ class Recorder3D {
       throw new Error(`Duplicate part ID registered: "${id}"`);
     }
     const {
-      ramp = "mid",          // 'lo' | 'mid' | 'hi' | 'lit' | 'brass' | 'copper'
-      outline = "mid",
+      ramp = "mid",          // 'lo' | 'mid' | 'hi' | 'lit' | 'brass' | 'copper' | 'glass' | 'intake' | 'comp' | 'comb' | 'exhaust' | 'channelA..D'
+      outline = ramp === "glass" ? "lo" : "mid",
       crease = "faint",
       creaseAngle = 28,
-      outlineWidth = 0.017,
+      outlineWidth = ramp === "glass" ? 0.009 : 0.017,
       topBias = 0.62,
       noOutline = false,
       noCrease = false,
+      clippable = false,
+      opacity = undefined,
       parent = this.root,
       pos = [0, 0, 0],
       rot = [0, 0, 0],
@@ -1245,7 +1703,9 @@ class Recorder3D {
       outlineWidth,
       topBias,
       noOutline,
-      noCrease
+      noCrease,
+      clippable: Boolean(clippable),
+      opacity
     });
     group.name = id;
     group.position.set(...pos);
@@ -1263,11 +1723,97 @@ class Recorder3D {
       basePos: [...pos],
       baseRot: [...rot],
       detail,
-      cutawayHide
+      cutawayHide,
+      clippable: Boolean(clippable)
     };
 
     parent.add(group);
     this.parts.set(id, { id, group, geometry, opts: group.userData });
+    return group;
+  }
+
+  /**
+   * Mount a live 2D CanvasTexture readout / oscilloscope / telemetry screen inside the 3D scene.
+   * Returns the bezel THREE.Group so it participates in stages, explode, and interactions.
+   */
+  screen(id, opts = {}) {
+    const {
+      width = 1.2,
+      height = 0.78,
+      depth = 0.06,
+      bezelPad = 0.06,
+      resolution = [256, 168],
+      ramp = "lo",
+      outline = "mid",
+      parent = this.root,
+      pos = [0, 0, 0],
+      rot = [0, 0, 0],
+      mountOn = "ground",
+      allowOverlap = [],
+      explode = [0, 0, 0],
+      detail = false,
+      cutawayHide = false,
+      clippable = false,
+      stage = this.currentStage,
+      draw = null
+    } = opts;
+
+    const bezelGeo = new THREE.BoxGeometry(width + bezelPad * 2, height + bezelPad * 2, depth);
+    const group = this.part(id, bezelGeo, {
+      ramp,
+      outline,
+      crease: "hi",
+      parent,
+      pos,
+      rot,
+      mountOn,
+      allowOverlap,
+      explode,
+      detail,
+      cutawayHide,
+      clippable,
+      stage
+    });
+
+    let canvas = null;
+    let ctx = null;
+    let texture = null;
+    if (typeof document !== "undefined" && typeof document.createElement === "function") {
+      canvas = document.createElement("canvas");
+      canvas.width = resolution[0] || 256;
+      canvas.height = resolution[1] || 168;
+      ctx = canvas.getContext("2d");
+      texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+    }
+
+    const screenMat = new THREE.MeshBasicMaterial({
+      map: texture || undefined,
+      color: texture ? 0xffffff : 0x1e293b,
+      toneMapped: false
+    });
+    const screenGeo = new THREE.PlaneGeometry(width, height);
+    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+    screenMesh.name = "screen-face";
+    screenMesh.position.z = depth * 0.5 + 0.004;
+    group.add(screenMesh);
+
+    const entry = {
+      id,
+      group,
+      mesh: screenMesh,
+      canvas,
+      ctx,
+      texture,
+      width,
+      height,
+      resolution,
+      draw
+    };
+    this.screens.set(id, entry);
+    group.userData.screen = entry;
     return group;
   }
 
@@ -1469,6 +2015,32 @@ class Recorder3D {
 
 
 /* --- kit/runtime.mjs --- */
+function clamp01(x) {
+  return x <= 0 ? 0 : x >= 1 ? 1 : x;
+}
+function smooth(a, b, x) {
+  if (a === b) return x >= b ? 1 : 0;
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+}
+function burst(age, rise = 0.08, fall = 0.65) {
+  if (!Number.isFinite(age) || age < 0) return 0;
+  if (age <= rise) {
+    return rise <= 0 ? 1 : smooth(0, rise, age);
+  }
+  const end = rise + Math.max(0.001, fall);
+  if (age >= end) return 0;
+  return 1 - smooth(rise, end, age);
+}
+function settle(held, want, dt, seconds = 0.25, calm = 1) {
+  if (seconds <= 0 || dt <= 0) return want;
+  const alpha = 1 - Math.exp((-dt * Math.max(0.15, calm)) / Math.max(0.001, seconds));
+  if (typeof held === "object" && held !== null && "at" in held) {
+    held.at += (want - held.at) * alpha;
+    return held.at;
+  }
+  return held + (want - held) * alpha;
+}
 function mountAnatomyFigure(config) {
   const {
     spec,
@@ -1478,32 +2050,71 @@ function mountAnatomyFigure(config) {
     buildMechanism,
     buildShader,
     updateKinematics,
-    formatReadout
+    formatReadout,
+    tourAt
   } = config;
 
+  const simulationMode = spec.simulationMode || "continuous";
+  const isContinuous = simulationMode === "continuous";
+
   const features = Object.assign(
-    { explode: true, cutaway: true, shader: true, crank: true },
+    {
+      explode: true,
+      cutaway: true,
+      shader: true,
+      crank: isContinuous,
+      slow: isContinuous,
+      rpm: isContinuous
+    },
     spec.features || {}
   );
 
-  const controlDefs =
-    Array.isArray(spec.controls) && spec.controls.length > 0
-      ? spec.controls
-      : [
-          {
-            id: "rpm",
-            label: "RPM",
-            min: 0,
-            max: 2400,
-            step: 20,
-            initial: spec.initialRpm !== undefined ? spec.initialRpm : 720,
-            title: "Shaft speed"
-          }
-        ];
+  const sectionSpec =
+    spec.section && typeof spec.section === "object"
+      ? spec.section
+      : features.section
+        ? { axis: "z", min: -2.0, max: 2.0, initial: 2.0, label: "SECT" }
+        : null;
+
+  const baseControls =
+    Array.isArray(spec.controls)
+      ? [...spec.controls]
+      : isContinuous || features.rpm === true
+        ? [
+            {
+              id: "rpm",
+              label: "RPM",
+              min: 0,
+              max: 2400,
+              step: 20,
+              initial: spec.initialRpm !== undefined ? spec.initialRpm : 720,
+              title: "Shaft speed"
+            }
+          ]
+        : [];
+
+  if ((simulationMode === "timeline" || features.timeline === true) && !baseControls.some((c) => c.id === "timeline")) {
+    baseControls.push({
+      id: "timeline",
+      label: "TIME",
+      min: 0,
+      max: 1,
+      step: 0.005,
+      initial: spec.initialTimeline !== undefined ? spec.initialTimeline : 0,
+      title: "Scrub simulation timeline"
+    });
+  }
+
+  const controlDefs = baseControls;
+  const triggerDefs = Array.isArray(spec.triggers) ? spec.triggers : [];
+  const stepDefs = Array.isArray(spec.steps) ? spec.steps : [];
+  const cameraViews = Array.isArray(spec.cameraViews) ? spec.cameraViews : [];
+  const tourFn = typeof tourAt === "function" ? tourAt : typeof spec.tour === "function" ? spec.tour : null;
 
   const state = {
     theta: spec.initialTheta !== undefined ? spec.initialTheta : 0.65,
-    rpm: spec.initialRpm !== undefined ? spec.initialRpm : 720,
+    rpm: spec.initialRpm !== undefined ? spec.initialRpm : (isContinuous ? 720 : 0),
+    timeline: spec.initialTimeline !== undefined ? spec.initialTimeline : 0,
     params: {},
     slowModes: [1, 0.2, 0.05, 0],
     slowLabels: ["SLOW 1×", "SLOW 1/5×", "SLOW 1/20×", "PAUSED"],
@@ -1513,7 +2124,9 @@ function mountAnatomyFigure(config) {
     cutaway: spec.initialCutaway !== undefined ? spec.initialCutaway : features.cutaway,
     shaderEnabled: features.shader,
     hudVisible: true,
-    debugPaused: false
+    debugPaused: false,
+    stepIndex: 0,
+    section: sectionSpec ? (sectionSpec.initial !== undefined ? sectionSpec.initial : sectionSpec.max) : null
   };
 
   function createSpring(initial) {
@@ -1545,6 +2158,27 @@ function mountAnatomyFigure(config) {
   const explodeSpring = createSpring(0);
   const rpmSpring = paramSprings.rpm || createSpring(state.rpm);
   const shaderEnvSpring = createSpring(features.shader ? 1 : 0);
+  const sectionSpring = createSpring(state.section !== null ? state.section : 0);
+  let targetSection = state.section;
+  let thetaTarget = null;
+
+  let simClock = 0;
+  let tourClock = 0;
+  let hasUserInteracted = false;
+  let lastInteractionMs = performance.now();
+  const triggerTimes = {};
+  const triggerValues = {};
+  const triggerAges = {};
+  for (const t of triggerDefs) {
+    triggerTimes[t.id] = -999;
+    triggerValues[t.id] = 0;
+    triggerAges[t.id] = 999;
+  }
+
+  function markUserInteraction() {
+    hasUserInteracted = true;
+    lastInteractionMs = performance.now();
+  }
 
   const host = document.getElementById("canvas-host");
   const cardEl = document.getElementById("figure-card");
@@ -1554,11 +2188,15 @@ function mountAnatomyFigure(config) {
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  if (sectionSpec) {
+    renderer.localClippingEnabled = true;
+  }
   host.appendChild(renderer.domElement);
 
   const ISO_ELEV = ((spec.isoElevDeg !== undefined ? spec.isoElevDeg : 30) * Math.PI) / 180;
   const ISO_AZIM = ((spec.isoAzimDeg !== undefined ? spec.isoAzimDeg : -36) * Math.PI) / 180;
   let zoomFactor = spec.initialZoom || 1.08;
+  let targetZoom = zoomFactor;
   let panX = 0;
   let panY = spec.initialPanY !== undefined ? spec.initialPanY : -0.06;
   let targetPanX = panX;
@@ -1616,6 +2254,8 @@ function mountAnatomyFigure(config) {
 
   const schemeButtonsEl = document.getElementById("scheme-buttons");
   const customSlidersEl = document.getElementById("custom-sliders");
+  const triggersGroupEl = document.getElementById("triggers-group");
+  const cameraViewsGroupEl = document.getElementById("camera-views-group");
   const crankBtn = document.getElementById("crank-btn");
   const slowBtn = document.getElementById("slow-btn");
   const explodeBtn = document.getElementById("explode-btn");
@@ -1631,6 +2271,14 @@ function mountAnatomyFigure(config) {
 
   const controlDefMap = new Map(controlDefs.map((c) => [c.id, c]));
   const sliderInputs = new Map();
+  const triggerButtons = new Map();
+  let stepBtn = null;
+  let sectionSliderEl = null;
+  let activeCameraViewId = null;
+
+  const localSectionNormal = new THREE.Vector3(0, 0, -1);
+  const localSectionPlane = new THREE.Plane(localSectionNormal, 2.0);
+  const worldSectionPlane = new THREE.Plane(localSectionNormal, 2.0);
 
   function setParam(id, value, immediate = false) {
     const def = controlDefMap.get(id);
@@ -1638,12 +2286,104 @@ function mountAnatomyFigure(config) {
     const clamped = Math.max(def.min, Math.min(def.max, value));
     state.params[id] = clamped;
     if (id === "rpm") state.rpm = clamped;
+    if (id === "timeline") {
+      state.timeline = clamped;
+      state.theta = clamped * Math.PI * 2;
+    }
     const input = sliderInputs.get(id);
     if (input) input.value = String(clamped);
     if (immediate && paramSprings[id]) {
       paramSprings[id].at = clamped;
       paramSprings[id].rate = 0;
     }
+  }
+
+  function setSection(val, immediate = false) {
+    if (!sectionSpec || !Number.isFinite(val)) return;
+    const clamped = Math.max(sectionSpec.min, Math.min(sectionSpec.max, val));
+    targetSection = clamped;
+    if (sectionSliderEl) sectionSliderEl.value = String(clamped);
+    if (immediate) {
+      state.section = sectionSpring.at = clamped;
+      sectionSpring.rate = 0;
+    }
+  }
+
+  function setCameraViewSelectionUI(viewId) {
+    activeCameraViewId = viewId || null;
+    if (!cameraViewsGroupEl) return;
+    Array.from(cameraViewsGroupEl.children).forEach((btn) => {
+      btn.classList.toggle("active", Boolean(activeCameraViewId) && btn.dataset.viewId === activeCameraViewId);
+    });
+  }
+
+  function applyCameraView(viewIdOrIndex, immediate = false) {
+    if (cameraViews.length === 0) return null;
+    const view =
+      typeof viewIdOrIndex === "number"
+        ? cameraViews[viewIdOrIndex]
+        : cameraViews.find((v) => v.id === viewIdOrIndex);
+    if (!view) return null;
+
+    const elevDeg = view.elev !== undefined ? view.elev : (spec.isoElevDeg !== undefined ? spec.isoElevDeg : 30);
+    const azimDeg = view.azim !== undefined ? view.azim : (spec.isoAzimDeg !== undefined ? spec.isoAzimDeg : -36);
+    const zoom = view.zoom !== undefined ? view.zoom : (spec.initialZoom || 1.08);
+    const pan = Array.isArray(view.pan)
+      ? view.pan
+      : [0, spec.initialPanY !== undefined ? spec.initialPanY : -0.06];
+
+    targetRotX = (elevDeg * Math.PI) / 180;
+    targetRotY = (azimDeg * Math.PI) / 180;
+    targetPanX = pan[0] !== undefined ? pan[0] : 0;
+    targetPanY = pan[1] !== undefined ? pan[1] : 0;
+    targetZoom = Math.max(0.45, Math.min(4.5, zoom));
+
+    if (immediate) {
+      rotX = targetRotX;
+      rotY = targetRotY;
+      panX = targetPanX;
+      panY = targetPanY;
+      zoomFactor = targetZoom;
+      updateCameraSize();
+    }
+    setCameraViewSelectionUI(view.id);
+    return view;
+  }
+
+  function fireTrigger(id, opts = {}) {
+    const tDef = triggerDefs.find((t) => t.id === id);
+    if (!tDef) return false;
+    if (!opts.fromTour) markUserInteraction();
+    triggerTimes[id] = simClock;
+    triggerAges[id] = 0;
+    triggerValues[id] = burst(0, tDef.rise !== undefined ? tDef.rise : 0.08, tDef.fall !== undefined ? tDef.fall : 0.75);
+    if (typeof tDef.onTrigger === "function") {
+      tDef.onTrigger({ state, setParam, fireTrigger, applyStep });
+    }
+    const btn = triggerButtons.get(id);
+    if (btn) btn.classList.add("armed");
+    return true;
+  }
+
+  function applyStep(idx) {
+    if (stepDefs.length === 0) return null;
+    state.stepIndex = ((idx % stepDefs.length) + stepDefs.length) % stepDefs.length;
+    const step = stepDefs[state.stepIndex];
+    if (step.theta !== undefined) {
+      thetaTarget = step.theta;
+    }
+    if (step.timeline !== undefined) {
+      setParam("timeline", step.timeline, false);
+    }
+    if (step.params && typeof step.params === "object") {
+      for (const [k, v] of Object.entries(step.params)) {
+        setParam(k, v, false);
+      }
+    }
+    if (stepBtn) {
+      stepBtn.textContent = step.label || `STEP ${state.stepIndex + 1}/${stepDefs.length}`;
+    }
+    return step;
   }
 
   if (customSlidersEl) {
@@ -1662,6 +2402,7 @@ function mountAnatomyFigure(config) {
       input.step = String(c.step);
       input.value = String(c.initial);
       input.addEventListener("input", (e) => {
+        markUserInteraction();
         setParam(c.id, parseFloat(e.target.value), false);
       });
       lbl.appendChild(span);
@@ -1669,14 +2410,83 @@ function mountAnatomyFigure(config) {
       customSlidersEl.appendChild(lbl);
       sliderInputs.set(c.id, input);
     }
+
+    if (sectionSpec) {
+      const lbl = document.createElement("label");
+      lbl.className = "slider-label";
+      lbl.title = sectionSpec.title || "Slice 3D cross-section plane";
+      const span = document.createElement("span");
+      span.textContent = sectionSpec.label || "SECT";
+      const input = document.createElement("input");
+      input.type = "range";
+      input.id = "section-slider";
+      input.min = String(sectionSpec.min);
+      input.max = String(sectionSpec.max);
+      input.step = String(sectionSpec.step || 0.02);
+      input.value = String(targetSection);
+      input.addEventListener("input", (e) => {
+        markUserInteraction();
+        setSection(parseFloat(e.target.value), false);
+      });
+      lbl.appendChild(span);
+      lbl.appendChild(input);
+      customSlidersEl.appendChild(lbl);
+      sectionSliderEl = input;
+    }
   } else {
     const rpmSlider = document.getElementById("rpm-slider");
     if (rpmSlider) {
       rpmSlider.addEventListener("input", (e) => {
+        markUserInteraction();
         setParam("rpm", parseFloat(e.target.value), false);
       });
       sliderInputs.set("rpm", rpmSlider);
     }
+  }
+
+  if (triggersGroupEl) {
+    triggersGroupEl.innerHTML = "";
+    if (stepDefs.length > 0) {
+      stepBtn = document.createElement("button");
+      stepBtn.type = "button";
+      stepBtn.className = "action-btn trigger-btn";
+      stepBtn.id = "step-btn";
+      stepBtn.title = "Advance sequence step";
+      stepBtn.textContent = stepDefs[0].label || `STEP 1/${stepDefs.length}`;
+      stepBtn.addEventListener("click", () => {
+        markUserInteraction();
+        applyStep(state.stepIndex + 1);
+      });
+      triggersGroupEl.appendChild(stepBtn);
+    }
+    for (const t of triggerDefs) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "action-btn trigger-btn";
+      btn.id = `trigger-btn-${t.id}`;
+      btn.textContent = t.label;
+      if (t.title) btn.title = t.title;
+      btn.addEventListener("click", () => fireTrigger(t.id));
+      triggersGroupEl.appendChild(btn);
+      triggerButtons.set(t.id, btn);
+    }
+  }
+
+  if (cameraViewsGroupEl) {
+    cameraViewsGroupEl.innerHTML = "";
+    cameraViews.forEach((v, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "view-pill";
+      btn.dataset.viewId = v.id;
+      btn.textContent = v.label;
+      if (idx < 9) btn.title = `${v.label} (${idx + 1})`;
+      btn.addEventListener("click", () => {
+        markUserInteraction();
+        applyCameraView(v.id, false);
+      });
+      cameraViewsGroupEl.appendChild(btn);
+    });
   }
 
   if (!features.explode) {
@@ -1696,6 +2506,9 @@ function mountAnatomyFigure(config) {
   if (!features.crank) {
     if (crankBtn) crankBtn.style.display = "none";
     if (hintCrankEl) hintCrankEl.style.display = "none";
+  }
+  if (!features.slow && slowBtn) {
+    slowBtn.style.display = "none";
   }
   if (spec.interactionHint) {
     if (hintInteractEl) hintInteractEl.textContent = `${spec.interactionHint} · `;
@@ -1790,18 +2603,19 @@ function mountAnatomyFigure(config) {
     targetRotY = ISO_AZIM;
     targetPanX = 0;
     targetPanY = spec.initialPanY !== undefined ? spec.initialPanY : -0.06;
-    zoomFactor = spec.initialZoom || 1.08;
+    targetZoom = zoomFactor = spec.initialZoom || 1.08;
+    setCameraViewSelectionUI(null);
     updateCameraSize();
   }
 
-  crankBtn.addEventListener("click", toggleCrankMode);
-  slowBtn.addEventListener("click", cycleSlowMode);
-  explodeBtn.addEventListener("click", toggleExplode);
-  cutawayBtn.addEventListener("click", toggleCutaway);
-  shaderBtn.addEventListener("click", toggleShader);
+  crankBtn.addEventListener("click", () => { markUserInteraction(); toggleCrankMode(); });
+  slowBtn.addEventListener("click", () => { markUserInteraction(); cycleSlowMode(); });
+  explodeBtn.addEventListener("click", () => { markUserInteraction(); toggleExplode(); });
+  cutawayBtn.addEventListener("click", () => { markUserInteraction(); toggleCutaway(); });
+  shaderBtn.addEventListener("click", () => { markUserInteraction(); toggleShader(); });
   hudBtn.addEventListener("click", toggleHud);
   hudQuickBtn.addEventListener("click", toggleHud);
-  resetBtn.addEventListener("click", resetIsoView);
+  resetBtn.addEventListener("click", () => { markUserInteraction(); resetIsoView(); });
 
   const activePointers = new Map();
   let lastSingleX = 0;
@@ -1864,6 +2678,7 @@ function mountAnatomyFigure(config) {
   }
 
   host.addEventListener("pointerdown", (e) => {
+    markUserInteraction();
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     host.setPointerCapture(e.pointerId);
     cardEl.focus();
@@ -1891,6 +2706,7 @@ function mountAnatomyFigure(config) {
       }
       return;
     }
+    markUserInteraction();
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     const w = Math.max(host.clientWidth, 1);
@@ -1905,6 +2721,7 @@ function mountAnatomyFigure(config) {
       lastSingleY = e.clientY;
 
       if (isMousePan) {
+        setCameraViewSelectionUI(null);
         targetPanX += dx * worldPerPixelX;
         targetPanY -= dy * worldPerPixelY;
       } else if (activeInteractable && typeof activeInteractable.onDrag === "function") {
@@ -1915,15 +2732,20 @@ function mountAnatomyFigure(config) {
           worldDy: -dy * worldPerPixelY,
           state,
           setParam,
+          fireTrigger,
+          applyStep,
           event: e
         });
       } else if (e.shiftKey || state.crankMode || (features.crank && state.slowModes[state.slowIndex] === 0)) {
+        thetaTarget = null;
         state.theta -= dx * 0.024;
       } else {
+        setCameraViewSelectionUI(null);
         targetRotY += dx * 0.0085;
         targetRotX = Math.max(-Math.PI * 0.48, Math.min(Math.PI * 0.48, targetRotX + dy * 0.0085));
       }
     } else if (activePointers.size >= 2) {
+      setCameraViewSelectionUI(null);
       const pts = Array.from(activePointers.values());
       const midX = (pts[0].x + pts[1].x) * 0.5;
       const midY = (pts[0].y + pts[1].y) * 0.5;
@@ -1936,7 +2758,7 @@ function mountAnatomyFigure(config) {
 
       if (lastPinchDist > 12 && dist > 12) {
         const scale = dist / lastPinchDist;
-        zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor * scale));
+        targetZoom = zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor * scale));
         updateCameraSize();
       }
 
@@ -1969,21 +2791,35 @@ function mountAnatomyFigure(config) {
 
   host.addEventListener("wheel", (e) => {
     e.preventDefault();
-    zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor - e.deltaY * 0.0012));
+    markUserInteraction();
+    setCameraViewSelectionUI(null);
+    targetZoom = zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor - e.deltaY * 0.0012));
     updateCameraSize();
   }, { passive: false });
 
   window.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key >= "1" && e.key <= "9") {
+      const idx = Number(e.key) - 1;
+      if (cameraViews[idx]) {
+        markUserInteraction();
+        applyCameraView(idx, false);
+        return;
+      }
+    }
     const k = e.key.toLowerCase();
-    if (k === "e") toggleExplode();
-    else if (k === "s") cycleSlowMode();
-    else if (k === "c") toggleCutaway();
-    else if (k === "i") toggleShader();
+    if (k === "e") { markUserInteraction(); toggleExplode(); }
+    else if (k === "s") {
+      markUserInteraction();
+      if (features.slow) cycleSlowMode();
+      else if (stepDefs.length > 0) applyStep(state.stepIndex + 1);
+    }
+    else if (k === "c") { markUserInteraction(); toggleCutaway(); }
+    else if (k === "i") { markUserInteraction(); toggleShader(); }
     else if (k === "h") toggleHud();
-    else if (k === "r") resetIsoView();
-    else if (e.key === "ArrowRight") state.theta -= 0.12;
-    else if (e.key === "ArrowLeft") state.theta += 0.12;
+    else if (k === "r") { markUserInteraction(); resetIsoView(); }
+    else if (e.key === "ArrowRight") { markUserInteraction(); thetaTarget = null; state.theta -= 0.12; }
+    else if (e.key === "ArrowLeft") { markUserInteraction(); thetaTarget = null; state.theta += 0.12; }
   });
 
   window.addEventListener("resize", updateCameraSize);
@@ -2011,7 +2847,7 @@ function mountAnatomyFigure(config) {
     }
   }
 
-  function stepSceneAndRender(effectiveRpm) {
+  function stepSceneAndRender(effectiveRpm, dt = 0) {
     worldGroup.position.set(panX, panY, 0);
     worldGroup.rotation.order = "XYZ";
     worldGroup.rotation.x = rotX;
@@ -2020,36 +2856,80 @@ function mountAnatomyFigure(config) {
 
     reg.applyExplode(explodeSpring.at, state.cutaway);
 
+    if (sectionSpec) {
+      const sVal = sectionSpring.at;
+      state.section = sVal;
+      const isOpen = !sectionSpec.alwaysActive && sVal >= sectionSpec.max - 0.001;
+      if (isOpen) {
+        kit.setSectionPlane(null);
+      } else {
+        const axis = sectionSpec.axis || "z";
+        const sign = sectionSpec.invert ? 1 : -1;
+        localSectionNormal.set(
+          axis === "x" ? sign : 0,
+          axis === "y" ? sign : 0,
+          axis === "z" ? sign : 0
+        );
+        localSectionPlane.set(localSectionNormal, -sign * sVal);
+        worldSectionPlane.copy(localSectionPlane).applyMatrix4(worldGroup.matrixWorld);
+        kit.setSectionPlane(worldSectionPlane);
+      }
+    }
+
+    for (const t of triggerDefs) {
+      const age = simClock - triggerTimes[t.id];
+      triggerAges[t.id] = age;
+      const val = burst(age, t.rise !== undefined ? t.rise : 0.08, t.fall !== undefined ? t.fall : 0.75);
+      triggerValues[t.id] = val;
+      const btn = triggerButtons.get(t.id);
+      if (btn) btn.classList.toggle("armed", val > 0.04);
+    }
+
     const smoothedParams = {};
     for (const c of controlDefs) {
       smoothedParams[c.id] = paramSprings[c.id].at;
     }
+    if (smoothedParams.timeline !== undefined) {
+      state.timeline = smoothedParams.timeline;
+    }
+
+    const kinematicState = {
+      theta: state.theta,
+      explode: explodeSpring.at,
+      rpm: rpmSpring.at,
+      effectiveRpm,
+      shaderEnv: shaderEnvSpring.at,
+      cutaway: state.cutaway,
+      section: sectionSpec ? sectionSpring.at : null,
+      simClock,
+      dt,
+      simulationMode,
+      timeline: state.timeline,
+      stepIndex: state.stepIndex,
+      triggers: { ...triggerValues },
+      triggerAges: { ...triggerAges },
+      params: smoothedParams,
+      rawParams: state.params,
+      ...smoothedParams
+    };
 
     if (updateKinematics) {
-      updateKinematics(reg, {
-        theta: state.theta,
-        explode: explodeSpring.at,
-        rpm: rpmSpring.at,
-        effectiveRpm,
-        shaderEnv: shaderEnvSpring.at,
-        cutaway: state.cutaway,
-        params: smoothedParams,
-        rawParams: state.params,
-        ...smoothedParams
-      });
+      updateKinematics(reg, kinematicState);
     }
 
     worldGroup.updateMatrixWorld(true);
 
+    if (reg.screens && reg.screens.size > 0) {
+      for (const [, scr] of reg.screens) {
+        if (scr.ctx && scr.canvas && typeof scr.draw === "function") {
+          scr.draw(scr.ctx, scr.canvas, kinematicState, kit.currentTheme);
+          if (scr.texture) scr.texture.needsUpdate = true;
+        }
+      }
+    }
+
     if (state.hudVisible && formatReadout) {
-      const hudData = formatReadout({
-        theta: state.theta,
-        effectiveRpm,
-        explode: explodeSpring.at,
-        params: smoothedParams,
-        rawParams: state.params,
-        ...smoothedParams
-      });
+      const hudData = formatReadout(kinematicState);
       if (hudData.readout && readoutEl) readoutEl.textContent = hudData.readout;
       if (hudData.phase && phaseCornerEl) phaseCornerEl.textContent = hudData.phase;
       updateEngravedTags();
@@ -2070,12 +2950,63 @@ function mountAnatomyFigure(config) {
     lastTime = now;
 
     if (!state.debugPaused) {
+      simClock += dt;
+
+      let tourExplodeTarget = null;
+      let tourCutawayTarget = null;
+      let tourShaderTarget = null;
+      const idleThresholdMs = hasUserInteracted ? 3600 : 1600;
+      if (typeof tourFn === "function" && (now - lastInteractionMs) > idleThresholdMs && activePointers.size === 0) {
+        tourClock += dt;
+        const patch = tourFn(tourClock, {
+          theta: state.theta,
+          explode: explodeSpring.at,
+          cutaway: state.cutaway,
+          section: sectionSpec ? sectionSpring.at : null,
+          params: { ...state.params },
+          simulationMode
+        });
+        if (patch && typeof patch === "object") {
+          if (typeof patch.explode === "boolean") tourExplodeTarget = patch.explode ? 1.0 : 0.0;
+          else if (typeof patch.explode === "number") tourExplodeTarget = patch.explode;
+          if (typeof patch.cutaway === "boolean") tourCutawayTarget = patch.cutaway;
+          if (typeof patch.shader === "boolean") tourShaderTarget = patch.shader ? 1.0 : 0.0;
+          if (typeof patch.rpm === "number") setParam("rpm", patch.rpm, false);
+          if (typeof patch.theta === "number") {
+            thetaTarget = null;
+            state.theta = patch.theta;
+          }
+          if (typeof patch.section === "number" && sectionSpec) setSection(patch.section, false);
+          if (patch.params && typeof patch.params === "object") {
+            for (const [pk, pv] of Object.entries(patch.params)) {
+              setParam(pk, pv, false);
+            }
+          }
+          if (typeof patch.cameraView === "string" && patch.cameraView !== activeCameraViewId) {
+            applyCameraView(patch.cameraView, false);
+          }
+          if (typeof patch.trigger === "string") {
+            fireTrigger(patch.trigger, { fromTour: true });
+          }
+        }
+      }
+
+      if (tourCutawayTarget !== null && tourCutawayTarget !== state.cutaway) {
+        state.cutaway = tourCutawayTarget;
+        if (cutawayBtn) cutawayBtn.classList.toggle("active", state.cutaway);
+      }
+
       rotX += (targetRotX - rotX) * 0.2;
       rotY += (targetRotY - rotY) * 0.2;
       panX += (targetPanX - panX) * 0.22;
       panY += (targetPanY - panY) * 0.22;
+      if (Math.abs(targetZoom - zoomFactor) > 0.0004) {
+        zoomFactor += (targetZoom - zoomFactor) * 0.22;
+        updateCameraSize();
+      }
 
-      stepSpring(explodeSpring, features.explode && state.exploded ? 1.0 : 0.0, dt, 150, 19);
+      const wantExplode = tourExplodeTarget !== null ? tourExplodeTarget : (features.explode && state.exploded ? 1.0 : 0.0);
+      stepSpring(explodeSpring, wantExplode, dt, 150, 19);
       if (!paramSprings.rpm) {
         stepSpring(rpmSpring, state.rpm, dt, 110, 16);
       }
@@ -2085,7 +3016,11 @@ function mountAnatomyFigure(config) {
       if (paramSprings.rpm) {
         state.rpm = state.params.rpm;
       }
-      stepSpring(shaderEnvSpring, features.shader && state.shaderEnabled ? 1.0 : 0.0, dt, 140, 18);
+      if (sectionSpec) {
+        stepSpring(sectionSpring, targetSection, dt, 140, 18);
+      }
+      const wantShader = tourShaderTarget !== null ? tourShaderTarget : (features.shader && state.shaderEnabled ? 1.0 : 0.0);
+      stepSpring(shaderEnvSpring, wantShader, dt, 140, 18);
 
       const speedMult = state.slowModes[state.slowIndex];
       const effectiveRpm = rpmSpring.at * speedMult;
@@ -2093,13 +3028,25 @@ function mountAnatomyFigure(config) {
         activePointers.size === 1 &&
         !activeInteractable &&
         (state.crankMode || (features.crank && speedMult === 0));
-      if (!isUserCranking) {
+
+      if (thetaTarget !== null) {
+        state.theta += (thetaTarget - state.theta) * Math.min(1, dt * 8.5);
+        if (Math.abs(thetaTarget - state.theta) < 0.001) {
+          state.theta = thetaTarget;
+          thetaTarget = null;
+        }
+      } else if (simulationMode === "timeline" && paramSprings.timeline) {
+        state.theta = paramSprings.timeline.at * Math.PI * 2;
+      } else if (isContinuous && !isUserCranking) {
+        const omegaShaft = (effectiveRpm * Math.PI * 2) / 60;
+        state.theta -= omegaShaft * dt * 0.12;
+      } else if (!isContinuous && features.rpm && effectiveRpm > 0 && !isUserCranking) {
         const omegaShaft = (effectiveRpm * Math.PI * 2) / 60;
         state.theta -= omegaShaft * dt * 0.12;
       }
-      stepSceneAndRender(effectiveRpm);
+      stepSceneAndRender(effectiveRpm, dt);
     } else {
-      stepSceneAndRender(0);
+      stepSceneAndRender(0, 0);
     }
   }
 
@@ -2118,9 +3065,10 @@ function mountAnatomyFigure(config) {
       state.debugPaused = true;
       rotX = targetRotX = (elevDeg * Math.PI) / 180;
       rotY = targetRotY = (azimDeg * Math.PI) / 180;
-      zoomFactor = zoom;
+      targetZoom = zoomFactor = zoom;
       panX = targetPanX = panXY[0];
       panY = targetPanY = panXY[1];
+      setCameraViewSelectionUI(null);
       updateCameraSize();
       stepSceneAndRender(0);
       return { elevDeg, azimDeg, zoom, panXY };
@@ -2145,6 +3093,42 @@ function mountAnatomyFigure(config) {
       return this.setCamera(v[0], v[1], v[2], v[3]);
     },
 
+    setCameraView(viewIdOrIndex) {
+      state.debugPaused = true;
+      const view = applyCameraView(viewIdOrIndex, true);
+      if (!view) {
+        throw new Error(`Unknown camera view "${viewIdOrIndex}"`);
+      }
+      stepSceneAndRender(0);
+      return view;
+    },
+
+    setSection(val) {
+      if (!sectionSpec) return null;
+      state.debugPaused = true;
+      setSection(val, true);
+      stepSceneAndRender(0);
+      return state.section;
+    },
+
+    fireTrigger(id) {
+      const ok = fireTrigger(id);
+      if (state.debugPaused) {
+        stepSceneAndRender(0);
+      }
+      return { id, ok, value: triggerValues[id] ?? 0 };
+    },
+
+    advanceStep() {
+      const step = applyStep(state.stepIndex + 1);
+      if (step && step.theta !== undefined) {
+        state.theta = step.theta;
+        thetaTarget = null;
+      }
+      if (state.debugPaused) stepSceneAndRender(0);
+      return { stepIndex: state.stepIndex, step };
+    },
+
     isolate(filter) {
       state.debugPaused = true;
       reg.isolate(filter, state.cutaway, explodeSpring.at);
@@ -2154,7 +3138,10 @@ function mountAnatomyFigure(config) {
 
     setPose(opts = {}) {
       state.debugPaused = opts.paused !== undefined ? opts.paused : true;
-      if (opts.theta !== undefined) state.theta = opts.theta;
+      if (opts.theta !== undefined) {
+        thetaTarget = null;
+        state.theta = opts.theta;
+      }
       if (opts.explode !== undefined) {
         state.exploded = features.explode && opts.explode > 0.5;
         explodeSpring.at = features.explode ? opts.explode : 0;
@@ -2180,6 +3167,15 @@ function mountAnatomyFigure(config) {
           rpmSpring.rate = 0;
         }
       }
+      if (opts.section !== undefined && sectionSpec) {
+        setSection(opts.section, true);
+      }
+      if (opts.cameraView !== undefined) {
+        applyCameraView(opts.cameraView, true);
+      }
+      if (opts.trigger) {
+        fireTrigger(opts.trigger);
+      }
       if (opts.params && typeof opts.params === "object") {
         for (const [pk, pv] of Object.entries(opts.params)) {
           setParam(pk, pv, true);
@@ -2203,6 +3199,7 @@ function mountAnatomyFigure(config) {
         explode: explodeSpring.at,
         cutaway: state.cutaway,
         shader: state.shaderEnabled,
+        section: state.section,
         hud: state.hudVisible,
         theme: kit.currentTheme.id,
         params: { ...state.params }
@@ -2219,7 +3216,7 @@ function mountAnatomyFigure(config) {
       rotY = targetRotY = (azimDeg * Math.PI) / 180;
       panX = targetPanX = 0;
       panY = targetPanY = 0;
-      zoomFactor = zoom;
+      targetZoom = zoomFactor = zoom;
       updateCameraSize();
       stepSceneAndRender(0);
 
@@ -2250,11 +3247,19 @@ function mountAnatomyFigure(config) {
 
     getSummary() {
       return {
+        archetype: spec.archetype || "bench",
+        simulationMode,
+        toneMode: spec.toneMode || "single-lit",
         parts: reg.parts.size,
         tubes: reg.tubes.length,
         joints: Array.from(reg.joints.keys()),
+        screensCount: reg.screens ? reg.screens.size : 0,
         themes: kit.THEMES.map((t) => t.id),
         features,
+        section: sectionSpec ? { ...sectionSpec, current: state.section } : null,
+        cameraViews: cameraViews.map((v) => v.id),
+        triggers: triggerDefs.map((t) => t.id),
+        stepsCount: stepDefs.length,
         controls: controlDefs.map((c) => c.id),
         interactables: reg.interactables.map((i) => i.id),
         drivePoses: spec.drivePoses || null
@@ -2266,6 +3271,9 @@ function mountAnatomyFigure(config) {
 
 /* --- figure/model.mjs --- */
 const SPEC = {
+  archetype: "bench",
+  simulationMode: "continuous",
+  toneMode: "single-lit",
   R: 1.33,
   e: 0.19,
   depth: 0.72,
@@ -2279,6 +3287,20 @@ const SPEC = {
   initialPanY: 0.22,
   minVertSpan: 5.3,
   minHorizSpan: 6.9,
+  section: {
+    axis: "z",
+    min: -0.65,
+    max: 0.95,
+    initial: 0.95,
+    label: "SECT",
+    title: "Slice epitrochoid stator & endplates along shaft Z axis"
+  },
+  cameraViews: [
+    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.95, pan: [0, 0.22] },
+    { id: "bore", label: "BORE", elev: 8, azim: -8, zoom: 1.32, pan: [0, 0.08] },
+    { id: "top", label: "TOP", elev: 85, azim: 0, zoom: 0.96, pan: [0, 0] },
+    { id: "gauge", label: "GAUGE", elev: 22, azim: -22, zoom: 1.48, pan: [1.55, 0.22] }
+  ],
   BASE_W: 5.4,
   BASE_D: 3.5,
   BASE_H: 0.24,
@@ -2672,6 +3694,7 @@ function buildStructure(reg, kit) {
     crease: "lo",
     creaseAngle: 22,
     outlineWidth: 0.02,
+    clippable: true,
     mountOn: "ground",
     allowOverlap: ["rear.plate", "front.cover", "shaft.main", "shaft.journal", "rear.statGear"]
   });
@@ -2844,6 +3867,7 @@ function buildStructure(reg, kit) {
     ramp: "lo",
     outline: "mid",
     crease: "lo",
+    clippable: true,
     mountOn: "stator.housing",
     allowOverlap: ["shaft.main", "shaft.rearWeight"]
   });
@@ -2881,6 +3905,7 @@ function buildStructure(reg, kit) {
     ramp: "mid",
     outline: "mid",
     crease: "lo",
+    clippable: true,
     mountOn: "stator.housing",
     allowOverlap: ["shaft.main", "shaft.frontWeight"]
   });
@@ -3648,7 +4673,8 @@ mountAnatomyFigure({
   buildMechanism: typeof buildMechanism !== "undefined" ? buildMechanism : null,
   buildShader: typeof buildShader !== "undefined" ? buildShader : null,
   updateKinematics: typeof updateKinematics !== "undefined" ? updateKinematics : null,
-  formatReadout: typeof formatReadout !== "undefined" ? formatReadout : null
+  formatReadout: typeof formatReadout !== "undefined" ? formatReadout : null,
+  tourAt: typeof tourAt !== "undefined" ? tourAt : (SPEC.tour || null)
 });
 
     })();

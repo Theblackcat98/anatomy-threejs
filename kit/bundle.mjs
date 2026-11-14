@@ -83,7 +83,7 @@ export function buildAndVerifyFigure(config) {
       for (const c of model.SPEC.controls) defaultParams[c.id] = c.initial;
     }
 
-    const stepPoseFn = (theta, explode, poseParams = {}) => {
+    const stepPoseFn = (theta, explode, poseParams = {}, poseMeta = {}) => {
       reg.applyExplode(explode, true);
       if (updateKinematics) {
         const mergedParams = Object.assign({}, defaultParams, poseParams);
@@ -93,6 +93,12 @@ export function buildAndVerifyFigure(config) {
             : model.SPEC?.initialRpm !== undefined
               ? model.SPEC.initialRpm
               : 720;
+        const triggers = Object.assign({}, poseMeta?.triggers || {});
+        if (Array.isArray(model.SPEC?.triggers)) {
+          for (const t of model.SPEC.triggers) {
+            if (triggers[t.id] === undefined) triggers[t.id] = 0;
+          }
+        }
         updateKinematics(reg, {
           theta,
           explode,
@@ -100,6 +106,14 @@ export function buildAndVerifyFigure(config) {
           effectiveRpm: rpmVal,
           shaderEnv: 1.0,
           cutaway: model.SPEC?.features?.cutaway === false ? false : true,
+          section: poseMeta?.section ?? null,
+          simClock: poseMeta?.simClock ?? 0,
+          dt: 0.016,
+          simulationMode: model.SPEC?.simulationMode || "continuous",
+          timeline: mergedParams.timeline ?? 0,
+          stepIndex: poseMeta?.stepIndex ?? 0,
+          triggers,
+          triggerAges: poseMeta?.triggerAges || {},
           params: mergedParams,
           ...mergedParams
         });
@@ -116,7 +130,10 @@ export function buildAndVerifyFigure(config) {
 
     const auditErrors = runGeometryAudit(reg, stepPoseFn, {
       features: model.SPEC?.features,
-      poses: auditPoses
+      poses: auditPoses,
+      archetype: model.SPEC?.archetype,
+      toneMode: model.SPEC?.toneMode,
+      simulationMode: model.SPEC?.simulationMode
     });
     const elapsed = (performance.now() - t0).toFixed(1);
 
@@ -153,7 +170,8 @@ mountAnatomyFigure({
   buildMechanism: typeof buildMechanism !== "undefined" ? buildMechanism : null,
   buildShader: typeof buildShader !== "undefined" ? buildShader : null,
   updateKinematics: typeof updateKinematics !== "undefined" ? updateKinematics : null,
-  formatReadout: typeof formatReadout !== "undefined" ? formatReadout : null
+  formatReadout: typeof formatReadout !== "undefined" ? formatReadout : null,
+  tourAt: typeof tourAt !== "undefined" ? tourAt : (SPEC.tour || null)
 });
 `);
 

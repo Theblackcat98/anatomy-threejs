@@ -255,6 +255,82 @@
       gap: 6px;
     }
 
+    .views-group {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 3px 5px;
+      border-radius: 8px;
+      border: 1px solid var(--anatomy-border);
+      background-color: color-mix(in srgb, var(--anatomy-card) 82%, transparent);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      max-width: calc(100% - 260px);
+    }
+
+    .views-group:empty,
+    .triggers-group:empty {
+      display: none;
+    }
+
+    .triggers-group {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .view-pill {
+      padding: 3px 7px;
+      border-radius: 5px;
+      border: 1px solid transparent;
+      background-color: transparent;
+      color: var(--anatomy-muted);
+      font-family: var(--anatomy-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .view-pill:hover {
+      background-color: var(--anatomy-pill-bg);
+      color: var(--anatomy-text);
+    }
+
+    .view-pill.active {
+      border-color: var(--anatomy-lit);
+      background-color: var(--anatomy-pill-bg);
+      color: var(--anatomy-lit);
+    }
+
+    .action-btn.trigger-btn {
+      border-color: color-mix(in srgb, var(--anatomy-lit) 55%, var(--anatomy-border));
+      color: var(--anatomy-text);
+      font-weight: 600;
+    }
+
+    .action-btn.trigger-btn:hover {
+      border-color: var(--anatomy-lit);
+      color: var(--anatomy-lit);
+      background-color: var(--anatomy-pill-bg);
+    }
+
+    .action-btn.trigger-btn.armed {
+      border-color: var(--anatomy-lit);
+      background-color: color-mix(in srgb, var(--anatomy-lit) 16%, transparent);
+      color: var(--anatomy-lit);
+    }
+
     .sliders-group {
       display: inline-flex;
       flex-wrap: wrap;
@@ -397,6 +473,14 @@
         font-size: 9.5px;
         padding: 3px 6px;
       }
+      .corner.top-left,
+      .corner.top-right {
+        max-width: 44%;
+      }
+      .views-group {
+        top: 42px;
+        max-width: calc(100% - 24px);
+      }
       .corner.bottom-left {
         bottom: 36px;
       }
@@ -450,6 +534,7 @@
         <span class="accent-dot"></span>
         <span>{{FIG_LABEL}}</span>
       </div>
+      <div class="views-group hud-detail" id="camera-views-group" aria-label="Camera views"></div>
       <div class="corner top-right hud-detail" id="phase-corner">{{INITIAL_PHASE}}</div>
 
       <div class="corner bottom-left hud-detail">
@@ -469,8 +554,9 @@
     <div class="controls-bar">
       <div class="scheme-group" id="scheme-buttons" aria-label="Anatomy color themes"></div>
       <div class="params-group">
+        <div class="triggers-group" id="triggers-group"></div>
         <div class="sliders-group" id="custom-sliders">
-          <label class="slider-label" title="Shaft speed">
+          <label class="slider-label" id="rpm-slider-wrap" title="Shaft speed">
             <span>RPM</span>
             <input type="range" id="rpm-slider" min="0" max="2400" step="20" value="720" />
           </label>

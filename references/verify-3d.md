@@ -21,7 +21,8 @@ node figures/<slug>/build.mjs --audit
 
 | Audit Tag | Meaning | How to Fix |
 | :--- | :--- | :--- |
-| `[TONE]` | No part uses `ramp: "lit"` or `"hi"`, or too few ramps are used. | Assign `ramp: "lit"` to the hero moving subject and use at least 3 distinct ramps (`lo`, `mid`, `hi`, `lit`, `brass`, `copper`). |
+| `[MODEL]` | Invalid `SPEC` enum (`archetype`, `simulationMode`, `toneMode`, `section`, `controls`, `triggers`, `cameraViews`), non-finite anchor coordinates, or `formatReadout` returns `NaN`/`undefined`. | Fix the malformed `SPEC` field or `ANCHORS` entry in `model.mjs`, or guard divide-by-zero in `formatReadout`. |
+| `[TONE]` | In `"single-lit"` mode: `stage: "subject"` has 0 `lit` parts or `lit` appears outside `"subject"`; in `"multi-channel"` mode: 0 parts use `lit`, `glass`, or channel ramps. | Assign `ramp: "lit"` to the hero subject, or set `SPEC.toneMode: "multi-channel"` in `model.mjs` when multiple flows/stages use `lit`, `glass`, or `channelA..D` ramps. |
 | `[UNMOUNTED]` | A non-detail part has no `mountOn` target. | Pass `mountOn: "<supportingPartId>"` (or `"ground"` for the bedplate/stator, or `"coaxial"` for the main shaft). |
 | `[MOUNT]` | `mountOn` references a part ID that does not exist. | Check spelling of the target part ID in `reg.part(...)`. |
 | `[FLOATING] A is floating X.XXX units away from mountOn target B` | The 3D bounding boxes of `A` and `B` have a surface gap `> 0.08` world units at pose $\theta$. | Derive `A`'s position from `SPEC.topSurfaceY` or a shared anchor rather than guessing coordinates. |

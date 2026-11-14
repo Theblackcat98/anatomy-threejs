@@ -41,7 +41,8 @@ export const THEMES = [
       comb: "#ea580c",
       exhaust: "#dc2626",
       cavity: "#ece9e0"
-    }
+    },
+    glass: { top: "#ffffff", rim: "#0284c7", tint: "#e0f2fe", opacity: 0.32 }
   },
   {
     id: "paper",
@@ -83,7 +84,8 @@ export const THEMES = [
       comb: "#d97706",
       exhaust: "#b91c1c",
       cavity: "#e9dfc9"
-    }
+    },
+    glass: { top: "#fffaf0", rim: "#b45309", tint: "#fef3c7", opacity: 0.32 }
   },
   {
     id: "dark",
@@ -125,7 +127,8 @@ export const THEMES = [
       comb: "#fb923c",
       exhaust: "#f87171",
       cavity: "#0e1013"
-    }
+    },
+    glass: { top: "#e0f2fe", rim: "#38bdf8", tint: "#0c4a6e", opacity: 0.36 }
   },
   {
     id: "blueprint",
@@ -167,7 +170,8 @@ export const THEMES = [
       comb: "#facc15",
       exhaust: "#fb7185",
       cavity: "#09172b"
-    }
+    },
+    glass: { top: "#ffffff", rim: "#93c5fd", tint: "#1e40af", opacity: 0.34 }
   },
   {
     id: "sepia",
@@ -209,15 +213,51 @@ export const THEMES = [
       comb: "#e11d48",
       exhaust: "#b91c1c",
       cavity: "#e2d5c0"
-    }
+    },
+    glass: { top: "#fffbeb", rim: "#b45309", tint: "#fde68a", opacity: 0.34 }
   }
 ];
 
+const CHANNEL_RAMP_ALIASES = {
+  channelA: "intake",
+  channelB: "comp",
+  channelC: "comb",
+  channelD: "exhaust"
+};
+
+function deriveChannelRamp(hexColor, isDark) {
+  const base = new THREE.Color(hexColor);
+  const white = new THREE.Color(isDark ? "#e2e8f0" : "#ffffff");
+  const black = new THREE.Color("#090b0f");
+  const mixHex = (target, amt) => "#" + base.clone().lerp(target, amt).getHexString();
+  return {
+    top: mixHex(white, isDark ? 0.42 : 0.62),
+    shades: [
+      mixHex(white, isDark ? 0.18 : 0.28),
+      "#" + base.getHexString(),
+      mixHex(black, 0.25),
+      mixHex(black, 0.48)
+    ]
+  };
+}
+
+function resolveThemeRamp(theme, rampKey) {
+  const canonical = CHANNEL_RAMP_ALIASES[rampKey] || rampKey;
+  if (theme.ramps[canonical]) return theme.ramps[canonical];
+  if (theme.channels && theme.channels[canonical]) {
+    return deriveChannelRamp(theme.channels[canonical], Boolean(theme.isDark));
+  }
+  return theme.ramps.mid;
+}
+
 export const CEL_VERTEX_SHADER = `
   varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
   void main() {
     vWorldNormal = normalize(mat3(modelMatrix) * normal);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
   }
 `;
 
@@ -229,7 +269,11 @@ export const CEL_FRAGMENT_SHADER = `
   uniform vec3 uShade2;
   uniform vec3 uShade3;
   uniform float uTopBias;
+  uniform vec4 uSectionPlane;
+  uniform float uSectionEnabled;
+  uniform float uClippedPart;
   varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
 
   float aaStep(float edge, float x) {
     float w = clamp(fwidth(x) * 1.15, 0.015, 0.08);
@@ -237,6 +281,18 @@ export const CEL_FRAGMENT_SHADER = `
   }
 
   void main() {
+    if (uSectionEnabled > 0.5 && uClippedPart > 0.5) {
+      float secDist = dot(vWorldPos, uSectionPlane.xyz) + uSectionPlane.w;
+      if (secDist < 0.0) discard;
+    }
+
+    if (!gl_FrontFacing) {
+      float hatch = step(0.54, fract((vWorldPos.x * 1.15 + vWorldPos.y * 1.35 + vWorldPos.z * 0.9) * 12.0));
+      vec3 cutCol = mix(uShade0 * 0.86, uShade1, hatch * 0.65);
+      gl_FragColor = vec4(cutCol, 1.0);
+      return;
+    }
+
     vec3 N = normalize(vWorldNormal);
     float ndotl = dot(N, normalize(uLightDir));
 
@@ -253,15 +309,71 @@ export const CEL_FRAGMENT_SHADER = `
   }
 `;
 
+export const GLASS_VERTEX_SHADER = `
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
+  varying vec3 vViewDir;
+  void main() {
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    vViewDir = normalize(cameraPosition - wp.xyz);
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+
+export const GLASS_FRAGMENT_SHADER = `
+  uniform vec3 uLightDir;
+  uniform vec3 uTop;
+  uniform vec3 uRim;
+  uniform vec3 uTint;
+  uniform float uOpacity;
+  uniform vec4 uSectionPlane;
+  uniform float uSectionEnabled;
+  uniform float uClippedPart;
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
+  varying vec3 vViewDir;
+
+  void main() {
+    if (uSectionEnabled > 0.5 && uClippedPart > 0.5) {
+      float secDist = dot(vWorldPos, uSectionPlane.xyz) + uSectionPlane.w;
+      if (secDist < 0.0) discard;
+    }
+
+    vec3 N = normalize(vWorldNormal);
+    if (!gl_FrontFacing) N = -N;
+    vec3 V = normalize(vViewDir);
+    vec3 L = normalize(uLightDir);
+
+    float ndotv = abs(dot(N, V));
+    float fresnel = pow(clamp(1.0 - ndotv, 0.0, 1.0), 2.0);
+    vec3 H = normalize(L + V);
+    float specBand = smoothstep(0.90, 0.96, max(dot(N, H), 0.0));
+    float topBand = smoothstep(0.68, 0.82, N.y + 0.15 * N.z) * 0.28;
+
+    vec3 col = mix(uTint, uRim, smoothstep(0.22, 0.65, fresnel));
+    col = mix(col, uTop, clamp(specBand * 0.72 + topBand, 0.0, 0.85));
+    float alpha = clamp(uOpacity + fresnel * 0.44 + specBand * 0.35, 0.06, 0.90);
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
 export function createShaderKit(initialTheme = THEMES[0]) {
   let currentTheme = initialTheme;
   const lightDir = new THREE.Vector3(0.52, 0.78, 0.48).normalize();
   const anatomyMaterials = [];
   const outlineMaterials = [];
+  const glassMaterials = [];
   const haloMaterials = [];
+  const clippableLineMaterials = [];
   const themeListeners = [];
   const lineMaterials = {};
   const dotMaterials = {};
+
+  let activeSectionPlane = null;
+  const sectionPlaneVec4 = new THREE.Vector4(0, 0, -1, 999);
+  let sectionEnabledVal = 0.0;
 
   ["hi", "mid", "lo", "faint", "lit"].forEach((k) => {
     lineMaterials[k] = new THREE.LineBasicMaterial({
@@ -277,8 +389,8 @@ export function createShaderKit(initialTheme = THEMES[0]) {
     });
   });
 
-  function createAnatomySolidMaterial(rampKey = "mid", topBias = 0.62) {
-    const ramp = currentTheme.ramps[rampKey] || currentTheme.ramps.mid;
+  function createAnatomySolidMaterial(rampKey = "mid", topBias = 0.62, clippable = false) {
+    const ramp = resolveThemeRamp(currentTheme, rampKey);
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         uLightDir: { value: lightDir },
@@ -287,41 +399,88 @@ export function createShaderKit(initialTheme = THEMES[0]) {
         uShade1: { value: new THREE.Color(ramp.shades[2]) },
         uShade2: { value: new THREE.Color(ramp.shades[1]) },
         uShade3: { value: new THREE.Color(ramp.shades[0]) },
-        uTopBias: { value: topBias }
+        uTopBias: { value: topBias },
+        uSectionPlane: { value: sectionPlaneVec4 },
+        uSectionEnabled: { value: sectionEnabledVal },
+        uClippedPart: { value: clippable ? 1.0 : 0.0 }
       },
       vertexShader: CEL_VERTEX_SHADER,
       fragmentShader: CEL_FRAGMENT_SHADER,
+      side: clippable && sectionEnabledVal > 0.5 ? THREE.DoubleSide : THREE.FrontSide,
       polygonOffset: true,
       polygonOffsetFactor: 1.5,
       polygonOffsetUnits: 1.5
     });
     mat.userData.rampKey = rampKey;
+    mat.userData.clippable = Boolean(clippable);
     anatomyMaterials.push(mat);
     return mat;
   }
 
-  function createOutlineMaterial(lineKey = "mid", thickness = 0.018) {
+  function createGlassMaterial(opts = {}) {
+    const gTheme = currentTheme.glass || { top: "#ffffff", rim: "#38bdf8", tint: "#bae6fd", opacity: 0.34 };
+    const clippable = Boolean(opts.clippable);
+    const customOpacity = typeof opts.opacity === "number" ? opts.opacity : null;
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uLightDir: { value: lightDir },
+        uTop: { value: new THREE.Color(gTheme.top) },
+        uRim: { value: new THREE.Color(gTheme.rim) },
+        uTint: { value: new THREE.Color(gTheme.tint) },
+        uOpacity: { value: customOpacity !== null ? customOpacity : gTheme.opacity },
+        uSectionPlane: { value: sectionPlaneVec4 },
+        uSectionEnabled: { value: sectionEnabledVal },
+        uClippedPart: { value: clippable ? 1.0 : 0.0 }
+      },
+      vertexShader: GLASS_VERTEX_SHADER,
+      fragmentShader: GLASS_FRAGMENT_SHADER,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    mat.userData.customOpacity = customOpacity;
+    mat.userData.clippable = clippable;
+    glassMaterials.push(mat);
+    return mat;
+  }
+
+  function createOutlineMaterial(lineKey = "mid", thickness = 0.018, clippable = false) {
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         uColor: { value: new THREE.Color(currentTheme.lines[lineKey] || currentTheme.lines.mid) },
-        uThickness: { value: thickness }
+        uThickness: { value: thickness },
+        uSectionPlane: { value: sectionPlaneVec4 },
+        uSectionEnabled: { value: sectionEnabledVal },
+        uClippedPart: { value: clippable ? 1.0 : 0.0 }
       },
       vertexShader: `
         uniform float uThickness;
+        varying vec3 vWorldPos;
         void main() {
           vec3 displaced = position + normalize(normal) * uThickness;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+          vec4 wp = modelMatrix * vec4(displaced, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
         }
       `,
       fragmentShader: `
         uniform vec3 uColor;
+        uniform vec4 uSectionPlane;
+        uniform float uSectionEnabled;
+        uniform float uClippedPart;
+        varying vec3 vWorldPos;
         void main() {
+          if (uSectionEnabled > 0.5 && uClippedPart > 0.5) {
+            float secDist = dot(vWorldPos, uSectionPlane.xyz) + uSectionPlane.w;
+            if (secDist < 0.0) discard;
+          }
           gl_FragColor = vec4(uColor, 1.0);
         }
       `,
       side: THREE.BackSide
     });
     mat.userData.lineKey = lineKey;
+    mat.userData.clippable = Boolean(clippable);
     outlineMaterials.push(mat);
     return mat;
   }
@@ -338,25 +497,33 @@ export function createShaderKit(initialTheme = THEMES[0]) {
   }
 
   function createAnatomyPart(geometry, options = {}) {
+    const isGlass = options.ramp === "glass";
     const opts = Object.assign({
       ramp: "mid",
-      outline: "mid",
+      outline: isGlass ? "lo" : "mid",
       crease: "faint",
       creaseAngle: 28,
-      outlineWidth: 0.017,
+      outlineWidth: isGlass ? 0.009 : 0.017,
       topBias: 0.62,
       noOutline: false,
-      noCrease: false
+      noCrease: false,
+      clippable: false,
+      opacity: undefined
     }, options);
 
     const group = new THREE.Group();
-    const solidMat = createAnatomySolidMaterial(opts.ramp, opts.topBias);
+    const solidMat = isGlass
+      ? createGlassMaterial({ opacity: opts.opacity, clippable: opts.clippable })
+      : createAnatomySolidMaterial(opts.ramp, opts.topBias, opts.clippable);
     const mesh = new THREE.Mesh(geometry, solidMat);
     mesh.name = "solid";
+    if (isGlass) {
+      mesh.renderOrder = 2;
+    }
     group.add(mesh);
 
     if (!opts.noOutline) {
-      const outMat = createOutlineMaterial(opts.outline, opts.outlineWidth);
+      const outMat = createOutlineMaterial(opts.outline, opts.outlineWidth, opts.clippable);
       const outMesh = new THREE.Mesh(geometry, outMat);
       outMesh.name = "outline";
       group.add(outMesh);
@@ -364,12 +531,47 @@ export function createShaderKit(initialTheme = THEMES[0]) {
 
     if (!opts.noCrease) {
       const edgesGeo = new THREE.EdgesGeometry(geometry, opts.creaseAngle);
-      const edges = new THREE.LineSegments(edgesGeo, lineMaterials[opts.crease] || lineMaterials.faint);
+      let creaseMat = lineMaterials[opts.crease] || lineMaterials.faint;
+      if (opts.clippable) {
+        creaseMat = creaseMat.clone();
+        creaseMat.userData.lineKey = opts.crease in lineMaterials ? opts.crease : "faint";
+        creaseMat.clippingPlanes = activeSectionPlane ? [activeSectionPlane] : [];
+        clippableLineMaterials.push(creaseMat);
+      }
+      const edges = new THREE.LineSegments(edgesGeo, creaseMat);
       edges.name = "crease";
       group.add(edges);
     }
 
     return group;
+  }
+
+  function setSectionPlane(planeOrNull) {
+    activeSectionPlane = planeOrNull || null;
+    sectionEnabledVal = activeSectionPlane ? 1.0 : 0.0;
+    if (activeSectionPlane) {
+      sectionPlaneVec4.set(
+        activeSectionPlane.normal.x,
+        activeSectionPlane.normal.y,
+        activeSectionPlane.normal.z,
+        activeSectionPlane.constant
+      );
+    }
+    anatomyMaterials.forEach((mat) => {
+      mat.uniforms.uSectionEnabled.value = sectionEnabledVal;
+      if (mat.userData.clippable) {
+        mat.side = activeSectionPlane ? THREE.DoubleSide : THREE.FrontSide;
+      }
+    });
+    glassMaterials.forEach((mat) => {
+      mat.uniforms.uSectionEnabled.value = sectionEnabledVal;
+    });
+    outlineMaterials.forEach((mat) => {
+      mat.uniforms.uSectionEnabled.value = sectionEnabledVal;
+    });
+    clippableLineMaterials.forEach((mat) => {
+      mat.clippingPlanes = activeSectionPlane ? [activeSectionPlane] : [];
+    });
   }
 
   function onThemeChange(fn) {
@@ -383,12 +585,22 @@ export function createShaderKit(initialTheme = THEMES[0]) {
     currentTheme = theme;
 
     anatomyMaterials.forEach((mat) => {
-      const ramp = theme.ramps[mat.userData.rampKey] || theme.ramps.mid;
+      const ramp = resolveThemeRamp(theme, mat.userData.rampKey);
       mat.uniforms.uTop.value.set(ramp.top);
       mat.uniforms.uShade0.value.set(ramp.shades[3]);
       mat.uniforms.uShade1.value.set(ramp.shades[2]);
       mat.uniforms.uShade2.value.set(ramp.shades[1]);
       mat.uniforms.uShade3.value.set(ramp.shades[0]);
+    });
+
+    const gTheme = theme.glass || { top: "#ffffff", rim: "#38bdf8", tint: "#bae6fd", opacity: 0.34 };
+    glassMaterials.forEach((mat) => {
+      mat.uniforms.uTop.value.set(gTheme.top);
+      mat.uniforms.uRim.value.set(gTheme.rim);
+      mat.uniforms.uTint.value.set(gTheme.tint);
+      if (mat.userData.customOpacity === null) {
+        mat.uniforms.uOpacity.value = gTheme.opacity;
+      }
     });
 
     outlineMaterials.forEach((mat) => {
@@ -398,6 +610,10 @@ export function createShaderKit(initialTheme = THEMES[0]) {
 
     Object.keys(lineMaterials).forEach((k) => {
       lineMaterials[k].color.set(theme.lines[k]);
+    });
+    clippableLineMaterials.forEach((mat) => {
+      const lk = mat.userData.lineKey || "faint";
+      mat.color.set(theme.lines[lk] || theme.lines.faint);
     });
     dotMaterials.dot.color.set(theme.lines.dot);
     dotMaterials.lit.color.set(theme.lines.lit);
@@ -418,9 +634,11 @@ export function createShaderKit(initialTheme = THEMES[0]) {
     lineMaterials,
     dotMaterials,
     createAnatomySolidMaterial,
+    createGlassMaterial,
     createOutlineMaterial,
     createHaloMaterial,
     createAnatomyPart,
+    setSectionPlane,
     onThemeChange,
     applyTheme
   };

@@ -1,4 +1,7 @@
 export const SPEC = {
+  archetype: "bench",
+  simulationMode: "continuous",
+  toneMode: "single-lit",
   R: 1.33,
   e: 0.19,
   depth: 0.72,
@@ -12,6 +15,20 @@ export const SPEC = {
   initialPanY: 0.22,
   minVertSpan: 5.3,
   minHorizSpan: 6.9,
+  section: {
+    axis: "z",
+    min: -0.65,
+    max: 0.95,
+    initial: 0.95,
+    label: "SECT",
+    title: "Slice epitrochoid stator & endplates along shaft Z axis"
+  },
+  cameraViews: [
+    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.95, pan: [0, 0.22] },
+    { id: "bore", label: "BORE", elev: 8, azim: -8, zoom: 1.32, pan: [0, 0.08] },
+    { id: "top", label: "TOP", elev: 85, azim: 0, zoom: 0.96, pan: [0, 0] },
+    { id: "gauge", label: "GAUGE", elev: 22, azim: -22, zoom: 1.48, pan: [1.55, 0.22] }
+  ],
   BASE_W: 5.4,
   BASE_D: 3.5,
   BASE_H: 0.24,

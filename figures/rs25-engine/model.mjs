@@ -1,4 +1,7 @@
 export const SPEC = {
+  archetype: "gantry",
+  simulationMode: "continuous",
+  toneMode: "single-lit",
   // Bench bedplate dimensions (world units ~ 1 m scaled static-fire rig)
   BASE_W: 5.8,
   BASE_D: 4.2,
@@ -102,6 +105,20 @@ export const SPEC = {
   initialPanY: 0.30,
   minVertSpan: 7.7,
   minHorizSpan: 8.8,
+  section: {
+    axis: "z",
+    min: -0.95,
+    max: 1.25,
+    initial: 1.25,
+    label: "SECT",
+    title: "Slice engine powerhead, combustion chamber, and nozzle bell along Z axis"
+  },
+  cameraViews: [
+    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.94, pan: [0, 0.30] },
+    { id: "powerhead", label: "PUMPS", elev: 18, azim: -22, zoom: 1.55, pan: [0, -0.92] },
+    { id: "throat", label: "THROAT", elev: 14, azim: -16, zoom: 1.48, pan: [0, -0.18] },
+    { id: "side", label: "SIDE", elev: 6, azim: -82, zoom: 0.98, pan: [0, 0.26] }
+  ],
 
   // Audit poses across throttle and ±10.5° TVC gimbal extremes
   auditPoses: [

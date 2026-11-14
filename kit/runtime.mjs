@@ -2,6 +2,36 @@ import * as THREE from "three";
 import { createShaderKit } from "./shaders.mjs";
 import { Recorder3D } from "./registry.mjs";
 
+export function clamp01(x) {
+  return x <= 0 ? 0 : x >= 1 ? 1 : x;
+}
+
+export function smooth(a, b, x) {
+  if (a === b) return x >= b ? 1 : 0;
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+}
+
+export function burst(age, rise = 0.08, fall = 0.65) {
+  if (!Number.isFinite(age) || age < 0) return 0;
+  if (age <= rise) {
+    return rise <= 0 ? 1 : smooth(0, rise, age);
+  }
+  const end = rise + Math.max(0.001, fall);
+  if (age >= end) return 0;
+  return 1 - smooth(rise, end, age);
+}
+
+export function settle(held, want, dt, seconds = 0.25, calm = 1) {
+  if (seconds <= 0 || dt <= 0) return want;
+  const alpha = 1 - Math.exp((-dt * Math.max(0.15, calm)) / Math.max(0.001, seconds));
+  if (typeof held === "object" && held !== null && "at" in held) {
+    held.at += (want - held.at) * alpha;
+    return held.at;
+  }
+  return held + (want - held) * alpha;
+}
+
 export function mountAnatomyFigure(config) {
   const {
     spec,
@@ -11,32 +41,71 @@ export function mountAnatomyFigure(config) {
     buildMechanism,
     buildShader,
     updateKinematics,
-    formatReadout
+    formatReadout,
+    tourAt
   } = config;
 
+  const simulationMode = spec.simulationMode || "continuous";
+  const isContinuous = simulationMode === "continuous";
+
   const features = Object.assign(
-    { explode: true, cutaway: true, shader: true, crank: true },
+    {
+      explode: true,
+      cutaway: true,
+      shader: true,
+      crank: isContinuous,
+      slow: isContinuous,
+      rpm: isContinuous
+    },
     spec.features || {}
   );
 
-  const controlDefs =
-    Array.isArray(spec.controls) && spec.controls.length > 0
-      ? spec.controls
-      : [
-          {
-            id: "rpm",
-            label: "RPM",
-            min: 0,
-            max: 2400,
-            step: 20,
-            initial: spec.initialRpm !== undefined ? spec.initialRpm : 720,
-            title: "Shaft speed"
-          }
-        ];
+  const sectionSpec =
+    spec.section && typeof spec.section === "object"
+      ? spec.section
+      : features.section
+        ? { axis: "z", min: -2.0, max: 2.0, initial: 2.0, label: "SECT" }
+        : null;
+
+  const baseControls =
+    Array.isArray(spec.controls)
+      ? [...spec.controls]
+      : isContinuous || features.rpm === true
+        ? [
+            {
+              id: "rpm",
+              label: "RPM",
+              min: 0,
+              max: 2400,
+              step: 20,
+              initial: spec.initialRpm !== undefined ? spec.initialRpm : 720,
+              title: "Shaft speed"
+            }
+          ]
+        : [];
+
+  if ((simulationMode === "timeline" || features.timeline === true) && !baseControls.some((c) => c.id === "timeline")) {
+    baseControls.push({
+      id: "timeline",
+      label: "TIME",
+      min: 0,
+      max: 1,
+      step: 0.005,
+      initial: spec.initialTimeline !== undefined ? spec.initialTimeline : 0,
+      title: "Scrub simulation timeline"
+    });
+  }
+
+  const controlDefs = baseControls;
+  const triggerDefs = Array.isArray(spec.triggers) ? spec.triggers : [];
+  const stepDefs = Array.isArray(spec.steps) ? spec.steps : [];
+  const cameraViews = Array.isArray(spec.cameraViews) ? spec.cameraViews : [];
+  const tourFn = typeof tourAt === "function" ? tourAt : typeof spec.tour === "function" ? spec.tour : null;
 
   const state = {
     theta: spec.initialTheta !== undefined ? spec.initialTheta : 0.65,
-    rpm: spec.initialRpm !== undefined ? spec.initialRpm : 720,
+    rpm: spec.initialRpm !== undefined ? spec.initialRpm : (isContinuous ? 720 : 0),
+    timeline: spec.initialTimeline !== undefined ? spec.initialTimeline : 0,
     params: {},
     slowModes: [1, 0.2, 0.05, 0],
     slowLabels: ["SLOW 1×", "SLOW 1/5×", "SLOW 1/20×", "PAUSED"],
@@ -46,7 +115,9 @@ export function mountAnatomyFigure(config) {
     cutaway: spec.initialCutaway !== undefined ? spec.initialCutaway : features.cutaway,
     shaderEnabled: features.shader,
     hudVisible: true,
-    debugPaused: false
+    debugPaused: false,
+    stepIndex: 0,
+    section: sectionSpec ? (sectionSpec.initial !== undefined ? sectionSpec.initial : sectionSpec.max) : null
   };
 
   function createSpring(initial) {
@@ -78,6 +149,27 @@ export function mountAnatomyFigure(config) {
   const explodeSpring = createSpring(0);
   const rpmSpring = paramSprings.rpm || createSpring(state.rpm);
   const shaderEnvSpring = createSpring(features.shader ? 1 : 0);
+  const sectionSpring = createSpring(state.section !== null ? state.section : 0);
+  let targetSection = state.section;
+  let thetaTarget = null;
+
+  let simClock = 0;
+  let tourClock = 0;
+  let hasUserInteracted = false;
+  let lastInteractionMs = performance.now();
+  const triggerTimes = {};
+  const triggerValues = {};
+  const triggerAges = {};
+  for (const t of triggerDefs) {
+    triggerTimes[t.id] = -999;
+    triggerValues[t.id] = 0;
+    triggerAges[t.id] = 999;
+  }
+
+  function markUserInteraction() {
+    hasUserInteracted = true;
+    lastInteractionMs = performance.now();
+  }
 
   const host = document.getElementById("canvas-host");
   const cardEl = document.getElementById("figure-card");
@@ -87,11 +179,15 @@ export function mountAnatomyFigure(config) {
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  if (sectionSpec) {
+    renderer.localClippingEnabled = true;
+  }
   host.appendChild(renderer.domElement);
 
   const ISO_ELEV = ((spec.isoElevDeg !== undefined ? spec.isoElevDeg : 30) * Math.PI) / 180;
   const ISO_AZIM = ((spec.isoAzimDeg !== undefined ? spec.isoAzimDeg : -36) * Math.PI) / 180;
   let zoomFactor = spec.initialZoom || 1.08;
+  let targetZoom = zoomFactor;
   let panX = 0;
   let panY = spec.initialPanY !== undefined ? spec.initialPanY : -0.06;
   let targetPanX = panX;
@@ -149,6 +245,8 @@ export function mountAnatomyFigure(config) {
 
   const schemeButtonsEl = document.getElementById("scheme-buttons");
   const customSlidersEl = document.getElementById("custom-sliders");
+  const triggersGroupEl = document.getElementById("triggers-group");
+  const cameraViewsGroupEl = document.getElementById("camera-views-group");
   const crankBtn = document.getElementById("crank-btn");
   const slowBtn = document.getElementById("slow-btn");
   const explodeBtn = document.getElementById("explode-btn");
@@ -164,6 +262,14 @@ export function mountAnatomyFigure(config) {
 
   const controlDefMap = new Map(controlDefs.map((c) => [c.id, c]));
   const sliderInputs = new Map();
+  const triggerButtons = new Map();
+  let stepBtn = null;
+  let sectionSliderEl = null;
+  let activeCameraViewId = null;
+
+  const localSectionNormal = new THREE.Vector3(0, 0, -1);
+  const localSectionPlane = new THREE.Plane(localSectionNormal, 2.0);
+  const worldSectionPlane = new THREE.Plane(localSectionNormal, 2.0);
 
   function setParam(id, value, immediate = false) {
     const def = controlDefMap.get(id);
@@ -171,12 +277,104 @@ export function mountAnatomyFigure(config) {
     const clamped = Math.max(def.min, Math.min(def.max, value));
     state.params[id] = clamped;
     if (id === "rpm") state.rpm = clamped;
+    if (id === "timeline") {
+      state.timeline = clamped;
+      state.theta = clamped * Math.PI * 2;
+    }
     const input = sliderInputs.get(id);
     if (input) input.value = String(clamped);
     if (immediate && paramSprings[id]) {
       paramSprings[id].at = clamped;
       paramSprings[id].rate = 0;
     }
+  }
+
+  function setSection(val, immediate = false) {
+    if (!sectionSpec || !Number.isFinite(val)) return;
+    const clamped = Math.max(sectionSpec.min, Math.min(sectionSpec.max, val));
+    targetSection = clamped;
+    if (sectionSliderEl) sectionSliderEl.value = String(clamped);
+    if (immediate) {
+      state.section = sectionSpring.at = clamped;
+      sectionSpring.rate = 0;
+    }
+  }
+
+  function setCameraViewSelectionUI(viewId) {
+    activeCameraViewId = viewId || null;
+    if (!cameraViewsGroupEl) return;
+    Array.from(cameraViewsGroupEl.children).forEach((btn) => {
+      btn.classList.toggle("active", Boolean(activeCameraViewId) && btn.dataset.viewId === activeCameraViewId);
+    });
+  }
+
+  function applyCameraView(viewIdOrIndex, immediate = false) {
+    if (cameraViews.length === 0) return null;
+    const view =
+      typeof viewIdOrIndex === "number"
+        ? cameraViews[viewIdOrIndex]
+        : cameraViews.find((v) => v.id === viewIdOrIndex);
+    if (!view) return null;
+
+    const elevDeg = view.elev !== undefined ? view.elev : (spec.isoElevDeg !== undefined ? spec.isoElevDeg : 30);
+    const azimDeg = view.azim !== undefined ? view.azim : (spec.isoAzimDeg !== undefined ? spec.isoAzimDeg : -36);
+    const zoom = view.zoom !== undefined ? view.zoom : (spec.initialZoom || 1.08);
+    const pan = Array.isArray(view.pan)
+      ? view.pan
+      : [0, spec.initialPanY !== undefined ? spec.initialPanY : -0.06];
+
+    targetRotX = (elevDeg * Math.PI) / 180;
+    targetRotY = (azimDeg * Math.PI) / 180;
+    targetPanX = pan[0] !== undefined ? pan[0] : 0;
+    targetPanY = pan[1] !== undefined ? pan[1] : 0;
+    targetZoom = Math.max(0.45, Math.min(4.5, zoom));
+
+    if (immediate) {
+      rotX = targetRotX;
+      rotY = targetRotY;
+      panX = targetPanX;
+      panY = targetPanY;
+      zoomFactor = targetZoom;
+      updateCameraSize();
+    }
+    setCameraViewSelectionUI(view.id);
+    return view;
+  }
+
+  function fireTrigger(id, opts = {}) {
+    const tDef = triggerDefs.find((t) => t.id === id);
+    if (!tDef) return false;
+    if (!opts.fromTour) markUserInteraction();
+    triggerTimes[id] = simClock;
+    triggerAges[id] = 0;
+    triggerValues[id] = burst(0, tDef.rise !== undefined ? tDef.rise : 0.08, tDef.fall !== undefined ? tDef.fall : 0.75);
+    if (typeof tDef.onTrigger === "function") {
+      tDef.onTrigger({ state, setParam, fireTrigger, applyStep });
+    }
+    const btn = triggerButtons.get(id);
+    if (btn) btn.classList.add("armed");
+    return true;
+  }
+
+  function applyStep(idx) {
+    if (stepDefs.length === 0) return null;
+    state.stepIndex = ((idx % stepDefs.length) + stepDefs.length) % stepDefs.length;
+    const step = stepDefs[state.stepIndex];
+    if (step.theta !== undefined) {
+      thetaTarget = step.theta;
+    }
+    if (step.timeline !== undefined) {
+      setParam("timeline", step.timeline, false);
+    }
+    if (step.params && typeof step.params === "object") {
+      for (const [k, v] of Object.entries(step.params)) {
+        setParam(k, v, false);
+      }
+    }
+    if (stepBtn) {
+      stepBtn.textContent = step.label || `STEP ${state.stepIndex + 1}/${stepDefs.length}`;
+    }
+    return step;
   }
 
   if (customSlidersEl) {
@@ -195,6 +393,7 @@ export function mountAnatomyFigure(config) {
       input.step = String(c.step);
       input.value = String(c.initial);
       input.addEventListener("input", (e) => {
+        markUserInteraction();
         setParam(c.id, parseFloat(e.target.value), false);
       });
       lbl.appendChild(span);
@@ -202,14 +401,83 @@ export function mountAnatomyFigure(config) {
       customSlidersEl.appendChild(lbl);
       sliderInputs.set(c.id, input);
     }
+
+    if (sectionSpec) {
+      const lbl = document.createElement("label");
+      lbl.className = "slider-label";
+      lbl.title = sectionSpec.title || "Slice 3D cross-section plane";
+      const span = document.createElement("span");
+      span.textContent = sectionSpec.label || "SECT";
+      const input = document.createElement("input");
+      input.type = "range";
+      input.id = "section-slider";
+      input.min = String(sectionSpec.min);
+      input.max = String(sectionSpec.max);
+      input.step = String(sectionSpec.step || 0.02);
+      input.value = String(targetSection);
+      input.addEventListener("input", (e) => {
+        markUserInteraction();
+        setSection(parseFloat(e.target.value), false);
+      });
+      lbl.appendChild(span);
+      lbl.appendChild(input);
+      customSlidersEl.appendChild(lbl);
+      sectionSliderEl = input;
+    }
   } else {
     const rpmSlider = document.getElementById("rpm-slider");
     if (rpmSlider) {
       rpmSlider.addEventListener("input", (e) => {
+        markUserInteraction();
         setParam("rpm", parseFloat(e.target.value), false);
       });
       sliderInputs.set("rpm", rpmSlider);
     }
+  }
+
+  if (triggersGroupEl) {
+    triggersGroupEl.innerHTML = "";
+    if (stepDefs.length > 0) {
+      stepBtn = document.createElement("button");
+      stepBtn.type = "button";
+      stepBtn.className = "action-btn trigger-btn";
+      stepBtn.id = "step-btn";
+      stepBtn.title = "Advance sequence step";
+      stepBtn.textContent = stepDefs[0].label || `STEP 1/${stepDefs.length}`;
+      stepBtn.addEventListener("click", () => {
+        markUserInteraction();
+        applyStep(state.stepIndex + 1);
+      });
+      triggersGroupEl.appendChild(stepBtn);
+    }
+    for (const t of triggerDefs) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "action-btn trigger-btn";
+      btn.id = `trigger-btn-${t.id}`;
+      btn.textContent = t.label;
+      if (t.title) btn.title = t.title;
+      btn.addEventListener("click", () => fireTrigger(t.id));
+      triggersGroupEl.appendChild(btn);
+      triggerButtons.set(t.id, btn);
+    }
+  }
+
+  if (cameraViewsGroupEl) {
+    cameraViewsGroupEl.innerHTML = "";
+    cameraViews.forEach((v, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "view-pill";
+      btn.dataset.viewId = v.id;
+      btn.textContent = v.label;
+      if (idx < 9) btn.title = `${v.label} (${idx + 1})`;
+      btn.addEventListener("click", () => {
+        markUserInteraction();
+        applyCameraView(v.id, false);
+      });
+      cameraViewsGroupEl.appendChild(btn);
+    });
   }
 
   if (!features.explode) {
@@ -229,6 +497,9 @@ export function mountAnatomyFigure(config) {
   if (!features.crank) {
     if (crankBtn) crankBtn.style.display = "none";
     if (hintCrankEl) hintCrankEl.style.display = "none";
+  }
+  if (!features.slow && slowBtn) {
+    slowBtn.style.display = "none";
   }
   if (spec.interactionHint) {
     if (hintInteractEl) hintInteractEl.textContent = `${spec.interactionHint} · `;
@@ -323,18 +594,19 @@ export function mountAnatomyFigure(config) {
     targetRotY = ISO_AZIM;
     targetPanX = 0;
     targetPanY = spec.initialPanY !== undefined ? spec.initialPanY : -0.06;
-    zoomFactor = spec.initialZoom || 1.08;
+    targetZoom = zoomFactor = spec.initialZoom || 1.08;
+    setCameraViewSelectionUI(null);
     updateCameraSize();
   }
 
-  crankBtn.addEventListener("click", toggleCrankMode);
-  slowBtn.addEventListener("click", cycleSlowMode);
-  explodeBtn.addEventListener("click", toggleExplode);
-  cutawayBtn.addEventListener("click", toggleCutaway);
-  shaderBtn.addEventListener("click", toggleShader);
+  crankBtn.addEventListener("click", () => { markUserInteraction(); toggleCrankMode(); });
+  slowBtn.addEventListener("click", () => { markUserInteraction(); cycleSlowMode(); });
+  explodeBtn.addEventListener("click", () => { markUserInteraction(); toggleExplode(); });
+  cutawayBtn.addEventListener("click", () => { markUserInteraction(); toggleCutaway(); });
+  shaderBtn.addEventListener("click", () => { markUserInteraction(); toggleShader(); });
   hudBtn.addEventListener("click", toggleHud);
   hudQuickBtn.addEventListener("click", toggleHud);
-  resetBtn.addEventListener("click", resetIsoView);
+  resetBtn.addEventListener("click", () => { markUserInteraction(); resetIsoView(); });
 
   const activePointers = new Map();
   let lastSingleX = 0;
@@ -397,6 +669,7 @@ export function mountAnatomyFigure(config) {
   }
 
   host.addEventListener("pointerdown", (e) => {
+    markUserInteraction();
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     host.setPointerCapture(e.pointerId);
     cardEl.focus();
@@ -424,6 +697,7 @@ export function mountAnatomyFigure(config) {
       }
       return;
     }
+    markUserInteraction();
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     const w = Math.max(host.clientWidth, 1);
@@ -438,6 +712,7 @@ export function mountAnatomyFigure(config) {
       lastSingleY = e.clientY;
 
       if (isMousePan) {
+        setCameraViewSelectionUI(null);
         targetPanX += dx * worldPerPixelX;
         targetPanY -= dy * worldPerPixelY;
       } else if (activeInteractable && typeof activeInteractable.onDrag === "function") {
@@ -448,15 +723,20 @@ export function mountAnatomyFigure(config) {
           worldDy: -dy * worldPerPixelY,
           state,
           setParam,
+          fireTrigger,
+          applyStep,
           event: e
         });
       } else if (e.shiftKey || state.crankMode || (features.crank && state.slowModes[state.slowIndex] === 0)) {
+        thetaTarget = null;
         state.theta -= dx * 0.024;
       } else {
+        setCameraViewSelectionUI(null);
         targetRotY += dx * 0.0085;
         targetRotX = Math.max(-Math.PI * 0.48, Math.min(Math.PI * 0.48, targetRotX + dy * 0.0085));
       }
     } else if (activePointers.size >= 2) {
+      setCameraViewSelectionUI(null);
       const pts = Array.from(activePointers.values());
       const midX = (pts[0].x + pts[1].x) * 0.5;
       const midY = (pts[0].y + pts[1].y) * 0.5;
@@ -469,7 +749,7 @@ export function mountAnatomyFigure(config) {
 
       if (lastPinchDist > 12 && dist > 12) {
         const scale = dist / lastPinchDist;
-        zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor * scale));
+        targetZoom = zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor * scale));
         updateCameraSize();
       }
 
@@ -502,21 +782,35 @@ export function mountAnatomyFigure(config) {
 
   host.addEventListener("wheel", (e) => {
     e.preventDefault();
-    zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor - e.deltaY * 0.0012));
+    markUserInteraction();
+    setCameraViewSelectionUI(null);
+    targetZoom = zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor - e.deltaY * 0.0012));
     updateCameraSize();
   }, { passive: false });
 
   window.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key >= "1" && e.key <= "9") {
+      const idx = Number(e.key) - 1;
+      if (cameraViews[idx]) {
+        markUserInteraction();
+        applyCameraView(idx, false);
+        return;
+      }
+    }
     const k = e.key.toLowerCase();
-    if (k === "e") toggleExplode();
-    else if (k === "s") cycleSlowMode();
-    else if (k === "c") toggleCutaway();
-    else if (k === "i") toggleShader();
+    if (k === "e") { markUserInteraction(); toggleExplode(); }
+    else if (k === "s") {
+      markUserInteraction();
+      if (features.slow) cycleSlowMode();
+      else if (stepDefs.length > 0) applyStep(state.stepIndex + 1);
+    }
+    else if (k === "c") { markUserInteraction(); toggleCutaway(); }
+    else if (k === "i") { markUserInteraction(); toggleShader(); }
     else if (k === "h") toggleHud();
-    else if (k === "r") resetIsoView();
-    else if (e.key === "ArrowRight") state.theta -= 0.12;
-    else if (e.key === "ArrowLeft") state.theta += 0.12;
+    else if (k === "r") { markUserInteraction(); resetIsoView(); }
+    else if (e.key === "ArrowRight") { markUserInteraction(); thetaTarget = null; state.theta -= 0.12; }
+    else if (e.key === "ArrowLeft") { markUserInteraction(); thetaTarget = null; state.theta += 0.12; }
   });
 
   window.addEventListener("resize", updateCameraSize);
@@ -544,7 +838,7 @@ export function mountAnatomyFigure(config) {
     }
   }
 
-  function stepSceneAndRender(effectiveRpm) {
+  function stepSceneAndRender(effectiveRpm, dt = 0) {
     worldGroup.position.set(panX, panY, 0);
     worldGroup.rotation.order = "XYZ";
     worldGroup.rotation.x = rotX;
@@ -553,36 +847,80 @@ export function mountAnatomyFigure(config) {
 
     reg.applyExplode(explodeSpring.at, state.cutaway);
 
+    if (sectionSpec) {
+      const sVal = sectionSpring.at;
+      state.section = sVal;
+      const isOpen = !sectionSpec.alwaysActive && sVal >= sectionSpec.max - 0.001;
+      if (isOpen) {
+        kit.setSectionPlane(null);
+      } else {
+        const axis = sectionSpec.axis || "z";
+        const sign = sectionSpec.invert ? 1 : -1;
+        localSectionNormal.set(
+          axis === "x" ? sign : 0,
+          axis === "y" ? sign : 0,
+          axis === "z" ? sign : 0
+        );
+        localSectionPlane.set(localSectionNormal, -sign * sVal);
+        worldSectionPlane.copy(localSectionPlane).applyMatrix4(worldGroup.matrixWorld);
+        kit.setSectionPlane(worldSectionPlane);
+      }
+    }
+
+    for (const t of triggerDefs) {
+      const age = simClock - triggerTimes[t.id];
+      triggerAges[t.id] = age;
+      const val = burst(age, t.rise !== undefined ? t.rise : 0.08, t.fall !== undefined ? t.fall : 0.75);
+      triggerValues[t.id] = val;
+      const btn = triggerButtons.get(t.id);
+      if (btn) btn.classList.toggle("armed", val > 0.04);
+    }
+
     const smoothedParams = {};
     for (const c of controlDefs) {
       smoothedParams[c.id] = paramSprings[c.id].at;
     }
+    if (smoothedParams.timeline !== undefined) {
+      state.timeline = smoothedParams.timeline;
+    }
+
+    const kinematicState = {
+      theta: state.theta,
+      explode: explodeSpring.at,
+      rpm: rpmSpring.at,
+      effectiveRpm,
+      shaderEnv: shaderEnvSpring.at,
+      cutaway: state.cutaway,
+      section: sectionSpec ? sectionSpring.at : null,
+      simClock,
+      dt,
+      simulationMode,
+      timeline: state.timeline,
+      stepIndex: state.stepIndex,
+      triggers: { ...triggerValues },
+      triggerAges: { ...triggerAges },
+      params: smoothedParams,
+      rawParams: state.params,
+      ...smoothedParams
+    };
 
     if (updateKinematics) {
-      updateKinematics(reg, {
-        theta: state.theta,
-        explode: explodeSpring.at,
-        rpm: rpmSpring.at,
-        effectiveRpm,
-        shaderEnv: shaderEnvSpring.at,
-        cutaway: state.cutaway,
-        params: smoothedParams,
-        rawParams: state.params,
-        ...smoothedParams
-      });
+      updateKinematics(reg, kinematicState);
     }
 
     worldGroup.updateMatrixWorld(true);
 
+    if (reg.screens && reg.screens.size > 0) {
+      for (const [, scr] of reg.screens) {
+        if (scr.ctx && scr.canvas && typeof scr.draw === "function") {
+          scr.draw(scr.ctx, scr.canvas, kinematicState, kit.currentTheme);
+          if (scr.texture) scr.texture.needsUpdate = true;
+        }
+      }
+    }
+
     if (state.hudVisible && formatReadout) {
-      const hudData = formatReadout({
-        theta: state.theta,
-        effectiveRpm,
-        explode: explodeSpring.at,
-        params: smoothedParams,
-        rawParams: state.params,
-        ...smoothedParams
-      });
+      const hudData = formatReadout(kinematicState);
       if (hudData.readout && readoutEl) readoutEl.textContent = hudData.readout;
       if (hudData.phase && phaseCornerEl) phaseCornerEl.textContent = hudData.phase;
       updateEngravedTags();
@@ -603,12 +941,63 @@ export function mountAnatomyFigure(config) {
     lastTime = now;
 
     if (!state.debugPaused) {
+      simClock += dt;
+
+      let tourExplodeTarget = null;
+      let tourCutawayTarget = null;
+      let tourShaderTarget = null;
+      const idleThresholdMs = hasUserInteracted ? 3600 : 1600;
+      if (typeof tourFn === "function" && (now - lastInteractionMs) > idleThresholdMs && activePointers.size === 0) {
+        tourClock += dt;
+        const patch = tourFn(tourClock, {
+          theta: state.theta,
+          explode: explodeSpring.at,
+          cutaway: state.cutaway,
+          section: sectionSpec ? sectionSpring.at : null,
+          params: { ...state.params },
+          simulationMode
+        });
+        if (patch && typeof patch === "object") {
+          if (typeof patch.explode === "boolean") tourExplodeTarget = patch.explode ? 1.0 : 0.0;
+          else if (typeof patch.explode === "number") tourExplodeTarget = patch.explode;
+          if (typeof patch.cutaway === "boolean") tourCutawayTarget = patch.cutaway;
+          if (typeof patch.shader === "boolean") tourShaderTarget = patch.shader ? 1.0 : 0.0;
+          if (typeof patch.rpm === "number") setParam("rpm", patch.rpm, false);
+          if (typeof patch.theta === "number") {
+            thetaTarget = null;
+            state.theta = patch.theta;
+          }
+          if (typeof patch.section === "number" && sectionSpec) setSection(patch.section, false);
+          if (patch.params && typeof patch.params === "object") {
+            for (const [pk, pv] of Object.entries(patch.params)) {
+              setParam(pk, pv, false);
+            }
+          }
+          if (typeof patch.cameraView === "string" && patch.cameraView !== activeCameraViewId) {
+            applyCameraView(patch.cameraView, false);
+          }
+          if (typeof patch.trigger === "string") {
+            fireTrigger(patch.trigger, { fromTour: true });
+          }
+        }
+      }
+
+      if (tourCutawayTarget !== null && tourCutawayTarget !== state.cutaway) {
+        state.cutaway = tourCutawayTarget;
+        if (cutawayBtn) cutawayBtn.classList.toggle("active", state.cutaway);
+      }
+
       rotX += (targetRotX - rotX) * 0.2;
       rotY += (targetRotY - rotY) * 0.2;
       panX += (targetPanX - panX) * 0.22;
       panY += (targetPanY - panY) * 0.22;
+      if (Math.abs(targetZoom - zoomFactor) > 0.0004) {
+        zoomFactor += (targetZoom - zoomFactor) * 0.22;
+        updateCameraSize();
+      }
 
-      stepSpring(explodeSpring, features.explode && state.exploded ? 1.0 : 0.0, dt, 150, 19);
+      const wantExplode = tourExplodeTarget !== null ? tourExplodeTarget : (features.explode && state.exploded ? 1.0 : 0.0);
+      stepSpring(explodeSpring, wantExplode, dt, 150, 19);
       if (!paramSprings.rpm) {
         stepSpring(rpmSpring, state.rpm, dt, 110, 16);
       }
@@ -618,7 +1007,11 @@ export function mountAnatomyFigure(config) {
       if (paramSprings.rpm) {
         state.rpm = state.params.rpm;
       }
-      stepSpring(shaderEnvSpring, features.shader && state.shaderEnabled ? 1.0 : 0.0, dt, 140, 18);
+      if (sectionSpec) {
+        stepSpring(sectionSpring, targetSection, dt, 140, 18);
+      }
+      const wantShader = tourShaderTarget !== null ? tourShaderTarget : (features.shader && state.shaderEnabled ? 1.0 : 0.0);
+      stepSpring(shaderEnvSpring, wantShader, dt, 140, 18);
 
       const speedMult = state.slowModes[state.slowIndex];
       const effectiveRpm = rpmSpring.at * speedMult;
@@ -626,13 +1019,25 @@ export function mountAnatomyFigure(config) {
         activePointers.size === 1 &&
         !activeInteractable &&
         (state.crankMode || (features.crank && speedMult === 0));
-      if (!isUserCranking) {
+
+      if (thetaTarget !== null) {
+        state.theta += (thetaTarget - state.theta) * Math.min(1, dt * 8.5);
+        if (Math.abs(thetaTarget - state.theta) < 0.001) {
+          state.theta = thetaTarget;
+          thetaTarget = null;
+        }
+      } else if (simulationMode === "timeline" && paramSprings.timeline) {
+        state.theta = paramSprings.timeline.at * Math.PI * 2;
+      } else if (isContinuous && !isUserCranking) {
+        const omegaShaft = (effectiveRpm * Math.PI * 2) / 60;
+        state.theta -= omegaShaft * dt * 0.12;
+      } else if (!isContinuous && features.rpm && effectiveRpm > 0 && !isUserCranking) {
         const omegaShaft = (effectiveRpm * Math.PI * 2) / 60;
         state.theta -= omegaShaft * dt * 0.12;
       }
-      stepSceneAndRender(effectiveRpm);
+      stepSceneAndRender(effectiveRpm, dt);
     } else {
-      stepSceneAndRender(0);
+      stepSceneAndRender(0, 0);
     }
   }
 
@@ -651,9 +1056,10 @@ export function mountAnatomyFigure(config) {
       state.debugPaused = true;
       rotX = targetRotX = (elevDeg * Math.PI) / 180;
       rotY = targetRotY = (azimDeg * Math.PI) / 180;
-      zoomFactor = zoom;
+      targetZoom = zoomFactor = zoom;
       panX = targetPanX = panXY[0];
       panY = targetPanY = panXY[1];
+      setCameraViewSelectionUI(null);
       updateCameraSize();
       stepSceneAndRender(0);
       return { elevDeg, azimDeg, zoom, panXY };
@@ -678,6 +1084,42 @@ export function mountAnatomyFigure(config) {
       return this.setCamera(v[0], v[1], v[2], v[3]);
     },
 
+    setCameraView(viewIdOrIndex) {
+      state.debugPaused = true;
+      const view = applyCameraView(viewIdOrIndex, true);
+      if (!view) {
+        throw new Error(`Unknown camera view "${viewIdOrIndex}"`);
+      }
+      stepSceneAndRender(0);
+      return view;
+    },
+
+    setSection(val) {
+      if (!sectionSpec) return null;
+      state.debugPaused = true;
+      setSection(val, true);
+      stepSceneAndRender(0);
+      return state.section;
+    },
+
+    fireTrigger(id) {
+      const ok = fireTrigger(id);
+      if (state.debugPaused) {
+        stepSceneAndRender(0);
+      }
+      return { id, ok, value: triggerValues[id] ?? 0 };
+    },
+
+    advanceStep() {
+      const step = applyStep(state.stepIndex + 1);
+      if (step && step.theta !== undefined) {
+        state.theta = step.theta;
+        thetaTarget = null;
+      }
+      if (state.debugPaused) stepSceneAndRender(0);
+      return { stepIndex: state.stepIndex, step };
+    },
+
     isolate(filter) {
       state.debugPaused = true;
       reg.isolate(filter, state.cutaway, explodeSpring.at);
@@ -687,7 +1129,10 @@ export function mountAnatomyFigure(config) {
 
     setPose(opts = {}) {
       state.debugPaused = opts.paused !== undefined ? opts.paused : true;
-      if (opts.theta !== undefined) state.theta = opts.theta;
+      if (opts.theta !== undefined) {
+        thetaTarget = null;
+        state.theta = opts.theta;
+      }
       if (opts.explode !== undefined) {
         state.exploded = features.explode && opts.explode > 0.5;
         explodeSpring.at = features.explode ? opts.explode : 0;
@@ -713,6 +1158,15 @@ export function mountAnatomyFigure(config) {
           rpmSpring.rate = 0;
         }
       }
+      if (opts.section !== undefined && sectionSpec) {
+        setSection(opts.section, true);
+      }
+      if (opts.cameraView !== undefined) {
+        applyCameraView(opts.cameraView, true);
+      }
+      if (opts.trigger) {
+        fireTrigger(opts.trigger);
+      }
       if (opts.params && typeof opts.params === "object") {
         for (const [pk, pv] of Object.entries(opts.params)) {
           setParam(pk, pv, true);
@@ -736,6 +1190,7 @@ export function mountAnatomyFigure(config) {
         explode: explodeSpring.at,
         cutaway: state.cutaway,
         shader: state.shaderEnabled,
+        section: state.section,
         hud: state.hudVisible,
         theme: kit.currentTheme.id,
         params: { ...state.params }
@@ -752,7 +1207,7 @@ export function mountAnatomyFigure(config) {
       rotY = targetRotY = (azimDeg * Math.PI) / 180;
       panX = targetPanX = 0;
       panY = targetPanY = 0;
-      zoomFactor = zoom;
+      targetZoom = zoomFactor = zoom;
       updateCameraSize();
       stepSceneAndRender(0);
 
@@ -783,11 +1238,19 @@ export function mountAnatomyFigure(config) {
 
     getSummary() {
       return {
+        archetype: spec.archetype || "bench",
+        simulationMode,
+        toneMode: spec.toneMode || "single-lit",
         parts: reg.parts.size,
         tubes: reg.tubes.length,
         joints: Array.from(reg.joints.keys()),
+        screensCount: reg.screens ? reg.screens.size : 0,
         themes: kit.THEMES.map((t) => t.id),
         features,
+        section: sectionSpec ? { ...sectionSpec, current: state.section } : null,
+        cameraViews: cameraViews.map((v) => v.id),
+        triggers: triggerDefs.map((t) => t.id),
+        stepsCount: stepDefs.length,
         controls: controlDefs.map((c) => c.id),
         interactables: reg.interactables.map((i) => i.id),
         drivePoses: spec.drivePoses || null

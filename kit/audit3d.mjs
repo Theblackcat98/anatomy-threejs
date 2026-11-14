@@ -1,5 +1,31 @@
 import * as THREE from "three";
 
+export const VALID_ARCHETYPES = [
+  "bench",
+  "gantry",
+  "test-stand",
+  "cabinet",
+  "enclosure",
+  "section",
+  "diorama",
+  "free-space"
+];
+
+export const VALID_SIMULATION_MODES = ["continuous", "sequence", "timeline", "sandbox"];
+export const VALID_TONE_MODES = ["single-lit", "multi-channel"];
+export const ACCENT_RAMPS = new Set([
+  "lit",
+  "intake",
+  "comp",
+  "comb",
+  "exhaust",
+  "channelA",
+  "channelB",
+  "channelC",
+  "channelD",
+  "glass"
+]);
+
 /**
  * Computes minimum Euclidean distance between two THREE.Box3 instances (0 if intersecting),
  * along with per-axis gap [dx, dy, dz].
@@ -124,16 +150,85 @@ function pointInsideOrNearMesh(item, pt, radius) {
 }
 
 /**
- * Stage 1 Pure Model Audit: verifies physical constants, cycle bounds, and anchor definitions.
+ * Stage 1 Pure Model Audit: verifies physical constants, cycle bounds, SPEC fields, and anchor definitions.
  */
 export function runModelAudit(model) {
   const errors = [];
   if (!model || typeof model !== "object") {
     return ["[MODEL] model module must export SPEC, ANCHORS, and step/state functions"];
   }
-  const { SPEC, ANCHORS, getChamberState, epitrochoidPoint } = model;
+  const { SPEC, ANCHORS, getChamberState, epitrochoidPoint, formatReadout } = model;
   if (!SPEC) errors.push("[MODEL] Missing SPEC export in model.mjs");
   if (!ANCHORS) errors.push("[MODEL] Missing ANCHORS export in model.mjs");
+
+  if (ANCHORS && typeof ANCHORS === "object") {
+    for (const [k, v] of Object.entries(ANCHORS)) {
+      if (!Array.isArray(v) || v.length < 3 || !v.slice(0, 3).every(Number.isFinite)) {
+        errors.push(`[MODEL] Anchor "${k}" must be a finite [x, y, z] array`);
+      }
+    }
+  }
+
+  if (SPEC && typeof SPEC === "object") {
+    if (SPEC.archetype !== undefined && !VALID_ARCHETYPES.includes(SPEC.archetype)) {
+      errors.push(
+        `[MODEL] Invalid SPEC.archetype "${SPEC.archetype}" (valid: ${VALID_ARCHETYPES.join(", ")})`
+      );
+    }
+    if (SPEC.simulationMode !== undefined && !VALID_SIMULATION_MODES.includes(SPEC.simulationMode)) {
+      errors.push(
+        `[MODEL] Invalid SPEC.simulationMode "${SPEC.simulationMode}" (valid: ${VALID_SIMULATION_MODES.join(", ")})`
+      );
+    }
+    if (SPEC.toneMode !== undefined && !VALID_TONE_MODES.includes(SPEC.toneMode)) {
+      errors.push(
+        `[MODEL] Invalid SPEC.toneMode "${SPEC.toneMode}" (valid: ${VALID_TONE_MODES.join(", ")})`
+      );
+    }
+    if (Array.isArray(SPEC.controls)) {
+      for (const c of SPEC.controls) {
+        if (!c || typeof c.id !== "string" || typeof c.label !== "string") {
+          errors.push("[MODEL] Each SPEC.controls entry must have string id and label");
+          break;
+        }
+        if (!Number.isFinite(c.min) || !Number.isFinite(c.max) || c.min >= c.max || !Number.isFinite(c.initial)) {
+          errors.push(`[MODEL] SPEC.controls "${c.id}" has invalid min/max/initial bounds`);
+        }
+      }
+    }
+    if (Array.isArray(SPEC.cameraViews)) {
+      for (const v of SPEC.cameraViews) {
+        if (!v || typeof v.id !== "string" || typeof v.label !== "string") {
+          errors.push("[MODEL] Each SPEC.cameraViews entry must have string id and label");
+          break;
+        }
+        if (
+          (v.elev !== undefined && !Number.isFinite(v.elev)) ||
+          (v.azim !== undefined && !Number.isFinite(v.azim)) ||
+          (v.zoom !== undefined && (!Number.isFinite(v.zoom) || v.zoom <= 0))
+        ) {
+          errors.push(`[MODEL] SPEC.cameraViews "${v.id}" has invalid elev/azim/zoom`);
+        }
+      }
+    }
+    if (Array.isArray(SPEC.triggers)) {
+      for (const t of SPEC.triggers) {
+        if (!t || typeof t.id !== "string" || typeof t.label !== "string") {
+          errors.push("[MODEL] Each SPEC.triggers entry must have string id and label");
+          break;
+        }
+      }
+    }
+    if (SPEC.section && typeof SPEC.section === "object") {
+      const axis = SPEC.section.axis || "z";
+      if (!["x", "y", "z"].includes(axis)) {
+        errors.push(`[MODEL] Invalid SPEC.section.axis "${axis}" (must be "x", "y", or "z")`);
+      }
+      if (!Number.isFinite(SPEC.section.min) || !Number.isFinite(SPEC.section.max) || SPEC.section.min >= SPEC.section.max) {
+        errors.push("[MODEL] SPEC.section must define finite min < max");
+      }
+    }
+  }
 
   if (typeof epitrochoidPoint === "function") {
     for (let i = 0; i < 36; i++) {
@@ -169,6 +264,37 @@ export function runModelAudit(model) {
     }
   }
 
+  if (typeof formatReadout === "function" && SPEC) {
+    const baseParams = {};
+    if (Array.isArray(SPEC.controls)) {
+      for (const c of SPEC.controls) baseParams[c.id] = c.initial;
+    }
+    const baseTriggers = {};
+    if (Array.isArray(SPEC.triggers)) {
+      for (const t of SPEC.triggers) baseTriggers[t.id] = 0;
+    }
+    const testSweeps = [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5];
+    for (const theta of testSweeps) {
+      const out = formatReadout({
+        theta,
+        effectiveRpm: SPEC.initialRpm ?? 0,
+        explode: 0,
+        timeline: theta / (Math.PI * 2),
+        stepIndex: 0,
+        triggers: baseTriggers,
+        triggerAges: baseTriggers,
+        section: SPEC.section?.initial ?? null,
+        params: baseParams,
+        rawParams: baseParams,
+        ...baseParams
+      });
+      if (!out || typeof out.readout !== "string" || out.readout.includes("NaN") || out.readout.includes("undefined")) {
+        errors.push(`[MODEL] formatReadout returned invalid readout at θ=${theta.toFixed(2)}: ${out?.readout}`);
+        break;
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -189,13 +315,17 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
   const restPose = poses.find((p) => !p.explode) || poses[0];
 
   // 0. TONE HIERARCHY & MOUNT METADATA CHECK
+  const toneMode = options.toneMode || "single-lit";
   let litCount = 0;
+  let accentCount = 0;
   let hasSubjectStage = false;
   for (const [id, item] of reg.parts) {
     if (item.opts.stage === "subject") hasSubjectStage = true;
-    if (item.opts.ramp === "lit") {
+    const ramp = item.opts.ramp;
+    if (ACCENT_RAMPS.has(ramp)) accentCount++;
+    if (ramp === "lit") {
       litCount++;
-      if (item.opts.stage !== "subject" && !item.opts.detail) {
+      if (toneMode === "single-lit" && item.opts.stage !== "subject" && !item.opts.detail) {
         errors.push(`[TONE] "${id}" uses ramp "lit" outside stage "subject" (stage="${item.opts.stage}")`);
       }
     }
@@ -203,8 +333,14 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
       errors.push(`[UNMOUNTED] "${id}" is missing a mountOn property (specify parent part ID, "ground", or "coaxial")`);
     }
   }
-  if (hasSubjectStage && litCount === 0) {
-    errors.push(`[TONE] Stage "subject" has 0 parts with ramp: "lit" (the primary subject must be lit)`);
+  if (hasSubjectStage) {
+    if (toneMode === "multi-channel") {
+      if (accentCount === 0) {
+        errors.push(`[TONE] Multi-channel figure has 0 parts using "lit", "glass", or channel ramps`);
+      }
+    } else if (litCount === 0) {
+      errors.push(`[TONE] Stage "subject" has 0 parts with ramp: "lit" (the primary subject must be lit)`);
+    }
   }
 
   for (const pose of poses) {

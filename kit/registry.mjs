@@ -9,6 +9,7 @@ export class Recorder3D {
     this.joints = new Map();     // id -> THREE.Object3D (named anchor points)
     this.groups = new Map();     // id -> { id, group, opts }
     this.tags = new Map();       // id -> { id, text, pos }
+    this.screens = new Map();    // id -> { id, group, mesh, canvas, ctx, texture, draw }
     this.interactables = [];     // { id, object3d, cursor, hint, onDrag }
     this.currentStage = "base";  // 'base' | 'structure' | 'subject' | 'mechanism' | 'shader'
   }
@@ -95,14 +96,16 @@ export class Recorder3D {
       throw new Error(`Duplicate part ID registered: "${id}"`);
     }
     const {
-      ramp = "mid",          // 'lo' | 'mid' | 'hi' | 'lit' | 'brass' | 'copper'
-      outline = "mid",
+      ramp = "mid",          // 'lo' | 'mid' | 'hi' | 'lit' | 'brass' | 'copper' | 'glass' | 'intake' | 'comp' | 'comb' | 'exhaust' | 'channelA..D'
+      outline = ramp === "glass" ? "lo" : "mid",
       crease = "faint",
       creaseAngle = 28,
-      outlineWidth = 0.017,
+      outlineWidth = ramp === "glass" ? 0.009 : 0.017,
       topBias = 0.62,
       noOutline = false,
       noCrease = false,
+      clippable = false,
+      opacity = undefined,
       parent = this.root,
       pos = [0, 0, 0],
       rot = [0, 0, 0],
@@ -124,7 +127,9 @@ export class Recorder3D {
       outlineWidth,
       topBias,
       noOutline,
-      noCrease
+      noCrease,
+      clippable: Boolean(clippable),
+      opacity
     });
     group.name = id;
     group.position.set(...pos);
@@ -142,11 +147,97 @@ export class Recorder3D {
       basePos: [...pos],
       baseRot: [...rot],
       detail,
-      cutawayHide
+      cutawayHide,
+      clippable: Boolean(clippable)
     };
 
     parent.add(group);
     this.parts.set(id, { id, group, geometry, opts: group.userData });
+    return group;
+  }
+
+  /**
+   * Mount a live 2D CanvasTexture readout / oscilloscope / telemetry screen inside the 3D scene.
+   * Returns the bezel THREE.Group so it participates in stages, explode, and interactions.
+   */
+  screen(id, opts = {}) {
+    const {
+      width = 1.2,
+      height = 0.78,
+      depth = 0.06,
+      bezelPad = 0.06,
+      resolution = [256, 168],
+      ramp = "lo",
+      outline = "mid",
+      parent = this.root,
+      pos = [0, 0, 0],
+      rot = [0, 0, 0],
+      mountOn = "ground",
+      allowOverlap = [],
+      explode = [0, 0, 0],
+      detail = false,
+      cutawayHide = false,
+      clippable = false,
+      stage = this.currentStage,
+      draw = null
+    } = opts;
+
+    const bezelGeo = new THREE.BoxGeometry(width + bezelPad * 2, height + bezelPad * 2, depth);
+    const group = this.part(id, bezelGeo, {
+      ramp,
+      outline,
+      crease: "hi",
+      parent,
+      pos,
+      rot,
+      mountOn,
+      allowOverlap,
+      explode,
+      detail,
+      cutawayHide,
+      clippable,
+      stage
+    });
+
+    let canvas = null;
+    let ctx = null;
+    let texture = null;
+    if (typeof document !== "undefined" && typeof document.createElement === "function") {
+      canvas = document.createElement("canvas");
+      canvas.width = resolution[0] || 256;
+      canvas.height = resolution[1] || 168;
+      ctx = canvas.getContext("2d");
+      texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+    }
+
+    const screenMat = new THREE.MeshBasicMaterial({
+      map: texture || undefined,
+      color: texture ? 0xffffff : 0x1e293b,
+      toneMapped: false
+    });
+    const screenGeo = new THREE.PlaneGeometry(width, height);
+    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+    screenMesh.name = "screen-face";
+    screenMesh.position.z = depth * 0.5 + 0.004;
+    group.add(screenMesh);
+
+    const entry = {
+      id,
+      group,
+      mesh: screenMesh,
+      canvas,
+      ctx,
+      texture,
+      width,
+      height,
+      resolution,
+      draw
+    };
+    this.screens.set(id, entry);
+    group.userData.screen = entry;
     return group;
   }
 

@@ -177,6 +177,7 @@ export function buildStructure(reg, kit) {
     crease: "lo",
     creaseAngle: 22,
     outlineWidth: 0.02,
+    clippable: true,
     mountOn: "ground",
     allowOverlap: ["rear.plate", "front.cover", "shaft.main", "shaft.journal", "rear.statGear"]
   });
@@ -349,6 +350,7 @@ export function buildStructure(reg, kit) {
     ramp: "lo",
     outline: "mid",
     crease: "lo",
+    clippable: true,
     mountOn: "stator.housing",
     allowOverlap: ["shaft.main", "shaft.rearWeight"]
   });
@@ -386,6 +388,7 @@ export function buildStructure(reg, kit) {
     ramp: "mid",
     outline: "mid",
     crease: "lo",
+    clippable: true,
     mountOn: "stator.housing",
     allowOverlap: ["shaft.main", "shaft.frontWeight"]
   });

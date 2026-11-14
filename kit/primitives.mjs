@@ -201,3 +201,156 @@ export function makeHaloMesh(w, d, r, pos, kit) {
   haloMesh.position.set(...pos);
   return haloMesh;
 }
+
+/**
+ * Orthographic blueprint datum grid + perimeter frame for non-bench archetypes
+ * ("free-space", "section", "diorama").
+ */
+export function makeDatumGrid(width, depth, divisionsX = 8, divisionsZ = 6, y = 0, kit, toneKey = "faint") {
+  const g = new THREE.Group();
+  const hw = width * 0.5;
+  const hd = depth * 0.5;
+  const gridPts = [];
+  const tickPts = [];
+
+  for (let i = 0; i <= divisionsX; i++) {
+    const x = -hw + (i / divisionsX) * width;
+    const target = i === 0 || i === divisionsX ? tickPts : gridPts;
+    target.push(new THREE.Vector3(x, y, -hd), new THREE.Vector3(x, y, hd));
+  }
+  for (let j = 0; j <= divisionsZ; j++) {
+    const z = -hd + (j / divisionsZ) * depth;
+    const target = j === 0 || j === divisionsZ ? tickPts : gridPts;
+    target.push(new THREE.Vector3(-hw, y, z), new THREE.Vector3(hw, y, z));
+  }
+
+  const c = 0.14;
+  tickPts.push(
+    new THREE.Vector3(-c, y + 0.001, 0), new THREE.Vector3(c, y + 0.001, 0),
+    new THREE.Vector3(0, y + 0.001, -c), new THREE.Vector3(0, y + 0.001, c)
+  );
+
+  g.add(
+    new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(gridPts),
+      kit.lineMaterials[toneKey] || kit.lineMaterials.faint
+    ),
+    new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(tickPts),
+      kit.lineMaterials.lo
+    )
+  );
+  return g;
+}
+
+/**
+ * Graduated 3-axis / azimuthal gimbal datum ring for "free-space" or aerospace figures.
+ */
+export function makeGimbalDatumRing(radius, y = 0, kit, toneKey = "lo") {
+  const g = new THREE.Group();
+  g.position.set(0, y, 0);
+
+  const eqPts = [];
+  const tickPts = [];
+  const majorPts = [];
+  const segs = 72;
+  for (let i = 0; i <= segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    eqPts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+  }
+  for (let deg = 0; deg < 360; deg += 10) {
+    const a = (deg * Math.PI) / 180;
+    const isMajor = deg % 30 === 0;
+    const r0 = radius - (isMajor ? 0.14 : 0.07);
+    const target = isMajor ? majorPts : tickPts;
+    target.push(
+      new THREE.Vector3(Math.cos(a) * r0, 0, Math.sin(a) * r0),
+      new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius)
+    );
+  }
+
+  const meridPts = [];
+  for (let i = 0; i <= segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    const rM = radius * 1.03;
+    meridPts.push(new THREE.Vector3(Math.cos(a) * rM, Math.sin(a) * rM, 0));
+  }
+
+  g.add(
+    new THREE.Line(new THREE.BufferGeometry().setFromPoints(eqPts), kit.lineMaterials[toneKey] || kit.lineMaterials.lo),
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(tickPts), kit.lineMaterials.faint),
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(majorPts), kit.lineMaterials.mid),
+    new THREE.Line(new THREE.BufferGeometry().setFromPoints(meridPts), kit.lineMaterials.faint)
+  );
+  return g;
+}
+
+/**
+ * Builds an open-front hollow cabinet/chassis shell BufferGeometry for "cabinet" / "enclosure" archetypes.
+ * Centered on X and Z; Y runs from 0..height (or -height/2..+height/2 when centerY = true).
+ */
+export function buildEnclosureBoxGeometry(width, height, depth, wallThickness = 0.12, opts = {}) {
+  const { openTop = false, centerY = true } = opts;
+  const hw = width * 0.5;
+  const hd = depth * 0.5;
+  const t = Math.min(wallThickness, hw * 0.45, height * 0.35, hd * 0.45);
+  const y0 = centerY ? -height * 0.5 : 0;
+  const y1 = centerY ? height * 0.5 : height;
+  const iy0 = y0 + t;
+  const iy1 = openTop ? y1 : y1 - t;
+  const iz0 = -hd + t;
+
+  const positions = [];
+  const pushTri = (a, b, c) => {
+    positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+  };
+  // Quad with outward normal when vertices [p0, p1, p2, p3] are ordered CCW from outside
+  const pushQuad = (p0, p1, p2, p3) => {
+    pushTri(p0, p1, p2);
+    pushTri(p0, p2, p3);
+  };
+
+  // Outer left (-X)
+  pushQuad([-hw, y0, -hd], [-hw, y0, hd], [-hw, y1, hd], [-hw, y1, -hd]);
+  // Outer right (+X)
+  pushQuad([hw, y0, hd], [hw, y0, -hd], [hw, y1, -hd], [hw, y1, hd]);
+  // Outer back (-Z)
+  pushQuad([hw, y0, -hd], [-hw, y0, -hd], [-hw, y1, -hd], [hw, y1, -hd]);
+  // Outer bottom (-Y)
+  pushQuad([-hw, y0, -hd], [hw, y0, -hd], [hw, y0, hd], [-hw, y0, hd]);
+
+  // Inner bottom (+Y)
+  pushQuad([-hw + t, iy0, hd], [hw - t, iy0, hd], [hw - t, iy0, iz0], [-hw + t, iy0, iz0]);
+  // Inner back (+Z)
+  pushQuad([-hw + t, iy0, iz0], [hw - t, iy0, iz0], [hw - t, iy1, iz0], [-hw + t, iy1, iz0]);
+  // Inner left (+X)
+  pushQuad([-hw + t, iy0, hd], [-hw + t, iy0, iz0], [-hw + t, iy1, iz0], [-hw + t, iy1, hd]);
+  // Inner right (-X)
+  pushQuad([hw - t, iy0, iz0], [hw - t, iy0, hd], [hw - t, iy1, hd], [hw - t, iy1, iz0]);
+
+  if (!openTop) {
+    // Outer top (+Y)
+    pushQuad([-hw, y1, hd], [hw, y1, hd], [hw, y1, -hd], [-hw, y1, -hd]);
+    // Inner top (-Y)
+    pushQuad([-hw + t, iy1, iz0], [hw - t, iy1, iz0], [hw - t, iy1, hd], [-hw + t, iy1, hd]);
+    // Front rim (+Z): 4 strips around opening
+    pushQuad([-hw, y0, hd], [hw, y0, hd], [hw, iy0, hd], [-hw, iy0, hd]); // bottom rim
+    pushQuad([-hw, iy1, hd], [hw, iy1, hd], [hw, y1, hd], [-hw, y1, hd]); // top rim
+    pushQuad([-hw, iy0, hd], [-hw + t, iy0, hd], [-hw + t, iy1, hd], [-hw, iy1, hd]); // left post
+    pushQuad([hw - t, iy0, hd], [hw, iy0, hd], [hw, iy1, hd], [hw - t, iy1, hd]); // right post
+  } else {
+    // Front U-rim (+Z)
+    pushQuad([-hw, y0, hd], [hw, y0, hd], [hw, iy0, hd], [-hw, iy0, hd]); // bottom rim
+    pushQuad([-hw, iy0, hd], [-hw + t, iy0, hd], [-hw + t, y1, hd], [-hw, y1, hd]); // left post
+    pushQuad([hw - t, iy0, hd], [hw, iy0, hd], [hw, y1, hd], [hw - t, y1, hd]); // right post
+    // Open top U-rim (+Y)
+    pushQuad([-hw, y1, hd], [-hw + t, y1, hd], [-hw + t, y1, iz0], [-hw, y1, iz0]); // top left lip
+    pushQuad([hw - t, y1, hd], [hw, y1, hd], [hw, y1, iz0], [hw - t, y1, iz0]); // top right lip
+    pushQuad([-hw, y1, iz0], [hw, y1, iz0], [hw, y1, -hd], [-hw, y1, -hd]); // top back lip
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
+}

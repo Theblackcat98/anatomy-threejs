@@ -4,11 +4,12 @@
 
 `anatomy-threejs` adapts and re-architects [Ryan's original `anatomy` SVG skill](https://skills.wheresryan.sh/anatomy) into native real-time 3D WebGL. Rather than drawing flat boxes and label arrows—or asking an LLM to hallucinate a monolithic 1,500-line Three.js script in one shot—it guides the agent to build a tangible bench-top apparatus whose physical mechanics **are** the explanation:
 
-- **Four-tone + top-cap quantized cel shading** (`lo`, `mid`, `hi`, `lit`, `brass`, `copper` ramps across 5 switchable themes: `Light`, `Paper`, `Dark`, `Blueprint`, `Sepia`)
+- **Four-tone + top-cap quantized cel shading, optical glass & multi-channel ramps** (`lo`, `mid`, `hi`, `lit`, `brass`, `copper`, `glass`, and semantic `intake`/`comp`/`comb`/`exhaust` / `channelA..D` ramps across 5 themes: `Light`, `Paper`, `Dark`, `Blueprint`, `Sepia`)
+- **Pluggable mounting archetypes (`SPEC.archetype`) & live 3D section slicing (`SPEC.section`)**: author as a `"bench"` bedplate, `"gantry"` stand, `"cabinet"` enclosure, `"section"` diorama, or `"free-space"` gimbal rig—and slice smoothly through `clippable: true` shells with cross-hatched cut faces
 - **Ink linework in true 3D**: backface inverted-hull silhouettes + `THREE.EdgesGeometry` crease lines
-- **Confined GLSL physical medium shaders** (combustion gas, rotor wake, plasma, fluid, optical beams) strictly masked to active cavities
-- **Bespoke operator controls & live telemetry** (`SPEC.controls` sliders, springs, custom gauges/scales) calibrated directly from the mathematical model (`model.mjs`)
-- **Direct 3D viewport manipulation** (`reg.interactable`): grab and drag assemblies, sticks, or levers right on the canvas—even when rotation is paused
+- **Confined GLSL physical medium shaders & diegetic 3D screens** (`reg.screen`): live `<canvas>` displays mounted directly inside 3D geometry alongside GLSL gas/wake/plume/wave shaders
+- **Pluggable simulation paradigms (`SPEC.simulationMode`) & scripted idle tours (`tourAt`)**: build `"continuous"` rotary machines, `"sequence"` stepped/trigger machines (`burst()`/`settle()`), `"timeline"` scrubs, or `"sandbox"` interactive assemblies
+- **Camera bookmarks (`SPEC.cameraViews`) & direct 3D viewport manipulation** (`reg.interactable`): switch curated angles (`1`–`9` keys + top pills) or grab and drag 3D controls directly on the canvas
 - **Optional view modes** (`SPEC.features`): `explode` (`E`), `cutaway` (`C`), `shader` (`I`), and `crank` (`Shift`+drag), enabled only when meaningful for the mechanism
 - **Two-tier verification harness**: fast headless Node.js 3D spatial audit (`kit/audit3d.mjs`) + zero-dependency headless Chrome CDP visual inspection (`scripts/inspect.mjs` & `scripts/drive.mjs`)
 
@@ -71,6 +72,12 @@ Both skills share the same editorial craft philosophy from [`anatomy`](https://s
    - **No cloned Wankel hardware**: Even on a helicopter rotor rig, the model had reused the Wankel engine's rotary `knob.drum`, tall pressure gauge, and manifold box. We added bespoke-control rules to [`SKILL.md`](SKILL.md) and [`references/craft-3d.md`](references/craft-3d.md), and replaced the helicopter's cloned controls with a **2-axis Cyclic Stick**, a **Collective Pitch Quadrant Lever**, a **Semi-circular Blade Pitch Protractor Stand**, and **3 Bowden conduits**.
    - **No straight-to-code rushing**: The agent previously jumped straight to building without agreeing on interactions. We added **Stage 0 — Apparatus & Interaction Brief** in [`SKILL.md`](SKILL.md) and added native **`THREE.Raycaster` direct 3D dragging (`reg.interactable`)** + dynamic **`SPEC.controls`** sliders to [`kit/registry.mjs`](kit/registry.mjs) and [`kit/runtime.mjs`](kit/runtime.mjs), so users can grab the swashplate, cyclic stick, or collective lever directly in 3D (even at `0 rpm`) to see the blades feather.
    - **Exploded view shouldn't be mandatory**: Forcing `APART` (`E`) on an open articulated swashplate separated links from their pitch horns without revealing anything hidden. We added **`SPEC.features`** (`{ explode, cutaway, shader, crank }`) so open linkages can cleanly set `explode: false`, removing the `APART` button, skipping exploded audit poses, and omitting `hero-exploded.png` during `drive.mjs`.
+
+5. **Unlocking Creative Freedom (Pluggable Archetypes, Simulation Paradigms, Section Slicing, Glass/Channel Ramps, Diegetic Screens & Camera Bookmarks)**
+   - **Archetypes (`SPEC.archetype`) & Non-Bench Primitives**: Added `makeDatumGrid`, `makeGimbalDatumRing`, and `buildEnclosureBoxGeometry` so figures are no longer locked to a 4-foot tabletop bedplate—supporting `"bench"`, `"gantry"`, `"cabinet"`, `"section"`, and `"free-space"` mounts.
+   - **Simulation Modes (`SPEC.simulationMode`) & Idle Tours**: Added `"continuous"`, `"sequence"` (`SPEC.steps` + `SPEC.triggers` + `burst()`/`settle()`), `"timeline"`, and `"sandbox"` modes plus optional `tourAt(clock, state)` idle demonstrations.
+   - **Richer Materials, Section Slicing & Screens**: Added translucent `ramp: "glass"`, semantic channel ramps (`intake`/`comp`/`comb`/`exhaust` / `channelA..D`), `SPEC.toneMode: "multi-channel"`, live 3D `SPEC.section` slicing across `clippable: true` shells with cross-hatched interiors, and `reg.screen()` diegetic 2D-in-3D canvas panels.
+   - **Metaphor Ideation & Camera Bookmarks (`SPEC.cameraViews`)**: Added Stage 0 metaphor exploration in `SKILL.md` / `references/craft-3d.md` plus clickable/numeric (`1`–`9`) camera presets.
 
 ---
 

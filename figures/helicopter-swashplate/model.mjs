@@ -1,4 +1,7 @@
 export const SPEC = {
+  archetype: "bench",
+  simulationMode: "continuous",
+  toneMode: "single-lit",
   // Rotor & Swashplate dimensions (world units ~ 1m scaled bench instrument)
   numBlades: 3,
   rotorR: 2.45,
@@ -209,6 +212,12 @@ export const SPEC = {
   initialPanY: 0.50,
   minVertSpan: 5.6,
   minHorizSpan: 7.2,
+  cameraViews: [
+    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.86, pan: [0, 0.50] },
+    { id: "swash", label: "SWASH", elev: 18, azim: -24, zoom: 1.45, pan: [0, 0.12] },
+    { id: "hub", label: "HUB", elev: 24, azim: -32, zoom: 1.48, pan: [0, -0.58] },
+    { id: "top", label: "TOP", elev: 88, azim: 0, zoom: 0.88, pan: [0, 0] }
+  ],
 
   // Heavy datum bedplate
   BASE_W: 5.4,
