@@ -37,7 +37,7 @@
     <td width="50%"><img src=".github/assets/typewriter-hero-dark.webp" alt="Manual Type-Bar Typewriter in Dark theme showing the typebar mechanism, ribbon, platen, keyboard, and carriage."></td>
   </tr>
   <tr>
-    <td><sub><b><a href="figures/manual-typewriter/">manual-typewriter</a></b> (Light): type, space, feed, and return controls drive a seven-typebar mechanism and carriage.</sub></td>
+    <td><sub><b><a href="figures/manual-typewriter/">manual-typewriter</a></b> (Light): 49-key QWERTY layout drives 45 linked, pivoting typebars, with paired type slugs, ribbon, paper feed, and carriage return.</sub></td>
     <td><sub><b><a href="figures/manual-typewriter/">manual-typewriter</a></b> (Dark): 5 switchable themes with live paper and carriage readouts.</sub></td>
   </tr>
 </table>
@@ -162,14 +162,18 @@ Every output bundle in `figures/<slug>/dist/<slug>.html` is self-contained and c
 - **Verification**: Passes Stage 1 model test (`11 anchors`), Tier-1 3D audit (`119 parts · 3 tubes · 32 joints · 5 poses · 0 problems`), `inspect.mjs --ortho` / `--joints`, `drive.mjs` (`8 poses`, no `hero-exploded.png`, `scrolls sideways: no`), and headless CDP pointer-drag verification on `swash.assembly`.
 
 ### 3. [`figures/manual-typewriter/`](figures/manual-typewriter/) — Manual Type-Bar Typewriter
-- **Mechanics**: Seven pivoting typebars strike an ink ribbon against paper on a moving platen; visible QWERTY keys, spool feeds, escapement, carriage rails, and return lever complete the machine.
-- **Direct interaction**: Drag the `K` key to type, the space bar to advance without printing, the return lever to reset the carriage, or the carriage itself to inspect line travel. The paper readout and FEED slider track the current column.
-- **Verification**: Passes Stage 1 model test (`9 anchors`), Tier-1 audit (`125 parts · 25 joints · 5 poses · 0 problems`), orthographic and joint inspection, and the 8-pose interactive drive; the 390px mobile check reports no sideways page scroll and the browser console is clean.
+- **Mechanics**: A four-row, 49-key QWERTY layout drives 45 individual pivoting typebars with paired lowercase/uppercase slugs and key-to-bar pull-links. A platen-mounted paper sheet, ribbon vibrator and spools, escapement rack, carriage rails, line feed, and return lever complete the machine.
+- **Direct interaction**: Drag any printable key to strike its typebar, use SHIFT for the alternate character, SPACE to advance without printing, BACKSPACE to step left, LINE FEED to turn the platen, or drag RETURN to send the carriage home and feed a line. The CARRIAGE control moves through 32 character spaces.
+- **Verification**: Passes Stage 1 model test (`10 anchors`), Tier-1 audit (`782 parts · 0 tubes · 25 joints · 5 poses · 0 problems`), orthographic and joint inspection, and the 8-pose interactive drive; the 390px mobile check has no sideways scroll and the browser console is clean.
+
+<details>
+  <summary>Nine-angle geometry view</summary>
+  <p><img src=".github/assets/typewriter-all-angles.png" alt="Nine-angle view of the redesigned typewriter, including front, side, rear, and top perspectives."></p>
+</details>
 
 ### Verification Outputs (`inspect.mjs` & `drive.mjs`)
 
 Every figure is verified with headless Chrome CDP across orthographic elevations (`--ortho`), zoomed joint reticle crops (`--joints`), and an 8-state interactive drive sheet (`drive.mjs`):
-
 <table>
   <tr>
     <td width="50%"><img src=".github/assets/wankel-inspect-ortho.webp" alt="Wankel engine 2x2 orthographic quad showing Front, Right, Top, and Canonical Iso views."></td>
