@@ -8,7 +8,17 @@
     "test:wankel": "node figures/wankel-engine/build.mjs --test-model",
     "audit:wankel": "node figures/wankel-engine/build.mjs --audit",
     "inspect:wankel": "node scripts/inspect.mjs figures/wankel-engine/dist/wankel-engine.html",
-    "drive:wankel": "node scripts/drive.mjs figures/wankel-engine/dist/wankel-engine.html"
+    "drive:wankel": "node scripts/drive.mjs figures/wankel-engine/dist/wankel-engine.html",
+    "build:50mm": "node figures/lens-50mm-f14/build.mjs",
+    "test:50mm": "node figures/lens-50mm-f14/build.mjs --test-model",
+    "audit:50mm": "node figures/lens-50mm-f14/build.mjs --audit",
+    "inspect:50mm": "node scripts/inspect.mjs figures/lens-50mm-f14/dist/lens-50mm-f14.html",
+    "drive:50mm": "node scripts/drive.mjs figures/lens-50mm-f14/dist/lens-50mm-f14.html",
+    "build:zoom": "node figures/zoom-lens-24-70/build.mjs",
+    "test:zoom": "node figures/zoom-lens-24-70/build.mjs --test-model",
+    "audit:zoom": "node figures/zoom-lens-24-70/build.mjs --audit",
+    "inspect:zoom": "node scripts/inspect.mjs figures/zoom-lens-24-70/dist/zoom-lens-24-70.html",
+    "drive:zoom": "node scripts/drive.mjs figures/zoom-lens-24-70/dist/zoom-lens-24-70.html"
   },
   "dependencies": {
     "three": "^0.128.0"

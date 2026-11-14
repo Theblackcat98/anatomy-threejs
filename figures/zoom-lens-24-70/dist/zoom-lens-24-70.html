@@ -1,0 +1,5545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Anatomy · 24–70mm f/2.8 Parfocal Zoom Lens (Three.js Isometric)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --anatomy-bg: #f3f2ee;
+      --anatomy-card: #faf9f5;
+      --anatomy-paper: #faf9f5;
+      --anatomy-border: #dfddd5;
+      --anatomy-text: #181715;
+      --anatomy-muted: #78746c;
+      --anatomy-strong: #0c0b0a;
+      --anatomy-lit: #d97706;
+      --anatomy-pill-bg: #efede7;
+      --anatomy-pill-hover: #e4e1d8;
+      --anatomy-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      --anatomy-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--anatomy-bg);
+      color: var(--anatomy-text);
+      font-family: var(--anatomy-sans);
+      transition: background-color 0.25s ease, color 0.25s ease;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      height: 100dvh;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 1600px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .figure-card {
+      position: relative;
+      width: 100%;
+      flex: 1 1 auto;
+      min-height: 0;
+      background-color: var(--anatomy-card);
+      border: 1px solid var(--anatomy-border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 14px rgba(0, 0, 0, 0.04);
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+      outline: none;
+    }
+
+    .figure-card:focus-visible {
+      border-color: var(--anatomy-lit);
+    }
+
+    #canvas-host {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #canvas-host:active {
+      cursor: grabbing;
+    }
+
+    #canvas-host canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+
+    .hud-detail {
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    body.hud-hidden .figure-card .hud-detail {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transform: translateY(4px);
+    }
+
+    body.hud-hidden .caption-bar {
+      display: none;
+    }
+
+    .corner {
+      position: absolute;
+      z-index: 3;
+      pointer-events: none;
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      line-height: 1.45;
+      color: var(--anatomy-muted);
+      background-color: color-mix(in srgb, var(--anatomy-card) 78%, transparent);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .corner.top-left {
+      top: 12px;
+      left: 12px;
+      font-weight: 600;
+      color: var(--anatomy-text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .corner.top-right {
+      top: 12px;
+      right: 52px;
+      text-align: right;
+      text-transform: uppercase;
+    }
+
+    .corner.bottom-left {
+      bottom: 12px;
+      left: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      max-width: calc(100% - 24px);
+    }
+
+    .corner.bottom-right {
+      bottom: 12px;
+      right: 12px;
+      text-align: right;
+      color: var(--anatomy-text);
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    .hud-quick-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 4;
+      width: 32px;
+      height: 28px;
+      border-radius: 7px;
+      border: 1px solid var(--anatomy-border);
+      background-color: color-mix(in srgb, var(--anatomy-card) 85%, transparent);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: var(--anatomy-text);
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .hud-quick-btn:hover {
+      background-color: var(--anatomy-pill-bg);
+    }
+
+    .hud-quick-btn.active {
+      border-color: var(--anatomy-lit);
+      color: var(--anatomy-lit);
+    }
+
+    .accent-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--anatomy-lit);
+      flex-shrink: 0;
+      transition: background-color 0.25s ease;
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      font-family: var(--anatomy-mono);
+      font-size: 10px;
+      color: var(--anatomy-text);
+      background-color: var(--anatomy-pill-bg);
+      border: 1px solid var(--anatomy-border);
+      border-radius: 4px;
+      line-height: 1.3;
+    }
+
+    .engraved-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      overflow: hidden;
+    }
+
+    .engraved-tag {
+      position: absolute;
+      font-family: var(--anatomy-mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: var(--anatomy-muted);
+      opacity: 0.8;
+      transform: translate(-50%, -50%);
+      white-space: nowrap;
+    }
+
+    .controls-bar {
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background-color: var(--anatomy-card);
+      border: 1px solid var(--anatomy-border);
+      border-radius: 12px;
+      padding: 8px 12px;
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .scheme-group,
+    .params-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .views-group {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 3px 5px;
+      border-radius: 8px;
+      border: 1px solid var(--anatomy-border);
+      background-color: color-mix(in srgb, var(--anatomy-card) 82%, transparent);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      max-width: calc(100% - 260px);
+    }
+
+    .views-group:empty,
+    .triggers-group:empty {
+      display: none;
+    }
+
+    .triggers-group {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .view-pill {
+      padding: 3px 7px;
+      border-radius: 5px;
+      border: 1px solid transparent;
+      background-color: transparent;
+      color: var(--anatomy-muted);
+      font-family: var(--anatomy-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .view-pill:hover {
+      background-color: var(--anatomy-pill-bg);
+      color: var(--anatomy-text);
+    }
+
+    .view-pill.active {
+      border-color: var(--anatomy-lit);
+      background-color: var(--anatomy-pill-bg);
+      color: var(--anatomy-lit);
+    }
+
+    .action-btn.trigger-btn {
+      border-color: color-mix(in srgb, var(--anatomy-lit) 55%, var(--anatomy-border));
+      color: var(--anatomy-text);
+      font-weight: 600;
+    }
+
+    .action-btn.trigger-btn:hover {
+      border-color: var(--anatomy-lit);
+      color: var(--anatomy-lit);
+      background-color: var(--anatomy-pill-bg);
+    }
+
+    .action-btn.trigger-btn.armed {
+      border-color: var(--anatomy-lit);
+      background-color: color-mix(in srgb, var(--anatomy-lit) 16%, transparent);
+      color: var(--anatomy-lit);
+    }
+
+    .sliders-group {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scheme-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 9px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      background-color: var(--anatomy-pill-bg);
+      color: var(--anatomy-text);
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .scheme-btn:hover {
+      background-color: var(--anatomy-pill-hover);
+    }
+
+    .scheme-btn.active {
+      border-color: var(--anatomy-lit);
+      background-color: var(--anatomy-card);
+    }
+
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(128, 128, 128, 0.4);
+      flex-shrink: 0;
+    }
+
+    .slider-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+      color: var(--anatomy-muted);
+      margin-right: 2px;
+    }
+
+    input[type="range"] {
+      width: 82px;
+      accent-color: var(--anatomy-lit);
+      cursor: pointer;
+    }
+
+    .action-btn {
+      padding: 5px 9px;
+      border-radius: 7px;
+      border: 1px solid var(--anatomy-border);
+      background-color: transparent;
+      color: var(--anatomy-text);
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .action-btn:hover {
+      background-color: var(--anatomy-pill-bg);
+    }
+
+    .action-btn.active {
+      border-color: var(--anatomy-lit);
+      color: var(--anatomy-lit);
+      background-color: var(--anatomy-pill-bg);
+    }
+
+    .caption-bar {
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 4px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--anatomy-muted);
+    }
+
+    .caption-bar strong {
+      color: var(--anatomy-text);
+      font-weight: 600;
+    }
+
+    .legend-strip {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--anatomy-mono);
+      font-size: 11px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    .desktop-hint {
+      display: inline;
+    }
+    .mobile-hint {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 6px;
+      }
+      .wrapper {
+        gap: 6px;
+      }
+      .desktop-hint {
+        display: none;
+      }
+      .mobile-hint {
+        display: inline;
+      }
+      .corner {
+        font-size: 9.5px;
+        padding: 3px 6px;
+      }
+      .corner.top-left,
+      .corner.top-right {
+        max-width: 44%;
+      }
+      .views-group {
+        top: 42px;
+        max-width: calc(100% - 24px);
+      }
+      .corner.bottom-left {
+        bottom: 36px;
+      }
+      .corner.bottom-right {
+        bottom: 8px;
+        right: 8px;
+      }
+      .controls-bar {
+        padding: 7px 8px;
+        gap: 6px;
+      }
+      .scheme-group,
+      .params-group {
+        width: 100%;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+      }
+      .sliders-group {
+        flex-wrap: nowrap;
+        flex-shrink: 0;
+      }
+      .scheme-group::-webkit-scrollbar,
+      .params-group::-webkit-scrollbar {
+        display: none;
+      }
+      .caption-bar {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper iso-plate">
+    <div class="figure-card" id="figure-card" tabindex="0" aria-label="Interactive 24-70mm f/2.8 four-group parfocal zoom lens optical bench">
+      <div id="canvas-host"></div>
+
+      <button type="button" class="hud-quick-btn active" id="hud-quick-btn" title="Toggle Floating Details (H)" aria-label="Toggle Floating Details">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </button>
+
+      <div class="engraved-layer hud-detail" id="engraved-layer">
+        <div class="engraved-tag" id="tag-plate">24–70mm f/2.8 · 4-GROUP CAM</div>
+        <div class="engraved-tag" id="tag-zoom">24 · 35 · 50 · 70mm</div>
+      </div>
+
+      <div class="corner top-left hud-detail">
+        <span class="accent-dot"></span>
+        <span>Fig 08 · 24–70mm f/2.8 Zoom</span>
+      </div>
+      <div class="views-group hud-detail" id="camera-views-group" aria-label="Camera views"></div>
+      <div class="corner top-right hud-detail" id="phase-corner">MID ZOOM · PARFOCAL TRACKING</div>
+
+      <div class="corner bottom-left hud-detail">
+        <span class="desktop-hint">
+          <span id="hint-interact"></span>Drag orbit · Right-drag pan · Scroll zoom · <span id="hint-crank"><kbd>Shift</kbd>+Drag crank · </span><span id="hint-explode"><kbd>E</kbd> apart · </span><kbd>H</kbd> details · <kbd>R</kbd> iso
+        </span>
+        <span class="mobile-hint">
+          <span id="hint-interact-mobile"></span>1-finger orbit · 2-finger pan &amp; pinch zoom · Tap DETAILS to hide HUD
+        </span>
+      </div>
+
+      <div class="corner bottom-right hud-detail" id="readout" data-readout aria-live="polite">
+        35mm f/2.8 · FOV 63.4° · d 1.50m · G2/G3 Δ 0.65 · ΔBFL 0.00mm
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <div class="scheme-group" id="scheme-buttons" aria-label="Anatomy color themes"></div>
+      <div class="params-group">
+        <div class="triggers-group" id="triggers-group"></div>
+        <div class="sliders-group" id="custom-sliders">
+          <label class="slider-label" id="rpm-slider-wrap" title="Shaft speed">
+            <span>RPM</span>
+            <input type="range" id="rpm-slider" min="0" max="2400" step="20" value="720" />
+          </label>
+        </div>
+        <button type="button" class="action-btn" id="crank-btn" title="1-finger drag cranks the engine shaft">CRANK</button>
+        <button type="button" class="action-btn" id="slow-btn" title="Shortcut: S">SLOW 1×</button>
+        <button type="button" class="action-btn" id="explode-btn" title="Shortcut: E">APART</button>
+        <button type="button" class="action-btn active" id="cutaway-btn" title="Shortcut: C">CUTAWAY</button>
+        <button type="button" class="action-btn active" id="shader-btn" title="Shortcut: I">SHADER</button>
+        <button type="button" class="action-btn active" id="hud-btn" title="Shortcut: H">DETAILS</button>
+        <button type="button" class="action-btn" id="reset-btn" title="Shortcut: R">RESET</button>
+      </div>
+    </div>
+
+    <div class="caption-bar hud-detail">
+      <div><strong>The object is the explanation.</strong> Drag the slotted brass zoom cam barrel, G2 variator carriage, or servo zoom rocker: rotating the cam drum drives the G2 variator monotonically while reciprocating the G3 compensator along a non-linear parabolic track so the back focal distance stays locked to the sensor across 24–70 mm.</div>
+      <div class="legend-strip">
+        <span class="legend-item"><span class="legend-swatch" id="leg-lit"></span>Lit Variator &amp; Compensator</span>
+        <span class="legend-item"><span class="legend-swatch" id="leg-intake"></span>G1 Collector &amp; CMOS Sensor</span>
+        <span class="legend-item"><span class="legend-swatch" id="leg-comb"></span>Parfocal Ray Envelope</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+/* --- kit/shaders.mjs --- */
+const THEMES = [
+  {
+    id: "light",
+    name: "Light",
+    swatch: "#e4e1d8",
+    isDark: false,
+    css: {
+      bg: "#f3f2ee",
+      card: "#faf9f5",
+      border: "#dfddd5",
+      text: "#181715",
+      muted: "#78746c",
+      strong: "#0c0b0a",
+      lit: "#d97706",
+      pillBg: "#efede7",
+      pillHover: "#e4e1d8"
+    },
+    ramps: {
+      lo:  { top: "#f5f3ed", shades: ["#ebe8df", "#dedad0", "#cfcac0", "#b8b2a6"] },
+      mid: { top: "#fcfbf8", shades: ["#efede6", "#e0ddd3", "#cbc6ba", "#b0aaa0"] },
+      hi:  { top: "#ffffff", shades: ["#f4f2ec", "#e5e2d9", "#d0cbc0", "#b4aea2"] },
+      lit: { top: "#fff7ed", shades: ["#fed7aa", "#fb923c", "#ea580c", "#9a3412"] },
+      brass: { top: "#fef9c3", shades: ["#fde68a", "#eab308", "#ca8a04", "#854d0e"] },
+      copper: { top: "#ffedd5", shades: ["#fdba74", "#ea580c", "#c2410c", "#7c2d12"] }
+    },
+    lines: {
+      hi: "#141311",
+      mid: "#3b3833",
+      lo: "#78736a",
+      faint: "#b8b3a8",
+      lit: "#7c2d12",
+      dot: "#292724"
+    },
+    halo: "#d5d1c7",
+    haloOpacity: 0.42,
+    channels: {
+      intake: "#2563eb",
+      comp: "#7c3aed",
+      comb: "#ea580c",
+      exhaust: "#dc2626",
+      cavity: "#ece9e0"
+    },
+    glass: { top: "#ffffff", rim: "#0284c7", tint: "#e0f2fe", opacity: 0.32 }
+  },
+  {
+    id: "paper",
+    name: "Paper",
+    swatch: "#e8dec9",
+    isDark: false,
+    css: {
+      bg: "#ece5d5",
+      card: "#fbf7ee",
+      border: "#dcd2be",
+      text: "#231e18",
+      muted: "#7c7161",
+      strong: "#120f0b",
+      lit: "#b45309",
+      pillBg: "#efe7d6",
+      pillHover: "#e4d9c3"
+    },
+    ramps: {
+      lo:  { top: "#f4ede0", shades: ["#e8dec9", "#d9ccb4", "#c5b69c", "#ad9d82"] },
+      mid: { top: "#fcf9f2", shades: ["#eee5d3", "#dfd3bc", "#c9baa0", "#ae9e84"] },
+      hi:  { top: "#fffdf9", shades: ["#f3ebd9", "#e4d8c1", "#cebfa4", "#b2a287"] },
+      lit: { top: "#fef3c7", shades: ["#fcd34d", "#d97706", "#b45309", "#78350f"] },
+      brass: { top: "#fef08a", shades: ["#facc15", "#ca8a04", "#a16207", "#713f12"] },
+      copper: { top: "#fed7aa", shades: ["#fb923c", "#c2410c", "#9a3412", "#6c2710"] }
+    },
+    lines: {
+      hi: "#1e1913",
+      mid: "#463d31",
+      lo: "#7d7160",
+      faint: "#bfb39f",
+      lit: "#6c2710",
+      dot: "#2e271f"
+    },
+    halo: "#d4c8b2",
+    haloOpacity: 0.46,
+    channels: {
+      intake: "#1d4ed8",
+      comp: "#6d28d9",
+      comb: "#d97706",
+      exhaust: "#b91c1c",
+      cavity: "#e9dfc9"
+    },
+    glass: { top: "#fffaf0", rim: "#b45309", tint: "#fef3c7", opacity: 0.32 }
+  },
+  {
+    id: "dark",
+    name: "Dark",
+    swatch: "#262a30",
+    isDark: true,
+    css: {
+      bg: "#0c0e10",
+      card: "#14171a",
+      border: "#262b31",
+      text: "#e6e4dd",
+      muted: "#889099",
+      strong: "#ffffff",
+      lit: "#38bdf8",
+      pillBg: "#1d2227",
+      pillHover: "#272d35"
+    },
+    ramps: {
+      lo:  { top: "#262b32", shades: ["#1f242a", "#1a1e23", "#15181c", "#101216"] },
+      mid: { top: "#383f48", shades: ["#2e343c", "#252a31", "#1d2127", "#15181d"] },
+      hi:  { top: "#4c5561", shades: ["#3f4752", "#323942", "#262c33", "#1b1f24"] },
+      lit: { top: "#e0f2fe", shades: ["#7dd3fc", "#38bdf8", "#0284c7", "#0369a1"] },
+      brass: { top: "#fef08a", shades: ["#eab308", "#ca8a04", "#854d0e", "#422006"] },
+      copper: { top: "#fdba74", shades: ["#ea580c", "#9a3412", "#7c2d12", "#431407"] }
+    },
+    lines: {
+      hi: "#f1efe9",
+      mid: "#a5acb6",
+      lo: "#5c6470",
+      faint: "#343a42",
+      lit: "#e0f2fe",
+      dot: "#d6d4ce"
+    },
+    halo: "#07080a",
+    haloOpacity: 0.78,
+    channels: {
+      intake: "#38bdf8",
+      comp: "#a855f7",
+      comb: "#fb923c",
+      exhaust: "#f87171",
+      cavity: "#0e1013"
+    },
+    glass: { top: "#e0f2fe", rim: "#38bdf8", tint: "#0c4a6e", opacity: 0.36 }
+  },
+  {
+    id: "blueprint",
+    name: "Blueprint",
+    swatch: "#1b3b66",
+    isDark: true,
+    css: {
+      bg: "#081426",
+      card: "#0d1f3a",
+      border: "#1c3c6b",
+      text: "#e0f2fe",
+      muted: "#7da5d9",
+      strong: "#ffffff",
+      lit: "#fbbf24",
+      pillBg: "#132c52",
+      pillHover: "#1b3c6e"
+    },
+    ramps: {
+      lo:  { top: "#1b3a66", shades: ["#163157", "#122847", "#0e2038", "#0a1729"] },
+      mid: { top: "#274f87", shades: ["#204373", "#19365e", "#132a4a", "#0e1f38"] },
+      hi:  { top: "#3767ab", shades: ["#2c5691", "#224575", "#19355c", "#122645"] },
+      lit: { top: "#fef9c3", shades: ["#fde047", "#fbbf24", "#d97706", "#92400e"] },
+      brass: { top: "#fef08a", shades: ["#facc15", "#ca8a04", "#854d0e", "#422006"] },
+      copper: { top: "#fed7aa", shades: ["#fb923c", "#ea580c", "#9a3412", "#431407"] }
+    },
+    lines: {
+      hi: "#eff6ff",
+      mid: "#93c5fd",
+      lo: "#3b82f6",
+      faint: "#1e40af",
+      lit: "#fef08a",
+      dot: "#dbeafe"
+    },
+    halo: "#050d1a",
+    haloOpacity: 0.75,
+    channels: {
+      intake: "#38bdf8",
+      comp: "#818cf8",
+      comb: "#facc15",
+      exhaust: "#fb7185",
+      cavity: "#09172b"
+    },
+    glass: { top: "#ffffff", rim: "#93c5fd", tint: "#1e40af", opacity: 0.34 }
+  },
+  {
+    id: "sepia",
+    name: "Sepia",
+    swatch: "#dfd3be",
+    isDark: false,
+    css: {
+      bg: "#e4dac8",
+      card: "#f4ece0",
+      border: "#d1c4ae",
+      text: "#2b2118",
+      muted: "#7a6a58",
+      strong: "#17110c",
+      lit: "#be123c",
+      pillBg: "#e8decb",
+      pillHover: "#ddd0b8"
+    },
+    ramps: {
+      lo:  { top: "#ece2d0", shades: ["#dfd2bc", "#cfc0a7", "#bca98e", "#a38f73"] },
+      mid: { top: "#f7f0e4", shades: ["#e8dcc8", "#d7c8b0", "#c2b095", "#a79478"] },
+      hi:  { top: "#fcf8f0", shades: ["#eee3d0", "#ded0b8", "#c8b69b", "#ad9a7e"] },
+      lit: { top: "#ffe4e6", shades: ["#fda4af", "#f43f5e", "#be123c", "#881337"] },
+      brass: { top: "#fef08a", shades: ["#eab308", "#ca8a04", "#a16207", "#713f12"] },
+      copper: { top: "#fed7aa", shades: ["#fb923c", "#c2410c", "#9a3412", "#7c2d12"] }
+    },
+    lines: {
+      hi: "#261c14",
+      mid: "#4f3e2e",
+      lo: "#806c58",
+      faint: "#bda992",
+      lit: "#881337",
+      dot: "#36281d"
+    },
+    halo: "#cbbba2",
+    haloOpacity: 0.48,
+    channels: {
+      intake: "#0369a1",
+      comp: "#6d28d9",
+      comb: "#e11d48",
+      exhaust: "#b91c1c",
+      cavity: "#e2d5c0"
+    },
+    glass: { top: "#fffbeb", rim: "#b45309", tint: "#fde68a", opacity: 0.34 }
+  }
+];
+
+const CHANNEL_RAMP_ALIASES = {
+  channelA: "intake",
+  channelB: "comp",
+  channelC: "comb",
+  channelD: "exhaust"
+};
+
+function deriveChannelRamp(hexColor, isDark) {
+  const base = new THREE.Color(hexColor);
+  const white = new THREE.Color(isDark ? "#e2e8f0" : "#ffffff");
+  const black = new THREE.Color("#090b0f");
+  const mixHex = (target, amt) => "#" + base.clone().lerp(target, amt).getHexString();
+  return {
+    top: mixHex(white, isDark ? 0.42 : 0.62),
+    shades: [
+      mixHex(white, isDark ? 0.18 : 0.28),
+      "#" + base.getHexString(),
+      mixHex(black, 0.25),
+      mixHex(black, 0.48)
+    ]
+  };
+}
+
+function resolveThemeRamp(theme, rampKey) {
+  const canonical = CHANNEL_RAMP_ALIASES[rampKey] || rampKey;
+  if (theme.ramps[canonical]) return theme.ramps[canonical];
+  if (theme.channels && theme.channels[canonical]) {
+    return deriveChannelRamp(theme.channels[canonical], Boolean(theme.isDark));
+  }
+  return theme.ramps.mid;
+}
+const CEL_VERTEX_SHADER = `
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
+  void main() {
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+const CEL_FRAGMENT_SHADER = `
+  uniform vec3 uLightDir;
+  uniform vec3 uTop;
+  uniform vec3 uShade0;
+  uniform vec3 uShade1;
+  uniform vec3 uShade2;
+  uniform vec3 uShade3;
+  uniform float uTopBias;
+  uniform vec4 uSectionPlane;
+  uniform float uSectionEnabled;
+  uniform float uClippedPart;
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
+
+  float aaStep(float edge, float x) {
+    float w = clamp(fwidth(x) * 1.15, 0.015, 0.08);
+    return smoothstep(edge - w, edge + w, x);
+  }
+
+  void main() {
+    if (uSectionEnabled > 0.5 && uClippedPart > 0.5) {
+      float secDist = dot(vWorldPos, uSectionPlane.xyz) + uSectionPlane.w;
+      if (secDist < 0.0) discard;
+    }
+
+    if (!gl_FrontFacing) {
+      float hatch = step(0.54, fract((vWorldPos.x * 1.15 + vWorldPos.y * 1.35 + vWorldPos.z * 0.9) * 12.0));
+      vec3 cutCol = mix(uShade0 * 0.86, uShade1, hatch * 0.65);
+      gl_FragColor = vec4(cutCol, 1.0);
+      return;
+    }
+
+    vec3 N = normalize(vWorldNormal);
+    float ndotl = dot(N, normalize(uLightDir));
+
+    vec3 sideCol = uShade0;
+    sideCol = mix(sideCol, uShade1, aaStep(-0.28, ndotl));
+    sideCol = mix(sideCol, uShade2, aaStep(0.14, ndotl));
+    sideCol = mix(sideCol, uShade3, aaStep(0.56, ndotl));
+
+    float upness = N.y + 0.18 * N.z;
+    float isTop = aaStep(uTopBias, upness);
+    vec3 col = mix(sideCol, uTop, isTop);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+const GLASS_VERTEX_SHADER = `
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
+  varying vec3 vViewDir;
+  void main() {
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    vViewDir = normalize(cameraPosition - wp.xyz);
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+const GLASS_FRAGMENT_SHADER = `
+  uniform vec3 uLightDir;
+  uniform vec3 uTop;
+  uniform vec3 uRim;
+  uniform vec3 uTint;
+  uniform float uOpacity;
+  uniform vec4 uSectionPlane;
+  uniform float uSectionEnabled;
+  uniform float uClippedPart;
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
+  varying vec3 vViewDir;
+
+  void main() {
+    if (uSectionEnabled > 0.5 && uClippedPart > 0.5) {
+      float secDist = dot(vWorldPos, uSectionPlane.xyz) + uSectionPlane.w;
+      if (secDist < 0.0) discard;
+    }
+
+    vec3 N = normalize(vWorldNormal);
+    if (!gl_FrontFacing) N = -N;
+    vec3 V = normalize(vViewDir);
+    vec3 L = normalize(uLightDir);
+
+    float ndotv = abs(dot(N, V));
+    float fresnel = pow(clamp(1.0 - ndotv, 0.0, 1.0), 2.0);
+    vec3 H = normalize(L + V);
+    float specBand = smoothstep(0.90, 0.96, max(dot(N, H), 0.0));
+    float topBand = smoothstep(0.68, 0.82, N.y + 0.15 * N.z) * 0.28;
+
+    vec3 col = mix(uTint, uRim, smoothstep(0.22, 0.65, fresnel));
+    col = mix(col, uTop, clamp(specBand * 0.72 + topBand, 0.0, 0.85));
+    float alpha = clamp(uOpacity + fresnel * 0.44 + specBand * 0.35, 0.06, 0.90);
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+function createShaderKit(initialTheme = THEMES[0]) {
+  let currentTheme = initialTheme;
+  const lightDir = new THREE.Vector3(0.52, 0.78, 0.48).normalize();
+  const anatomyMaterials = [];
+  const outlineMaterials = [];
+  const glassMaterials = [];
+  const haloMaterials = [];
+  const clippableLineMaterials = [];
+  const themeListeners = [];
+  const lineMaterials = {};
+  const dotMaterials = {};
+
+  let activeSectionPlane = null;
+  const sectionPlaneVec4 = new THREE.Vector4(0, 0, -1, 999);
+  let sectionEnabledVal = 0.0;
+
+  ["hi", "mid", "lo", "faint", "lit"].forEach((k) => {
+    lineMaterials[k] = new THREE.LineBasicMaterial({
+      color: new THREE.Color(currentTheme.lines[k]),
+      transparent: true,
+      opacity: k === "faint" ? 0.72 : 0.95
+    });
+  });
+
+  ["dot", "lit"].forEach((k) => {
+    dotMaterials[k] = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(currentTheme.lines[k === "dot" ? "dot" : "lit"])
+    });
+  });
+
+  function createAnatomySolidMaterial(rampKey = "mid", topBias = 0.62, clippable = false) {
+    const ramp = resolveThemeRamp(currentTheme, rampKey);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uLightDir: { value: lightDir },
+        uTop:    { value: new THREE.Color(ramp.top) },
+        uShade0: { value: new THREE.Color(ramp.shades[3]) },
+        uShade1: { value: new THREE.Color(ramp.shades[2]) },
+        uShade2: { value: new THREE.Color(ramp.shades[1]) },
+        uShade3: { value: new THREE.Color(ramp.shades[0]) },
+        uTopBias: { value: topBias },
+        uSectionPlane: { value: sectionPlaneVec4 },
+        uSectionEnabled: { value: sectionEnabledVal },
+        uClippedPart: { value: clippable ? 1.0 : 0.0 }
+      },
+      vertexShader: CEL_VERTEX_SHADER,
+      fragmentShader: CEL_FRAGMENT_SHADER,
+      side: clippable && sectionEnabledVal > 0.5 ? THREE.DoubleSide : THREE.FrontSide,
+      polygonOffset: true,
+      polygonOffsetFactor: 1.5,
+      polygonOffsetUnits: 1.5
+    });
+    mat.userData.rampKey = rampKey;
+    mat.userData.clippable = Boolean(clippable);
+    anatomyMaterials.push(mat);
+    return mat;
+  }
+
+  function createGlassMaterial(opts = {}) {
+    const gTheme = currentTheme.glass || { top: "#ffffff", rim: "#38bdf8", tint: "#bae6fd", opacity: 0.34 };
+    const clippable = Boolean(opts.clippable);
+    const customOpacity = typeof opts.opacity === "number" ? opts.opacity : null;
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uLightDir: { value: lightDir },
+        uTop: { value: new THREE.Color(gTheme.top) },
+        uRim: { value: new THREE.Color(gTheme.rim) },
+        uTint: { value: new THREE.Color(gTheme.tint) },
+        uOpacity: { value: customOpacity !== null ? customOpacity : gTheme.opacity },
+        uSectionPlane: { value: sectionPlaneVec4 },
+        uSectionEnabled: { value: sectionEnabledVal },
+        uClippedPart: { value: clippable ? 1.0 : 0.0 }
+      },
+      vertexShader: GLASS_VERTEX_SHADER,
+      fragmentShader: GLASS_FRAGMENT_SHADER,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    mat.userData.customOpacity = customOpacity;
+    mat.userData.clippable = clippable;
+    glassMaterials.push(mat);
+    return mat;
+  }
+
+  function createOutlineMaterial(lineKey = "mid", thickness = 0.018, clippable = false) {
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(currentTheme.lines[lineKey] || currentTheme.lines.mid) },
+        uThickness: { value: thickness },
+        uSectionPlane: { value: sectionPlaneVec4 },
+        uSectionEnabled: { value: sectionEnabledVal },
+        uClippedPart: { value: clippable ? 1.0 : 0.0 }
+      },
+      vertexShader: `
+        uniform float uThickness;
+        varying vec3 vWorldPos;
+        void main() {
+          vec3 displaced = position + normalize(normal) * uThickness;
+          vec4 wp = modelMatrix * vec4(displaced, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform vec4 uSectionPlane;
+        uniform float uSectionEnabled;
+        uniform float uClippedPart;
+        varying vec3 vWorldPos;
+        void main() {
+          if (uSectionEnabled > 0.5 && uClippedPart > 0.5) {
+            float secDist = dot(vWorldPos, uSectionPlane.xyz) + uSectionPlane.w;
+            if (secDist < 0.0) discard;
+          }
+          gl_FragColor = vec4(uColor, 1.0);
+        }
+      `,
+      side: THREE.BackSide
+    });
+    mat.userData.lineKey = lineKey;
+    mat.userData.clippable = Boolean(clippable);
+    outlineMaterials.push(mat);
+    return mat;
+  }
+
+  function createHaloMaterial() {
+    const mat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(currentTheme.halo),
+      transparent: true,
+      opacity: currentTheme.haloOpacity,
+      depthWrite: false
+    });
+    haloMaterials.push(mat);
+    return mat;
+  }
+
+  function createAnatomyPart(geometry, options = {}) {
+    const isGlass = options.ramp === "glass";
+    const opts = Object.assign({
+      ramp: "mid",
+      outline: isGlass ? "lo" : "mid",
+      crease: "faint",
+      creaseAngle: 28,
+      outlineWidth: isGlass ? 0.009 : 0.017,
+      topBias: 0.62,
+      noOutline: false,
+      noCrease: false,
+      clippable: false,
+      opacity: undefined
+    }, options);
+
+    const group = new THREE.Group();
+    const solidMat = isGlass
+      ? createGlassMaterial({ opacity: opts.opacity, clippable: opts.clippable })
+      : createAnatomySolidMaterial(opts.ramp, opts.topBias, opts.clippable);
+    const mesh = new THREE.Mesh(geometry, solidMat);
+    mesh.name = "solid";
+    if (isGlass) {
+      mesh.renderOrder = 2;
+    }
+    group.add(mesh);
+
+    if (!opts.noOutline) {
+      const outMat = createOutlineMaterial(opts.outline, opts.outlineWidth, opts.clippable);
+      const outMesh = new THREE.Mesh(geometry, outMat);
+      outMesh.name = "outline";
+      group.add(outMesh);
+    }
+
+    if (!opts.noCrease) {
+      const edgesGeo = new THREE.EdgesGeometry(geometry, opts.creaseAngle);
+      let creaseMat = lineMaterials[opts.crease] || lineMaterials.faint;
+      if (opts.clippable) {
+        creaseMat = creaseMat.clone();
+        creaseMat.userData.lineKey = opts.crease in lineMaterials ? opts.crease : "faint";
+        creaseMat.clippingPlanes = activeSectionPlane ? [activeSectionPlane] : [];
+        clippableLineMaterials.push(creaseMat);
+      }
+      const edges = new THREE.LineSegments(edgesGeo, creaseMat);
+      edges.name = "crease";
+      group.add(edges);
+    }
+
+    return group;
+  }
+
+  function setSectionPlane(planeOrNull) {
+    activeSectionPlane = planeOrNull || null;
+    sectionEnabledVal = activeSectionPlane ? 1.0 : 0.0;
+    if (activeSectionPlane) {
+      sectionPlaneVec4.set(
+        activeSectionPlane.normal.x,
+        activeSectionPlane.normal.y,
+        activeSectionPlane.normal.z,
+        activeSectionPlane.constant
+      );
+    }
+    anatomyMaterials.forEach((mat) => {
+      mat.uniforms.uSectionEnabled.value = sectionEnabledVal;
+      if (mat.userData.clippable) {
+        mat.side = activeSectionPlane ? THREE.DoubleSide : THREE.FrontSide;
+      }
+    });
+    glassMaterials.forEach((mat) => {
+      mat.uniforms.uSectionEnabled.value = sectionEnabledVal;
+    });
+    outlineMaterials.forEach((mat) => {
+      mat.uniforms.uSectionEnabled.value = sectionEnabledVal;
+    });
+    clippableLineMaterials.forEach((mat) => {
+      mat.clippingPlanes = activeSectionPlane ? [activeSectionPlane] : [];
+    });
+  }
+
+  function onThemeChange(fn) {
+    themeListeners.push(fn);
+  }
+
+  function applyTheme(themeOrId) {
+    const theme = typeof themeOrId === "string"
+      ? THEMES.find((t) => t.id === themeOrId) || THEMES[0]
+      : themeOrId;
+    currentTheme = theme;
+
+    anatomyMaterials.forEach((mat) => {
+      const ramp = resolveThemeRamp(theme, mat.userData.rampKey);
+      mat.uniforms.uTop.value.set(ramp.top);
+      mat.uniforms.uShade0.value.set(ramp.shades[3]);
+      mat.uniforms.uShade1.value.set(ramp.shades[2]);
+      mat.uniforms.uShade2.value.set(ramp.shades[1]);
+      mat.uniforms.uShade3.value.set(ramp.shades[0]);
+    });
+
+    const gTheme = theme.glass || { top: "#ffffff", rim: "#38bdf8", tint: "#bae6fd", opacity: 0.34 };
+    glassMaterials.forEach((mat) => {
+      mat.uniforms.uTop.value.set(gTheme.top);
+      mat.uniforms.uRim.value.set(gTheme.rim);
+      mat.uniforms.uTint.value.set(gTheme.tint);
+      if (mat.userData.customOpacity === null) {
+        mat.uniforms.uOpacity.value = gTheme.opacity;
+      }
+    });
+
+    outlineMaterials.forEach((mat) => {
+      const col = theme.lines[mat.userData.lineKey] || theme.lines.mid;
+      mat.uniforms.uColor.value.set(col);
+    });
+
+    Object.keys(lineMaterials).forEach((k) => {
+      lineMaterials[k].color.set(theme.lines[k]);
+    });
+    clippableLineMaterials.forEach((mat) => {
+      const lk = mat.userData.lineKey || "faint";
+      mat.color.set(theme.lines[lk] || theme.lines.faint);
+    });
+    dotMaterials.dot.color.set(theme.lines.dot);
+    dotMaterials.lit.color.set(theme.lines.lit);
+
+    haloMaterials.forEach((mat) => {
+      mat.color.set(theme.halo);
+      mat.opacity = theme.haloOpacity;
+    });
+
+    themeListeners.forEach((fn) => fn(theme));
+    return theme;
+  }
+
+  return {
+    THEMES,
+    get currentTheme() { return currentTheme; },
+    lightDir,
+    lineMaterials,
+    dotMaterials,
+    createAnatomySolidMaterial,
+    createGlassMaterial,
+    createOutlineMaterial,
+    createHaloMaterial,
+    createAnatomyPart,
+    setSectionPlane,
+    onThemeChange,
+    applyTheme
+  };
+}
+
+
+/* --- kit/primitives.mjs --- */
+function makeRoundedRectShape(w, h, r) {
+  const shape = new THREE.Shape();
+  const hw = w * 0.5;
+  const hh = h * 0.5;
+  const cr = Math.min(r, hw, hh);
+  shape.moveTo(-hw + cr, -hh);
+  shape.lineTo(hw - cr, -hh);
+  shape.absarc(hw - cr, -hh + cr, cr, -Math.PI / 2, 0, false);
+  shape.lineTo(hw, hh - cr);
+  shape.absarc(hw - cr, hh - cr, cr, 0, Math.PI / 2, false);
+  shape.lineTo(-hw + cr, hh);
+  shape.absarc(-hw + cr, hh - cr, cr, Math.PI / 2, Math.PI, false);
+  shape.lineTo(-hw, -hh + cr);
+  shape.absarc(-hw + cr, -hh + cr, cr, Math.PI, Math.PI * 1.5, false);
+  return shape;
+}
+
+/**
+ * Builds a horizontal rounded-rect slab in the XZ plane.
+ * After rotateX(Math.PI / 2), extrusion extends from y = 0 down to y = -h
+ * (so placing at y = topY sets the top surface at topY and bottom at topY - h).
+ */
+function buildSlabGeometry(w, d, h, opts = {}) {
+  const {
+    radius = 0.26,
+    bevel = true,
+    bevelSize = 0.025,
+    bevelThickness = 0.025,
+    bevelSegments = 2,
+    curveSegments = 16,
+    centerY = false
+  } = opts;
+  const shape = makeRoundedRectShape(w, d, radius);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: h,
+    bevelEnabled: bevel,
+    bevelSegments,
+    steps: 1,
+    bevelSize: bevel ? bevelSize : 0,
+    bevelThickness: bevel ? bevelThickness : 0,
+    curveSegments
+  });
+  geo.rotateX(Math.PI / 2);
+  if (centerY) {
+    geo.translate(0, h * 0.5, 0);
+  }
+  return geo;
+}
+
+/**
+ * Axis-aware cylinder helper so callers never mix up Y-up vs Z-aligned shafts.
+ */
+function buildCylinderGeometry(rTop, rBot, length, opts = {}) {
+  const { segments = 24, axis = "y" } = opts;
+  const geo = new THREE.CylinderGeometry(rTop, rBot, length, segments);
+  if (axis === "z") {
+    geo.rotateX(Math.PI / 2);
+  } else if (axis === "x") {
+    geo.rotateZ(-Math.PI / 2);
+  }
+  return geo;
+}
+function buildExternalGearGeometry(pitchR, teeth, toothDepth, width, boreFraction = 0.56) {
+  const shape = new THREE.Shape();
+  const stepsPerTooth = 4;
+  const total = teeth * stepsPerTooth;
+  for (let i = 0; i <= total; i++) {
+    const a = (i / total) * Math.PI * 2;
+    const phase = (i % stepsPerTooth) / stepsPerTooth;
+    const r = phase < 0.45 ? pitchR + toothDepth * 0.5 : pitchR - toothDepth * 0.5;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  if (boreFraction > 0) {
+    const bore = new THREE.Path();
+    bore.absarc(0, 0, pitchR * boreFraction, 0, Math.PI * 2, false);
+    shape.holes.push(bore);
+  }
+
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: width,
+    bevelEnabled: false,
+    curveSegments: total
+  });
+  geo.translate(0, 0, -width * 0.5);
+  return geo;
+}
+function buildInternalGearRingGeometry(outerR, pitchR, teeth, toothDepth, width, zOffset = -width * 0.5) {
+  const stepsPerTooth = 4;
+  const total = teeth * stepsPerTooth;
+
+  const shape = new THREE.Shape();
+  shape.absarc(0, 0, outerR, 0, Math.PI * 2, false);
+
+  const gearHole = new THREE.Path();
+  for (let i = 0; i <= total; i++) {
+    const a = (i / total) * Math.PI * 2;
+    const phase = (i % stepsPerTooth) / stepsPerTooth;
+    const r = phase < 0.45 ? pitchR - toothDepth * 0.5 : pitchR + toothDepth * 0.5;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) gearHole.moveTo(x, y);
+    else gearHole.lineTo(x, y);
+  }
+  shape.holes.push(gearHole);
+
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: width,
+    bevelEnabled: false,
+    curveSegments: total
+  });
+  geo.translate(0, 0, zOffset);
+  return geo;
+}
+function makePlanOutline(w, d, r, y, kit, toneKey = "faint") {
+  const shape = makeRoundedRectShape(w, d, r);
+  const pts2d = shape.getPoints(16);
+  const pts3d = pts2d.map((p) => new THREE.Vector3(p.x, y, p.y));
+  const geo = new THREE.BufferGeometry().setFromPoints(pts3d);
+  return new THREE.LineLoop(geo, kit.lineMaterials[toneKey] || kit.lineMaterials.faint);
+}
+function makeRingLine(radius, segments, kit, toneKey = "lo") {
+  const pts = [];
+  for (let i = 0; i <= segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
+    pts.push(new THREE.Vector3(Math.cos(a) * radius, Math.sin(a) * radius, 0));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  return new THREE.Line(geo, kit.lineMaterials[toneKey] || kit.lineMaterials.lo);
+}
+function makeScrewDetail(x, y, z, radius, axis, kit) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  const ring = makeRingLine(radius, 20, kit, "lo");
+  const dotGeo = new THREE.CircleGeometry(radius * 0.36, 12);
+  const dot = new THREE.Mesh(dotGeo, kit.dotMaterials.dot);
+  dot.position.z = 0.002;
+  g.add(ring, dot);
+  if (axis === "y") {
+    g.rotation.x = -Math.PI / 2;
+  } else if (axis === "x") {
+    g.rotation.y = Math.PI / 2;
+  }
+  return g;
+}
+function makeKnurlLines(radius, y0, y1, count, kit, opts = {}) {
+  const { tone = "lo", pointer = null } = opts;
+  const pts = [];
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    const kx = Math.cos(a) * (radius + 0.003);
+    const kz = Math.sin(a) * (radius + 0.003);
+    pts.push(new THREE.Vector3(kx, y0, kz), new THREE.Vector3(kx, y1, kz));
+  }
+  if (pointer) {
+    pts.push(
+      new THREE.Vector3(0, pointer.y, pointer.z0),
+      new THREE.Vector3(0, pointer.y, pointer.z1)
+    );
+  }
+  return new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    kit.lineMaterials[tone] || kit.lineMaterials.lo
+  );
+}
+function makeRulerTicks(rulerX, rulerW, rulerZ, rulerD, y, count, majorEvery, kit) {
+  const minorPts = [];
+  const majorPts = [];
+  for (let i = 0; i <= count; i++) {
+    const tx = rulerX - rulerW * 0.46 + (i / count) * (rulerW * 0.92);
+    const zEdge = rulerZ - rulerD * 0.5;
+    const len = i % majorEvery === 0 ? 0.15 : 0.08;
+    const target = i % majorEvery === 0 ? majorPts : minorPts;
+    target.push(new THREE.Vector3(tx, y, zEdge), new THREE.Vector3(tx, y, zEdge + len));
+  }
+  const g = new THREE.Group();
+  g.add(
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(minorPts), kit.lineMaterials.lo),
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(majorPts), kit.lineMaterials.mid)
+  );
+  return g;
+}
+function makeHaloMesh(w, d, r, pos, kit) {
+  const haloShape = makeRoundedRectShape(w, d, r);
+  const haloGeo = new THREE.ShapeGeometry(haloShape, 24);
+  haloGeo.rotateX(Math.PI / 2);
+  const haloMat = kit.createHaloMaterial();
+  const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+  haloMesh.position.set(...pos);
+  return haloMesh;
+}
+
+/**
+ * Orthographic blueprint datum grid + perimeter frame for non-bench archetypes
+ * ("free-space", "section", "diorama").
+ */
+function makeDatumGrid(width, depth, divisionsX = 8, divisionsZ = 6, y = 0, kit, toneKey = "faint") {
+  const g = new THREE.Group();
+  const hw = width * 0.5;
+  const hd = depth * 0.5;
+  const gridPts = [];
+  const tickPts = [];
+
+  for (let i = 0; i <= divisionsX; i++) {
+    const x = -hw + (i / divisionsX) * width;
+    const target = i === 0 || i === divisionsX ? tickPts : gridPts;
+    target.push(new THREE.Vector3(x, y, -hd), new THREE.Vector3(x, y, hd));
+  }
+  for (let j = 0; j <= divisionsZ; j++) {
+    const z = -hd + (j / divisionsZ) * depth;
+    const target = j === 0 || j === divisionsZ ? tickPts : gridPts;
+    target.push(new THREE.Vector3(-hw, y, z), new THREE.Vector3(hw, y, z));
+  }
+
+  const c = 0.14;
+  tickPts.push(
+    new THREE.Vector3(-c, y + 0.001, 0), new THREE.Vector3(c, y + 0.001, 0),
+    new THREE.Vector3(0, y + 0.001, -c), new THREE.Vector3(0, y + 0.001, c)
+  );
+
+  g.add(
+    new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(gridPts),
+      kit.lineMaterials[toneKey] || kit.lineMaterials.faint
+    ),
+    new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(tickPts),
+      kit.lineMaterials.lo
+    )
+  );
+  return g;
+}
+
+/**
+ * Graduated 3-axis / azimuthal gimbal datum ring for "free-space" or aerospace figures.
+ */
+function makeGimbalDatumRing(radius, y = 0, kit, toneKey = "lo") {
+  const g = new THREE.Group();
+  g.position.set(0, y, 0);
+
+  const eqPts = [];
+  const tickPts = [];
+  const majorPts = [];
+  const segs = 72;
+  for (let i = 0; i <= segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    eqPts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+  }
+  for (let deg = 0; deg < 360; deg += 10) {
+    const a = (deg * Math.PI) / 180;
+    const isMajor = deg % 30 === 0;
+    const r0 = radius - (isMajor ? 0.14 : 0.07);
+    const target = isMajor ? majorPts : tickPts;
+    target.push(
+      new THREE.Vector3(Math.cos(a) * r0, 0, Math.sin(a) * r0),
+      new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius)
+    );
+  }
+
+  const meridPts = [];
+  for (let i = 0; i <= segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    const rM = radius * 1.03;
+    meridPts.push(new THREE.Vector3(Math.cos(a) * rM, Math.sin(a) * rM, 0));
+  }
+
+  g.add(
+    new THREE.Line(new THREE.BufferGeometry().setFromPoints(eqPts), kit.lineMaterials[toneKey] || kit.lineMaterials.lo),
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(tickPts), kit.lineMaterials.faint),
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(majorPts), kit.lineMaterials.mid),
+    new THREE.Line(new THREE.BufferGeometry().setFromPoints(meridPts), kit.lineMaterials.faint)
+  );
+  return g;
+}
+
+/**
+ * Builds an open-front hollow cabinet/chassis shell BufferGeometry for "cabinet" / "enclosure" archetypes.
+ * Centered on X and Z; Y runs from 0..height (or -height/2..+height/2 when centerY = true).
+ */
+function buildEnclosureBoxGeometry(width, height, depth, wallThickness = 0.12, opts = {}) {
+  const { openTop = false, centerY = true } = opts;
+  const hw = width * 0.5;
+  const hd = depth * 0.5;
+  const t = Math.min(wallThickness, hw * 0.45, height * 0.35, hd * 0.45);
+  const y0 = centerY ? -height * 0.5 : 0;
+  const y1 = centerY ? height * 0.5 : height;
+  const iy0 = y0 + t;
+  const iy1 = openTop ? y1 : y1 - t;
+  const iz0 = -hd + t;
+
+  const positions = [];
+  const pushTri = (a, b, c) => {
+    positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+  };
+  // Quad with outward normal when vertices [p0, p1, p2, p3] are ordered CCW from outside
+  const pushQuad = (p0, p1, p2, p3) => {
+    pushTri(p0, p1, p2);
+    pushTri(p0, p2, p3);
+  };
+
+  // Outer left (-X)
+  pushQuad([-hw, y0, -hd], [-hw, y0, hd], [-hw, y1, hd], [-hw, y1, -hd]);
+  // Outer right (+X)
+  pushQuad([hw, y0, hd], [hw, y0, -hd], [hw, y1, -hd], [hw, y1, hd]);
+  // Outer back (-Z)
+  pushQuad([hw, y0, -hd], [-hw, y0, -hd], [-hw, y1, -hd], [hw, y1, -hd]);
+  // Outer bottom (-Y)
+  pushQuad([-hw, y0, -hd], [hw, y0, -hd], [hw, y0, hd], [-hw, y0, hd]);
+
+  // Inner bottom (+Y)
+  pushQuad([-hw + t, iy0, hd], [hw - t, iy0, hd], [hw - t, iy0, iz0], [-hw + t, iy0, iz0]);
+  // Inner back (+Z)
+  pushQuad([-hw + t, iy0, iz0], [hw - t, iy0, iz0], [hw - t, iy1, iz0], [-hw + t, iy1, iz0]);
+  // Inner left (+X)
+  pushQuad([-hw + t, iy0, hd], [-hw + t, iy0, iz0], [-hw + t, iy1, iz0], [-hw + t, iy1, hd]);
+  // Inner right (-X)
+  pushQuad([hw - t, iy0, iz0], [hw - t, iy0, hd], [hw - t, iy1, hd], [hw - t, iy1, iz0]);
+
+  if (!openTop) {
+    // Outer top (+Y)
+    pushQuad([-hw, y1, hd], [hw, y1, hd], [hw, y1, -hd], [-hw, y1, -hd]);
+    // Inner top (-Y)
+    pushQuad([-hw + t, iy1, iz0], [hw - t, iy1, iz0], [hw - t, iy1, hd], [-hw + t, iy1, hd]);
+    // Front rim (+Z): 4 strips around opening
+    pushQuad([-hw, y0, hd], [hw, y0, hd], [hw, iy0, hd], [-hw, iy0, hd]); // bottom rim
+    pushQuad([-hw, iy1, hd], [hw, iy1, hd], [hw, y1, hd], [-hw, y1, hd]); // top rim
+    pushQuad([-hw, iy0, hd], [-hw + t, iy0, hd], [-hw + t, iy1, hd], [-hw, iy1, hd]); // left post
+    pushQuad([hw - t, iy0, hd], [hw, iy0, hd], [hw, iy1, hd], [hw - t, iy1, hd]); // right post
+  } else {
+    // Front U-rim (+Z)
+    pushQuad([-hw, y0, hd], [hw, y0, hd], [hw, iy0, hd], [-hw, iy0, hd]); // bottom rim
+    pushQuad([-hw, iy0, hd], [-hw + t, iy0, hd], [-hw + t, y1, hd], [-hw, y1, hd]); // left post
+    pushQuad([hw - t, iy0, hd], [hw, iy0, hd], [hw, y1, hd], [hw - t, y1, hd]); // right post
+    // Open top U-rim (+Y)
+    pushQuad([-hw, y1, hd], [-hw + t, y1, hd], [-hw + t, y1, iz0], [-hw, y1, iz0]); // top left lip
+    pushQuad([hw - t, y1, hd], [hw, y1, hd], [hw, y1, iz0], [hw - t, y1, iz0]); // top right lip
+    pushQuad([-hw, y1, iz0], [hw, y1, iz0], [hw, y1, -hd], [-hw, y1, -hd]); // top back lip
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+
+/* --- kit/registry.mjs --- */
+class Recorder3D {
+  constructor(sceneRoot, kit) {
+    this.root = sceneRoot;
+    this.kit = kit;
+    this.parts = new Map();      // id -> { id, group, geometry, opts }
+    this.tubes = [];             // { id, part, curve, radius, from, to, waypoints, opts }
+    this.joints = new Map();     // id -> THREE.Object3D (named anchor points)
+    this.groups = new Map();     // id -> { id, group, opts }
+    this.tags = new Map();       // id -> { id, text, pos }
+    this.screens = new Map();    // id -> { id, group, mesh, canvas, ctx, texture, draw }
+    this.interactables = [];     // { id, object3d, cursor, hint, onDrag }
+    this.currentStage = "base";  // 'base' | 'structure' | 'subject' | 'mechanism' | 'shader'
+  }
+
+  setStage(stageName) {
+    this.currentStage = stageName;
+  }
+
+  /**
+   * Create and register a named Three.js Group (e.g., for assemblies or kinematic sub-trees)
+   */
+  group(id, opts = {}) {
+    const {
+      parent = this.root,
+      pos = [0, 0, 0],
+      rot = [0, 0, 0],
+      explode = [0, 0, 0],
+      cutawayHide = false,
+      stage = this.currentStage
+    } = opts;
+
+    const g = new THREE.Group();
+    g.name = id;
+    g.position.set(...pos);
+    g.rotation.set(...rot);
+    g.userData = {
+      id,
+      isAssemblyGroup: true,
+      stage,
+      explode,
+      cutawayHide,
+      basePos: [...pos],
+      baseRot: [...rot]
+    };
+    parent.add(g);
+    this.groups.set(id, { id, group: g, opts: g.userData });
+    return g;
+  }
+
+  /**
+   * Register a named 3D anchor/port so other files can snap to it without guessing coordinates.
+   * Pass opts.dir ([dx, dy, dz] in parentGroup local coordinates) for port outward normals.
+   */
+  anchor(id, x, y, z, parentGroup = this.root, opts = {}) {
+    const obj = new THREE.Object3D();
+    obj.name = `anchor:${id}`;
+    obj.position.set(x, y, z);
+    obj.userData.localDir = opts.dir ? new THREE.Vector3(...opts.dir).normalize() : null;
+    parentGroup.add(obj);
+    this.joints.set(id, obj);
+    return obj;
+  }
+
+  /**
+   * Get world position of a registered anchor
+   */
+  getAnchorWorldPos(id) {
+    const obj = this.joints.get(id);
+    if (!obj) {
+      throw new Error(`Missing registered anchor "${id}"`);
+    }
+    this.root.updateMatrixWorld(true);
+    return obj.getWorldPosition(new THREE.Vector3());
+  }
+
+  /**
+   * Get world-space outward port normal of a registered anchor, or null if none was registered
+   */
+  getAnchorWorldDir(id) {
+    const obj = this.joints.get(id);
+    if (!obj) {
+      throw new Error(`Missing registered anchor "${id}"`);
+    }
+    if (!obj.userData?.localDir) return null;
+    this.root.updateMatrixWorld(true);
+    return obj.userData.localDir.clone().transformDirection(obj.matrixWorld).normalize();
+  }
+
+  /**
+   * Create an Anatomy-styled 3D solid and register it for the 3D geometry audit
+   */
+  part(id, geometry, opts = {}) {
+    if (this.parts.has(id)) {
+      throw new Error(`Duplicate part ID registered: "${id}"`);
+    }
+    const {
+      ramp = "mid",          // 'lo' | 'mid' | 'hi' | 'lit' | 'brass' | 'copper' | 'glass' | 'intake' | 'comp' | 'comb' | 'exhaust' | 'channelA..D'
+      outline = ramp === "glass" ? "lo" : "mid",
+      crease = "faint",
+      creaseAngle = 28,
+      outlineWidth = ramp === "glass" ? 0.009 : 0.017,
+      topBias = 0.62,
+      noOutline = false,
+      noCrease = false,
+      clippable = false,
+      opacity = undefined,
+      parent = this.root,
+      pos = [0, 0, 0],
+      rot = [0, 0, 0],
+      mountOn = null,        // ID of part this must touch/rest on (or 'ground' or 'coaxial')
+      allowOverlap = [],     // IDs of parts allowed to intersect (e.g. meshing gears, coaxial shafts)
+      insideBoreOf = null,   // ID of hollow housing part whose inner bore contains this part
+      boreClearanceFn = null,// Optional (x, y, z) => signed radial clearance inside bore (>0 means clear, <0 means collision)
+      explode = [0, 0, 0],   // Axial offset vector when Explode (E) = 1
+      detail = false,        // True for tiny screws/ticks/fins (skips heavy collision checks)
+      cutawayHide = false,   // True if hidden when Cutaway (C) is active at rest
+      stage = this.currentStage
+    } = opts;
+
+    const group = this.kit.createAnatomyPart(geometry, {
+      ramp,
+      outline,
+      crease,
+      creaseAngle,
+      outlineWidth,
+      topBias,
+      noOutline,
+      noCrease,
+      clippable: Boolean(clippable),
+      opacity
+    });
+    group.name = id;
+    group.position.set(...pos);
+    group.rotation.set(...rot);
+    group.userData = {
+      id,
+      ramp,
+      outline,
+      stage,
+      mountOn,
+      allowOverlap: Array.isArray(allowOverlap) ? allowOverlap.filter(Boolean) : [],
+      insideBoreOf,
+      boreClearanceFn,
+      explode,
+      basePos: [...pos],
+      baseRot: [...rot],
+      detail,
+      cutawayHide,
+      clippable: Boolean(clippable)
+    };
+
+    parent.add(group);
+    this.parts.set(id, { id, group, geometry, opts: group.userData });
+    return group;
+  }
+
+  /**
+   * Mount a live 2D CanvasTexture readout / oscilloscope / telemetry screen inside the 3D scene.
+   * Returns the bezel THREE.Group so it participates in stages, explode, and interactions.
+   */
+  screen(id, opts = {}) {
+    const {
+      width = 1.2,
+      height = 0.78,
+      depth = 0.06,
+      bezelPad = 0.06,
+      resolution = [256, 168],
+      ramp = "lo",
+      outline = "mid",
+      parent = this.root,
+      pos = [0, 0, 0],
+      rot = [0, 0, 0],
+      mountOn = "ground",
+      allowOverlap = [],
+      explode = [0, 0, 0],
+      detail = false,
+      cutawayHide = false,
+      clippable = false,
+      stage = this.currentStage,
+      draw = null
+    } = opts;
+
+    const bezelGeo = new THREE.BoxGeometry(width + bezelPad * 2, height + bezelPad * 2, depth);
+    const group = this.part(id, bezelGeo, {
+      ramp,
+      outline,
+      crease: "hi",
+      parent,
+      pos,
+      rot,
+      mountOn,
+      allowOverlap,
+      explode,
+      detail,
+      cutawayHide,
+      clippable,
+      stage
+    });
+
+    let canvas = null;
+    let ctx = null;
+    let texture = null;
+    if (typeof document !== "undefined" && typeof document.createElement === "function") {
+      canvas = document.createElement("canvas");
+      canvas.width = resolution[0] || 256;
+      canvas.height = resolution[1] || 168;
+      ctx = canvas.getContext("2d");
+      texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+    }
+
+    const screenMat = new THREE.MeshBasicMaterial({
+      map: texture || undefined,
+      color: texture ? 0xffffff : 0x1e293b,
+      toneMapped: false
+    });
+    const screenGeo = new THREE.PlaneGeometry(width, height);
+    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+    screenMesh.name = "screen-face";
+    screenMesh.position.z = depth * 0.5 + 0.004;
+    group.add(screenMesh);
+
+    const entry = {
+      id,
+      group,
+      mesh: screenMesh,
+      canvas,
+      ctx,
+      texture,
+      width,
+      height,
+      resolution,
+      draw
+    };
+    this.screens.set(id, entry);
+    group.userData.screen = entry;
+    return group;
+  }
+
+  /**
+   * Add a decorative line/dot/mesh detail attached to a parent group and track its stage for isolation
+   */
+  detail(id, object3d, opts = {}) {
+    const {
+      parent = this.root,
+      cutawayHide = false,
+      stage = this.currentStage
+    } = opts;
+    object3d.name = id;
+    object3d.userData = Object.assign({}, object3d.userData, {
+      id,
+      stage,
+      cutawayHide: Boolean(cutawayHide || object3d.userData?.cutawayHide),
+      detail: true
+    });
+    parent.add(object3d);
+    return object3d;
+  }
+
+  /**
+   * Route a 3D pipe/cable between two named anchors and register it for bend/collision audits
+   */
+  tube(id, anchorFromId, waypoints, anchorToId, opts = {}) {
+    const fromObj = this.joints.get(anchorFromId);
+    const toObj = this.joints.get(anchorToId);
+    if (!fromObj || !toObj) {
+      throw new Error(`Tube "${id}" references missing anchor: ${anchorFromId} -> ${anchorToId}`);
+    }
+    this.root.updateMatrixWorld(true);
+    const pStart = fromObj.getWorldPosition(new THREE.Vector3());
+    const pEnd = toObj.getWorldPosition(new THREE.Vector3());
+    const fromDirWorld = opts.fromDir
+      ? new THREE.Vector3(...opts.fromDir).normalize()
+      : this.getAnchorWorldDir(anchorFromId);
+    const toDirWorld = opts.toDir
+      ? new THREE.Vector3(...opts.toDir).normalize()
+      : this.getAnchorWorldDir(anchorToId);
+
+    const leadOut = opts.leadOut !== undefined ? opts.leadOut : (fromDirWorld ? 0.18 : 0);
+    const leadIn = opts.leadIn !== undefined ? opts.leadIn : (toDirWorld ? 0.18 : 0);
+
+    const pts = [pStart];
+    if (fromDirWorld && leadOut > 0) {
+      pts.push(pStart.clone().addScaledVector(fromDirWorld, leadOut));
+    }
+    for (const wp of waypoints) {
+      pts.push(new THREE.Vector3(...wp));
+    }
+    if (toDirWorld && leadIn > 0) {
+      pts.push(pEnd.clone().addScaledVector(toDirWorld, leadIn));
+    }
+    pts.push(pEnd);
+
+    const curve = new THREE.CatmullRomCurve3(pts, false, opts.curveType || "centripetal");
+    const radius = opts.radius || 0.03;
+    const segments = opts.segments || 32;
+    const radialSegments = opts.radialSegments || 12;
+    const geo = new THREE.TubeGeometry(curve, segments, radius, radialSegments, false);
+
+    const allow = new Set(opts.allowOverlap || []);
+    if (opts.fromPart) allow.add(opts.fromPart);
+    if (opts.toPart) allow.add(opts.toPart);
+
+    const part = this.part(id, geo, {
+      ...opts,
+      noCrease: opts.noCrease !== undefined ? opts.noCrease : true,
+      outlineWidth: opts.outlineWidth || 0.012,
+      mountOn: opts.mountOn || opts.fromPart || "ground",
+      allowOverlap: Array.from(allow)
+    });
+
+    this.tubes.push({
+      id,
+      part,
+      curve,
+      radius,
+      from: anchorFromId,
+      to: anchorToId,
+      fromDirWorld,
+      toDirWorld,
+      fromPart: opts.fromPart || null,
+      toPart: opts.toPart || null,
+      waypoints,
+      opts
+    });
+    return part;
+  }
+
+  /**
+   * Register an engraved HUD tag anchored in 3D space
+   */
+  tag(id, text, x, y, z) {
+    this.tags.set(id, { id, text, pos: [x, y, z] });
+  }
+
+  /**
+   * Register a 3D group or part as directly draggable in the viewport via pointer raycasting.
+   * opts: { cursor = "move", hint = "", onDrag: ({ dx, dy, worldDx, worldDy, state, setParam, event }) => void }
+   */
+  interactable(targetId, opts = {}) {
+    const obj =
+      typeof targetId === "string"
+        ? this.groups.get(targetId)?.group || this.parts.get(targetId)?.group
+        : targetId;
+    if (!obj) {
+      throw new Error(`Interactable target "${targetId}" not found in registered groups or parts`);
+    }
+    const entry = {
+      id: typeof targetId === "string" ? targetId : obj.name || "interactable",
+      object3d: obj,
+      cursor: opts.cursor || "move",
+      hint: opts.hint || "",
+      onDrag: opts.onDrag || null
+    };
+    this.interactables.push(entry);
+    return entry;
+  }
+
+  /**
+   * Apply exploded axial offsets across all registered assembly groups and parts
+   */
+  applyExplode(exFactor, cutawayActive = true) {
+    for (const [, item] of this.groups) {
+      const [ex, ey, ez] = item.opts.explode;
+      if (ex || ey || ez) {
+        item.group.position.set(
+          item.opts.basePos[0] + ex * exFactor,
+          item.opts.basePos[1] + ey * exFactor,
+          item.opts.basePos[2] + ez * exFactor
+        );
+      }
+      if (item.opts.cutawayHide && !this._isolationActive) {
+        item.group.visible = !cutawayActive || exFactor > 0.08;
+      }
+    }
+    for (const [, item] of this.parts) {
+      const [ex, ey, ez] = item.opts.explode;
+      if (ex || ey || ez) {
+        item.group.position.set(
+          item.opts.basePos[0] + ex * exFactor,
+          item.opts.basePos[1] + ey * exFactor,
+          item.opts.basePos[2] + ez * exFactor
+        );
+      }
+      if (item.opts.cutawayHide && !this._isolationActive) {
+        item.group.visible = !cutawayActive || exFactor > 0.08;
+      }
+    }
+    if (!this._isolationActive) {
+      this.root.traverse((obj) => {
+        if (obj.userData && obj.userData.detail && obj.userData.cutawayHide) {
+          obj.visible = !cutawayActive || exFactor > 0.08;
+        }
+      });
+    }
+  }
+
+  /**
+   * Isolate a stage ('base', 'structure', 'subject', 'mechanism', 'shader') or list of part IDs/prefixes.
+   * Pass null or 'all' to restore visibility.
+   */
+  isolate(filter, cutawayActive = true, exFactor = 0) {
+    if (!filter || filter === "all") {
+      this._isolationActive = false;
+      this.root.traverse((obj) => {
+        if (obj === this.root) return;
+        if (obj.userData && obj.userData.cutawayHide) {
+          obj.visible = !cutawayActive || exFactor > 0.08;
+        } else if (obj.userData && (obj.userData.stage || obj.userData.id)) {
+          obj.visible = true;
+        }
+      });
+      return;
+    }
+
+    this._isolationActive = true;
+    const filters = Array.isArray(filter) ? filter : [filter];
+    const matches = (ud) => {
+      if (!ud) return false;
+      return filters.some((f) =>
+        ud.stage === f ||
+        ud.id === f ||
+        (typeof ud.id === "string" && ud.id.startsWith(f + "."))
+      );
+    };
+
+    // First set visibility on all registered parts and details
+    this.root.traverse((obj) => {
+      if (obj.userData && (obj.userData.id || obj.userData.stage) && !obj.userData.isAssemblyGroup) {
+        obj.visible = matches(obj.userData);
+      }
+    });
+  }
+}
+
+
+/* --- kit/runtime.mjs --- */
+function clamp01(x) {
+  return x <= 0 ? 0 : x >= 1 ? 1 : x;
+}
+function smooth(a, b, x) {
+  if (a === b) return x >= b ? 1 : 0;
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+}
+function burst(age, rise = 0.08, fall = 0.65) {
+  if (!Number.isFinite(age) || age < 0) return 0;
+  if (age <= rise) {
+    return rise <= 0 ? 1 : smooth(0, rise, age);
+  }
+  const end = rise + Math.max(0.001, fall);
+  if (age >= end) return 0;
+  return 1 - smooth(rise, end, age);
+}
+function settle(held, want, dt, seconds = 0.25, calm = 1) {
+  if (seconds <= 0 || dt <= 0) return want;
+  const alpha = 1 - Math.exp((-dt * Math.max(0.15, calm)) / Math.max(0.001, seconds));
+  if (typeof held === "object" && held !== null && "at" in held) {
+    held.at += (want - held.at) * alpha;
+    return held.at;
+  }
+  return held + (want - held) * alpha;
+}
+function mountAnatomyFigure(config) {
+  const {
+    spec,
+    buildBase,
+    buildStructure,
+    buildSubject,
+    buildMechanism,
+    buildShader,
+    updateKinematics,
+    formatReadout,
+    tourAt
+  } = config;
+
+  const simulationMode = spec.simulationMode || "continuous";
+  const isContinuous = simulationMode === "continuous";
+
+  const features = Object.assign(
+    {
+      explode: true,
+      cutaway: true,
+      shader: true,
+      crank: isContinuous,
+      slow: isContinuous,
+      rpm: isContinuous
+    },
+    spec.features || {}
+  );
+
+  const sectionSpec =
+    spec.section && typeof spec.section === "object"
+      ? spec.section
+      : features.section
+        ? { axis: "z", min: -2.0, max: 2.0, initial: 2.0, label: "SECT" }
+        : null;
+
+  const baseControls =
+    Array.isArray(spec.controls)
+      ? [...spec.controls]
+      : isContinuous || features.rpm === true
+        ? [
+            {
+              id: "rpm",
+              label: "RPM",
+              min: 0,
+              max: 2400,
+              step: 20,
+              initial: spec.initialRpm !== undefined ? spec.initialRpm : 720,
+              title: "Shaft speed"
+            }
+          ]
+        : [];
+
+  if ((simulationMode === "timeline" || features.timeline === true) && !baseControls.some((c) => c.id === "timeline")) {
+    baseControls.push({
+      id: "timeline",
+      label: "TIME",
+      min: 0,
+      max: 1,
+      step: 0.005,
+      initial: spec.initialTimeline !== undefined ? spec.initialTimeline : 0,
+      title: "Scrub simulation timeline"
+    });
+  }
+
+  const controlDefs = baseControls;
+  const triggerDefs = Array.isArray(spec.triggers) ? spec.triggers : [];
+  const stepDefs = Array.isArray(spec.steps) ? spec.steps : [];
+  const cameraViews = Array.isArray(spec.cameraViews) ? spec.cameraViews : [];
+  const tourFn = typeof tourAt === "function" ? tourAt : typeof spec.tour === "function" ? spec.tour : null;
+
+  const state = {
+    theta: spec.initialTheta !== undefined ? spec.initialTheta : 0.65,
+    rpm: spec.initialRpm !== undefined ? spec.initialRpm : (isContinuous ? 720 : 0),
+    timeline: spec.initialTimeline !== undefined ? spec.initialTimeline : 0,
+    params: {},
+    slowModes: [1, 0.2, 0.05, 0],
+    slowLabels: ["SLOW 1×", "SLOW 1/5×", "SLOW 1/20×", "PAUSED"],
+    slowIndex: 0,
+    crankMode: false,
+    exploded: false,
+    cutaway: spec.initialCutaway !== undefined ? spec.initialCutaway : features.cutaway,
+    shaderEnabled: features.shader,
+    hudVisible: true,
+    debugPaused: false,
+    stepIndex: 0,
+    section: sectionSpec ? (sectionSpec.initial !== undefined ? sectionSpec.initial : sectionSpec.max) : null
+  };
+
+  function createSpring(initial) {
+    return { at: initial, rate: 0 };
+  }
+
+  function stepSpring(held, want, dt, stiff, damping) {
+    const steps = Math.max(Math.ceil(dt * 120), 1);
+    const slice = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      held.rate += ((want - held.at) * stiff - held.rate * damping) * slice;
+      held.at += held.rate * slice;
+    }
+    if (Math.abs(want - held.at) < 0.0005 && Math.abs(held.rate) < 0.0005) {
+      held.at = want;
+      held.rate = 0;
+    }
+  }
+
+  const paramSprings = {};
+  for (const c of controlDefs) {
+    state.params[c.id] = c.initial;
+    paramSprings[c.id] = createSpring(c.initial);
+  }
+  if (state.params.rpm !== undefined) {
+    state.rpm = state.params.rpm;
+  }
+
+  const explodeSpring = createSpring(0);
+  const rpmSpring = paramSprings.rpm || createSpring(state.rpm);
+  const shaderEnvSpring = createSpring(features.shader ? 1 : 0);
+  const sectionSpring = createSpring(state.section !== null ? state.section : 0);
+  let targetSection = state.section;
+  let thetaTarget = null;
+
+  let simClock = 0;
+  let tourClock = 0;
+  let hasUserInteracted = false;
+  let lastInteractionMs = performance.now();
+  const triggerTimes = {};
+  const triggerValues = {};
+  const triggerAges = {};
+  for (const t of triggerDefs) {
+    triggerTimes[t.id] = -999;
+    triggerValues[t.id] = 0;
+    triggerAges[t.id] = 999;
+  }
+
+  function markUserInteraction() {
+    hasUserInteracted = true;
+    lastInteractionMs = performance.now();
+  }
+
+  const host = document.getElementById("canvas-host");
+  const cardEl = document.getElementById("figure-card");
+  const readoutEl = document.getElementById("readout");
+  const phaseCornerEl = document.getElementById("phase-corner");
+
+  const scene = new THREE.Scene();
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  if (sectionSpec) {
+    renderer.localClippingEnabled = true;
+  }
+  host.appendChild(renderer.domElement);
+
+  const ISO_ELEV = ((spec.isoElevDeg !== undefined ? spec.isoElevDeg : 30) * Math.PI) / 180;
+  const ISO_AZIM = ((spec.isoAzimDeg !== undefined ? spec.isoAzimDeg : -36) * Math.PI) / 180;
+  let zoomFactor = spec.initialZoom || 1.08;
+  let targetZoom = zoomFactor;
+  let panX = 0;
+  let panY = spec.initialPanY !== undefined ? spec.initialPanY : -0.06;
+  let targetPanX = panX;
+  let targetPanY = panY;
+  let rotX = ISO_ELEV;
+  let rotY = ISO_AZIM;
+  let targetRotX = ISO_ELEV;
+  let targetRotY = ISO_AZIM;
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+  camera.position.set(0, 0, 18);
+  camera.lookAt(0, 0, 0);
+
+  function updateCameraSize() {
+    const w = Math.max(host.clientWidth, 200);
+    const h = Math.max(host.clientHeight, 200);
+    const aspect = w / h;
+
+    const minVertSpan = spec.minVertSpan || 4.9;
+    const minHorizSpan = spec.minHorizSpan || 6.7;
+
+    let halfH = (minVertSpan * 0.5) / zoomFactor;
+    let halfW = halfH * aspect;
+
+    if (halfW < (minHorizSpan * 0.5) / zoomFactor) {
+      halfW = (minHorizSpan * 0.5) / zoomFactor;
+      halfH = halfW / aspect;
+    }
+
+    camera.left = -halfW;
+    camera.right = halfW;
+    camera.top = halfH;
+    camera.bottom = -halfH;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  }
+
+  const worldGroup = new THREE.Group();
+  scene.add(worldGroup);
+
+  const kit = createShaderKit();
+  const reg = new Recorder3D(worldGroup, kit);
+
+  // Build the 6 modular stages in order
+  reg.setStage("base");
+  if (buildBase) buildBase(reg, kit);
+  reg.setStage("structure");
+  if (buildStructure) buildStructure(reg, kit);
+  reg.setStage("subject");
+  if (buildSubject) buildSubject(reg, kit);
+  reg.setStage("mechanism");
+  if (buildMechanism) buildMechanism(reg, kit);
+  reg.setStage("shader");
+  if (buildShader) buildShader(reg, kit);
+
+  const schemeButtonsEl = document.getElementById("scheme-buttons");
+  const customSlidersEl = document.getElementById("custom-sliders");
+  const triggersGroupEl = document.getElementById("triggers-group");
+  const cameraViewsGroupEl = document.getElementById("camera-views-group");
+  const crankBtn = document.getElementById("crank-btn");
+  const slowBtn = document.getElementById("slow-btn");
+  const explodeBtn = document.getElementById("explode-btn");
+  const cutawayBtn = document.getElementById("cutaway-btn");
+  const shaderBtn = document.getElementById("shader-btn");
+  const hudBtn = document.getElementById("hud-btn");
+  const hudQuickBtn = document.getElementById("hud-quick-btn");
+  const resetBtn = document.getElementById("reset-btn");
+  const hintExplodeEl = document.getElementById("hint-explode");
+  const hintCrankEl = document.getElementById("hint-crank");
+  const hintInteractEl = document.getElementById("hint-interact");
+  const hintInteractMobileEl = document.getElementById("hint-interact-mobile");
+
+  const controlDefMap = new Map(controlDefs.map((c) => [c.id, c]));
+  const sliderInputs = new Map();
+  const triggerButtons = new Map();
+  let stepBtn = null;
+  let sectionSliderEl = null;
+  let activeCameraViewId = null;
+
+  const localSectionNormal = new THREE.Vector3(0, 0, -1);
+  const localSectionPlane = new THREE.Plane(localSectionNormal, 2.0);
+  const worldSectionPlane = new THREE.Plane(localSectionNormal, 2.0);
+
+  function setParam(id, value, immediate = false) {
+    const def = controlDefMap.get(id);
+    if (!def) return;
+    const clamped = Math.max(def.min, Math.min(def.max, value));
+    state.params[id] = clamped;
+    if (id === "rpm") state.rpm = clamped;
+    if (id === "timeline") {
+      state.timeline = clamped;
+      state.theta = clamped * Math.PI * 2;
+    }
+    const input = sliderInputs.get(id);
+    if (input) input.value = String(clamped);
+    if (immediate && paramSprings[id]) {
+      paramSprings[id].at = clamped;
+      paramSprings[id].rate = 0;
+    }
+  }
+
+  function setSection(val, immediate = false) {
+    if (!sectionSpec || !Number.isFinite(val)) return;
+    const clamped = Math.max(sectionSpec.min, Math.min(sectionSpec.max, val));
+    targetSection = clamped;
+    if (sectionSliderEl) sectionSliderEl.value = String(clamped);
+    if (immediate) {
+      state.section = sectionSpring.at = clamped;
+      sectionSpring.rate = 0;
+    }
+  }
+
+  function setCameraViewSelectionUI(viewId) {
+    activeCameraViewId = viewId || null;
+    if (!cameraViewsGroupEl) return;
+    Array.from(cameraViewsGroupEl.children).forEach((btn) => {
+      btn.classList.toggle("active", Boolean(activeCameraViewId) && btn.dataset.viewId === activeCameraViewId);
+    });
+  }
+
+  function applyCameraView(viewIdOrIndex, immediate = false) {
+    if (cameraViews.length === 0) return null;
+    const view =
+      typeof viewIdOrIndex === "number"
+        ? cameraViews[viewIdOrIndex]
+        : cameraViews.find((v) => v.id === viewIdOrIndex);
+    if (!view) return null;
+
+    const elevDeg = view.elev !== undefined ? view.elev : (spec.isoElevDeg !== undefined ? spec.isoElevDeg : 30);
+    const azimDeg = view.azim !== undefined ? view.azim : (spec.isoAzimDeg !== undefined ? spec.isoAzimDeg : -36);
+    const zoom = view.zoom !== undefined ? view.zoom : (spec.initialZoom || 1.08);
+    const pan = Array.isArray(view.pan)
+      ? view.pan
+      : [0, spec.initialPanY !== undefined ? spec.initialPanY : -0.06];
+
+    targetRotX = (elevDeg * Math.PI) / 180;
+    targetRotY = (azimDeg * Math.PI) / 180;
+    targetPanX = pan[0] !== undefined ? pan[0] : 0;
+    targetPanY = pan[1] !== undefined ? pan[1] : 0;
+    targetZoom = Math.max(0.45, Math.min(4.5, zoom));
+
+    if (immediate) {
+      rotX = targetRotX;
+      rotY = targetRotY;
+      panX = targetPanX;
+      panY = targetPanY;
+      zoomFactor = targetZoom;
+      updateCameraSize();
+    }
+    setCameraViewSelectionUI(view.id);
+    return view;
+  }
+
+  function fireTrigger(id, opts = {}) {
+    const tDef = triggerDefs.find((t) => t.id === id);
+    if (!tDef) return false;
+    if (!opts.fromTour) markUserInteraction();
+    triggerTimes[id] = simClock;
+    triggerAges[id] = 0;
+    triggerValues[id] = burst(0, tDef.rise !== undefined ? tDef.rise : 0.08, tDef.fall !== undefined ? tDef.fall : 0.75);
+    if (typeof tDef.onTrigger === "function") {
+      tDef.onTrigger({ state, setParam, fireTrigger, applyStep });
+    }
+    const btn = triggerButtons.get(id);
+    if (btn) btn.classList.add("armed");
+    return true;
+  }
+
+  function applyStep(idx) {
+    if (stepDefs.length === 0) return null;
+    state.stepIndex = ((idx % stepDefs.length) + stepDefs.length) % stepDefs.length;
+    const step = stepDefs[state.stepIndex];
+    if (step.theta !== undefined) {
+      thetaTarget = step.theta;
+    }
+    if (step.timeline !== undefined) {
+      setParam("timeline", step.timeline, false);
+    }
+    if (step.params && typeof step.params === "object") {
+      for (const [k, v] of Object.entries(step.params)) {
+        setParam(k, v, false);
+      }
+    }
+    if (stepBtn) {
+      stepBtn.textContent = step.label || `STEP ${state.stepIndex + 1}/${stepDefs.length}`;
+    }
+    return step;
+  }
+
+  if (customSlidersEl) {
+    customSlidersEl.innerHTML = "";
+    for (const c of controlDefs) {
+      const lbl = document.createElement("label");
+      lbl.className = "slider-label";
+      if (c.title) lbl.title = c.title;
+      const span = document.createElement("span");
+      span.textContent = c.label;
+      const input = document.createElement("input");
+      input.type = "range";
+      input.id = c.id === "rpm" ? "rpm-slider" : `param-slider-${c.id}`;
+      input.min = String(c.min);
+      input.max = String(c.max);
+      input.step = String(c.step);
+      input.value = String(c.initial);
+      input.addEventListener("input", (e) => {
+        markUserInteraction();
+        setParam(c.id, parseFloat(e.target.value), false);
+      });
+      lbl.appendChild(span);
+      lbl.appendChild(input);
+      customSlidersEl.appendChild(lbl);
+      sliderInputs.set(c.id, input);
+    }
+
+    if (sectionSpec) {
+      const lbl = document.createElement("label");
+      lbl.className = "slider-label";
+      lbl.title = sectionSpec.title || "Slice 3D cross-section plane";
+      const span = document.createElement("span");
+      span.textContent = sectionSpec.label || "SECT";
+      const input = document.createElement("input");
+      input.type = "range";
+      input.id = "section-slider";
+      input.min = String(sectionSpec.min);
+      input.max = String(sectionSpec.max);
+      input.step = String(sectionSpec.step || 0.02);
+      input.value = String(targetSection);
+      input.addEventListener("input", (e) => {
+        markUserInteraction();
+        setSection(parseFloat(e.target.value), false);
+      });
+      lbl.appendChild(span);
+      lbl.appendChild(input);
+      customSlidersEl.appendChild(lbl);
+      sectionSliderEl = input;
+    }
+  } else {
+    const rpmSlider = document.getElementById("rpm-slider");
+    if (rpmSlider) {
+      rpmSlider.addEventListener("input", (e) => {
+        markUserInteraction();
+        setParam("rpm", parseFloat(e.target.value), false);
+      });
+      sliderInputs.set("rpm", rpmSlider);
+    }
+  }
+
+  if (triggersGroupEl) {
+    triggersGroupEl.innerHTML = "";
+    if (stepDefs.length > 0) {
+      stepBtn = document.createElement("button");
+      stepBtn.type = "button";
+      stepBtn.className = "action-btn trigger-btn";
+      stepBtn.id = "step-btn";
+      stepBtn.title = "Advance sequence step";
+      stepBtn.textContent = stepDefs[0].label || `STEP 1/${stepDefs.length}`;
+      stepBtn.addEventListener("click", () => {
+        markUserInteraction();
+        applyStep(state.stepIndex + 1);
+      });
+      triggersGroupEl.appendChild(stepBtn);
+    }
+    for (const t of triggerDefs) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "action-btn trigger-btn";
+      btn.id = `trigger-btn-${t.id}`;
+      btn.textContent = t.label;
+      if (t.title) btn.title = t.title;
+      btn.addEventListener("click", () => fireTrigger(t.id));
+      triggersGroupEl.appendChild(btn);
+      triggerButtons.set(t.id, btn);
+    }
+  }
+
+  if (cameraViewsGroupEl) {
+    cameraViewsGroupEl.innerHTML = "";
+    cameraViews.forEach((v, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "view-pill";
+      btn.dataset.viewId = v.id;
+      btn.textContent = v.label;
+      if (idx < 9) btn.title = `${v.label} (${idx + 1})`;
+      btn.addEventListener("click", () => {
+        markUserInteraction();
+        applyCameraView(v.id, false);
+      });
+      cameraViewsGroupEl.appendChild(btn);
+    });
+  }
+
+  if (!features.explode) {
+    if (explodeBtn) explodeBtn.style.display = "none";
+    if (hintExplodeEl) hintExplodeEl.style.display = "none";
+  }
+  if (!features.cutaway) {
+    if (cutawayBtn) cutawayBtn.style.display = "none";
+  } else if (cutawayBtn) {
+    cutawayBtn.classList.toggle("active", state.cutaway);
+  }
+  if (!features.shader) {
+    if (shaderBtn) shaderBtn.style.display = "none";
+  } else if (shaderBtn) {
+    shaderBtn.classList.toggle("active", state.shaderEnabled);
+  }
+  if (!features.crank) {
+    if (crankBtn) crankBtn.style.display = "none";
+    if (hintCrankEl) hintCrankEl.style.display = "none";
+  }
+  if (!features.slow && slowBtn) {
+    slowBtn.style.display = "none";
+  }
+  if (spec.interactionHint) {
+    if (hintInteractEl) hintInteractEl.textContent = `${spec.interactionHint} · `;
+    if (hintInteractMobileEl) hintInteractMobileEl.textContent = `${spec.interactionHint} · `;
+  }
+
+  function applyTheme(themeOrId) {
+    const theme = kit.applyTheme(themeOrId);
+    const root = document.documentElement.style;
+    root.setProperty("--anatomy-bg", theme.css.bg);
+    root.setProperty("--anatomy-card", theme.css.card);
+    root.setProperty("--anatomy-paper", theme.css.card);
+    root.setProperty("--anatomy-border", theme.css.border);
+    root.setProperty("--anatomy-text", theme.css.text);
+    root.setProperty("--anatomy-muted", theme.css.muted);
+    root.setProperty("--anatomy-strong", theme.css.strong);
+    root.setProperty("--anatomy-lit", theme.css.lit);
+    root.setProperty("--anatomy-pill-bg", theme.css.pillBg);
+    root.setProperty("--anatomy-pill-hover", theme.css.pillHover);
+
+    const legLit = document.getElementById("leg-lit");
+    const legIntake = document.getElementById("leg-intake");
+    const legComb = document.getElementById("leg-comb");
+    const legExh = document.getElementById("leg-exh");
+    if (legLit) legLit.style.backgroundColor = theme.css.lit;
+    if (legIntake) legIntake.style.backgroundColor = theme.channels.intake;
+    if (legComb) legComb.style.backgroundColor = theme.channels.comb;
+    if (legExh) legExh.style.backgroundColor = theme.channels.exhaust;
+
+    if (schemeButtonsEl) {
+      Array.from(schemeButtonsEl.children).forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.id === theme.id);
+      });
+    }
+  }
+
+  kit.THEMES.forEach((t) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "scheme-btn";
+    btn.dataset.id = t.id;
+    btn.innerHTML = `<span class="swatch" style="background:${t.swatch}"></span>${t.name}`;
+    btn.addEventListener("click", () => applyTheme(t));
+    schemeButtonsEl.appendChild(btn);
+  });
+
+  function toggleCrankMode() {
+    if (!features.crank) return;
+    state.crankMode = !state.crankMode;
+    crankBtn.classList.toggle("active", state.crankMode);
+  }
+
+  function toggleExplode() {
+    if (!features.explode) return;
+    state.exploded = !state.exploded;
+    explodeBtn.classList.toggle("active", state.exploded);
+  }
+
+  function cycleSlowMode() {
+    state.slowIndex = (state.slowIndex + 1) % state.slowModes.length;
+    slowBtn.textContent = state.slowLabels[state.slowIndex];
+    slowBtn.classList.toggle("active", state.slowIndex > 0);
+  }
+
+  function toggleCutaway() {
+    if (!features.cutaway) return;
+    state.cutaway = !state.cutaway;
+    cutawayBtn.classList.toggle("active", state.cutaway);
+    reg.applyExplode(explodeSpring.at, state.cutaway);
+  }
+
+  function toggleShader() {
+    if (!features.shader) return;
+    state.shaderEnabled = !state.shaderEnabled;
+    shaderBtn.classList.toggle("active", state.shaderEnabled);
+  }
+
+  function setHudVisible(vis) {
+    state.hudVisible = vis;
+    document.body.classList.toggle("hud-hidden", !state.hudVisible);
+    hudBtn.classList.toggle("active", state.hudVisible);
+    hudQuickBtn.classList.toggle("active", state.hudVisible);
+    updateCameraSize();
+  }
+
+  function toggleHud() {
+    setHudVisible(!state.hudVisible);
+  }
+
+  function resetIsoView() {
+    targetRotX = ISO_ELEV;
+    targetRotY = ISO_AZIM;
+    targetPanX = 0;
+    targetPanY = spec.initialPanY !== undefined ? spec.initialPanY : -0.06;
+    targetZoom = zoomFactor = spec.initialZoom || 1.08;
+    setCameraViewSelectionUI(null);
+    updateCameraSize();
+  }
+
+  crankBtn.addEventListener("click", () => { markUserInteraction(); toggleCrankMode(); });
+  slowBtn.addEventListener("click", () => { markUserInteraction(); cycleSlowMode(); });
+  explodeBtn.addEventListener("click", () => { markUserInteraction(); toggleExplode(); });
+  cutawayBtn.addEventListener("click", () => { markUserInteraction(); toggleCutaway(); });
+  shaderBtn.addEventListener("click", () => { markUserInteraction(); toggleShader(); });
+  hudBtn.addEventListener("click", toggleHud);
+  hudQuickBtn.addEventListener("click", toggleHud);
+  resetBtn.addEventListener("click", () => { markUserInteraction(); resetIsoView(); });
+
+  const activePointers = new Map();
+  let lastSingleX = 0;
+  let lastSingleY = 0;
+  let lastMidX = 0;
+  let lastMidY = 0;
+  let lastPinchDist = 0;
+  let isMousePan = false;
+
+  const raycaster = new THREE.Raycaster();
+  const pointerNdc = new THREE.Vector2();
+  let activeInteractable = null;
+
+  function isEffectivelyVisible(obj) {
+    let cur = obj;
+    while (cur) {
+      if (!cur.visible) return false;
+      cur = cur.parent;
+    }
+    return true;
+  }
+
+  function pickInteractable(clientX, clientY) {
+    if (!reg.interactables || reg.interactables.length === 0) return null;
+    const rect = host.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
+
+    let bestEntry = null;
+    let bestDist = Infinity;
+    for (const entry of reg.interactables) {
+      if (!entry.object3d || !isEffectivelyVisible(entry.object3d)) continue;
+      const meshes = [];
+      entry.object3d.traverse((child) => {
+        if (child.isMesh && child.name === "solid" && isEffectivelyVisible(child)) {
+          meshes.push(child);
+        }
+      });
+      if (meshes.length === 0) continue;
+      const hits = raycaster.intersectObjects(meshes, false);
+      if (hits.length > 0 && hits[0].distance < bestDist) {
+        bestDist = hits[0].distance;
+        bestEntry = entry;
+      }
+    }
+    return bestEntry;
+  }
+
+  host.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  function syncTwoFingerMetrics() {
+    const pts = Array.from(activePointers.values());
+    if (pts.length >= 2) {
+      lastMidX = (pts[0].x + pts[1].x) * 0.5;
+      lastMidY = (pts[0].y + pts[1].y) * 0.5;
+      lastPinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    }
+  }
+
+  host.addEventListener("pointerdown", (e) => {
+    markUserInteraction();
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    host.setPointerCapture(e.pointerId);
+    cardEl.focus();
+
+    if (activePointers.size === 1) {
+      lastSingleX = e.clientX;
+      lastSingleY = e.clientY;
+      isMousePan = e.button === 2 || e.button === 1;
+      activeInteractable =
+        !isMousePan && !e.shiftKey && !state.crankMode
+          ? pickInteractable(e.clientX, e.clientY)
+          : null;
+      host.style.cursor = "grabbing";
+    } else if (activePointers.size === 2) {
+      activeInteractable = null;
+      syncTwoFingerMetrics();
+    }
+  });
+
+  host.addEventListener("pointermove", (e) => {
+    if (!activePointers.has(e.pointerId)) {
+      if (activePointers.size === 0 && reg.interactables.length > 0) {
+        const hoverHit = pickInteractable(e.clientX, e.clientY);
+        host.style.cursor = hoverHit ? hoverHit.cursor : "grab";
+      }
+      return;
+    }
+    markUserInteraction();
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const w = Math.max(host.clientWidth, 1);
+    const h = Math.max(host.clientHeight, 1);
+    const worldPerPixelX = (camera.right - camera.left) / w;
+    const worldPerPixelY = (camera.top - camera.bottom) / h;
+
+    if (activePointers.size === 1) {
+      const dx = e.clientX - lastSingleX;
+      const dy = e.clientY - lastSingleY;
+      lastSingleX = e.clientX;
+      lastSingleY = e.clientY;
+
+      if (isMousePan) {
+        setCameraViewSelectionUI(null);
+        targetPanX += dx * worldPerPixelX;
+        targetPanY -= dy * worldPerPixelY;
+      } else if (activeInteractable && typeof activeInteractable.onDrag === "function") {
+        activeInteractable.onDrag({
+          dx,
+          dy,
+          worldDx: dx * worldPerPixelX,
+          worldDy: -dy * worldPerPixelY,
+          state,
+          setParam,
+          fireTrigger,
+          applyStep,
+          event: e
+        });
+      } else if (e.shiftKey || state.crankMode || (features.crank && state.slowModes[state.slowIndex] === 0)) {
+        thetaTarget = null;
+        state.theta -= dx * 0.024;
+      } else {
+        setCameraViewSelectionUI(null);
+        targetRotY += dx * 0.0085;
+        targetRotX = Math.max(-Math.PI * 0.48, Math.min(Math.PI * 0.48, targetRotX + dy * 0.0085));
+      }
+    } else if (activePointers.size >= 2) {
+      setCameraViewSelectionUI(null);
+      const pts = Array.from(activePointers.values());
+      const midX = (pts[0].x + pts[1].x) * 0.5;
+      const midY = (pts[0].y + pts[1].y) * 0.5;
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+
+      const midDx = midX - lastMidX;
+      const midDy = midY - lastMidY;
+      targetPanX += midDx * worldPerPixelX;
+      targetPanY -= midDy * worldPerPixelY;
+
+      if (lastPinchDist > 12 && dist > 12) {
+        const scale = dist / lastPinchDist;
+        targetZoom = zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor * scale));
+        updateCameraSize();
+      }
+
+      lastMidX = midX;
+      lastMidY = midY;
+      lastPinchDist = dist;
+    }
+  });
+
+  function onPointerRelease(e) {
+    activePointers.delete(e.pointerId);
+    if (host.hasPointerCapture(e.pointerId)) {
+      host.releasePointerCapture(e.pointerId);
+    }
+    if (activePointers.size === 0) {
+      activeInteractable = null;
+      host.style.cursor = "grab";
+    } else if (activePointers.size === 1) {
+      const remaining = activePointers.values().next().value;
+      lastSingleX = remaining.x;
+      lastSingleY = remaining.y;
+      isMousePan = false;
+    } else if (activePointers.size >= 2) {
+      syncTwoFingerMetrics();
+    }
+  }
+
+  host.addEventListener("pointerup", onPointerRelease);
+  host.addEventListener("pointercancel", onPointerRelease);
+
+  host.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    markUserInteraction();
+    setCameraViewSelectionUI(null);
+    targetZoom = zoomFactor = Math.max(0.45, Math.min(4.5, zoomFactor - e.deltaY * 0.0012));
+    updateCameraSize();
+  }, { passive: false });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT") return;
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key >= "1" && e.key <= "9") {
+      const idx = Number(e.key) - 1;
+      if (cameraViews[idx]) {
+        markUserInteraction();
+        applyCameraView(idx, false);
+        return;
+      }
+    }
+    const k = e.key.toLowerCase();
+    if (k === "e") { markUserInteraction(); toggleExplode(); }
+    else if (k === "s") {
+      markUserInteraction();
+      if (features.slow) cycleSlowMode();
+      else if (stepDefs.length > 0) applyStep(state.stepIndex + 1);
+    }
+    else if (k === "c") { markUserInteraction(); toggleCutaway(); }
+    else if (k === "i") { markUserInteraction(); toggleShader(); }
+    else if (k === "h") toggleHud();
+    else if (k === "r") { markUserInteraction(); resetIsoView(); }
+    else if (e.key === "ArrowRight") { markUserInteraction(); thetaTarget = null; state.theta -= 0.12; }
+    else if (e.key === "ArrowLeft") { markUserInteraction(); thetaTarget = null; state.theta += 0.12; }
+  });
+
+  window.addEventListener("resize", updateCameraSize);
+
+  const tempProjVec = new THREE.Vector3();
+  function projectWorldPointToScreen(worldVec) {
+    tempProjVec.copy(worldVec).project(camera);
+    const w = host.clientWidth || 760;
+    const h = host.clientHeight || 475;
+    return {
+      x: (tempProjVec.x * 0.5 + 0.5) * w,
+      y: (-tempProjVec.y * 0.5 + 0.5) * h
+    };
+  }
+
+  function updateEngravedTags() {
+    if (!state.hudVisible) return;
+    for (const [id, tagInfo] of reg.tags) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      tempProjVec.set(...tagInfo.pos).applyMatrix4(worldGroup.matrixWorld);
+      const { x, y } = projectWorldPointToScreen(tempProjVec);
+      el.style.left = `${x.toFixed(1)}px`;
+      el.style.top = `${y.toFixed(1)}px`;
+    }
+  }
+
+  function stepSceneAndRender(effectiveRpm, dt = 0) {
+    worldGroup.position.set(panX, panY, 0);
+    worldGroup.rotation.order = "XYZ";
+    worldGroup.rotation.x = rotX;
+    worldGroup.rotation.y = rotY;
+    worldGroup.updateMatrixWorld(true);
+
+    reg.applyExplode(explodeSpring.at, state.cutaway);
+
+    if (sectionSpec) {
+      const sVal = sectionSpring.at;
+      state.section = sVal;
+      const isOpen = !sectionSpec.alwaysActive && sVal >= sectionSpec.max - 0.001;
+      if (isOpen) {
+        kit.setSectionPlane(null);
+      } else {
+        const axis = sectionSpec.axis || "z";
+        const sign = sectionSpec.invert ? 1 : -1;
+        localSectionNormal.set(
+          axis === "x" ? sign : 0,
+          axis === "y" ? sign : 0,
+          axis === "z" ? sign : 0
+        );
+        localSectionPlane.set(localSectionNormal, -sign * sVal);
+        worldSectionPlane.copy(localSectionPlane).applyMatrix4(worldGroup.matrixWorld);
+        kit.setSectionPlane(worldSectionPlane);
+      }
+    }
+
+    for (const t of triggerDefs) {
+      const age = simClock - triggerTimes[t.id];
+      triggerAges[t.id] = age;
+      const val = burst(age, t.rise !== undefined ? t.rise : 0.08, t.fall !== undefined ? t.fall : 0.75);
+      triggerValues[t.id] = val;
+      const btn = triggerButtons.get(t.id);
+      if (btn) btn.classList.toggle("armed", val > 0.04);
+    }
+
+    const smoothedParams = {};
+    for (const c of controlDefs) {
+      smoothedParams[c.id] = paramSprings[c.id].at;
+    }
+    if (smoothedParams.timeline !== undefined) {
+      state.timeline = smoothedParams.timeline;
+    }
+
+    const kinematicState = {
+      theta: state.theta,
+      explode: explodeSpring.at,
+      rpm: rpmSpring.at,
+      effectiveRpm,
+      shaderEnv: shaderEnvSpring.at,
+      cutaway: state.cutaway,
+      section: sectionSpec ? sectionSpring.at : null,
+      simClock,
+      dt,
+      simulationMode,
+      timeline: state.timeline,
+      stepIndex: state.stepIndex,
+      triggers: { ...triggerValues },
+      triggerAges: { ...triggerAges },
+      params: smoothedParams,
+      rawParams: state.params,
+      ...smoothedParams
+    };
+
+    if (updateKinematics) {
+      updateKinematics(reg, kinematicState);
+    }
+
+    worldGroup.updateMatrixWorld(true);
+
+    if (reg.screens && reg.screens.size > 0) {
+      for (const [, scr] of reg.screens) {
+        if (scr.ctx && scr.canvas && typeof scr.draw === "function") {
+          scr.draw(scr.ctx, scr.canvas, kinematicState, kit.currentTheme);
+          if (scr.texture) scr.texture.needsUpdate = true;
+        }
+      }
+    }
+
+    if (state.hudVisible && formatReadout) {
+      const hudData = formatReadout(kinematicState);
+      if (hudData.readout && readoutEl) readoutEl.textContent = hudData.readout;
+      if (hudData.phase && phaseCornerEl) phaseCornerEl.textContent = hudData.phase;
+      updateEngravedTags();
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  applyTheme(kit.THEMES[0]);
+  reg.applyExplode(0, state.cutaway);
+  updateCameraSize();
+
+  let lastTime = performance.now();
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min((now - lastTime) * 0.001, 0.05);
+    lastTime = now;
+
+    if (!state.debugPaused) {
+      simClock += dt;
+
+      let tourExplodeTarget = null;
+      let tourCutawayTarget = null;
+      let tourShaderTarget = null;
+      const idleThresholdMs = hasUserInteracted ? 3600 : 1600;
+      if (typeof tourFn === "function" && (now - lastInteractionMs) > idleThresholdMs && activePointers.size === 0) {
+        tourClock += dt;
+        const patch = tourFn(tourClock, {
+          theta: state.theta,
+          explode: explodeSpring.at,
+          cutaway: state.cutaway,
+          section: sectionSpec ? sectionSpring.at : null,
+          params: { ...state.params },
+          simulationMode
+        });
+        if (patch && typeof patch === "object") {
+          if (typeof patch.explode === "boolean") tourExplodeTarget = patch.explode ? 1.0 : 0.0;
+          else if (typeof patch.explode === "number") tourExplodeTarget = patch.explode;
+          if (typeof patch.cutaway === "boolean") tourCutawayTarget = patch.cutaway;
+          if (typeof patch.shader === "boolean") tourShaderTarget = patch.shader ? 1.0 : 0.0;
+          if (typeof patch.rpm === "number") setParam("rpm", patch.rpm, false);
+          if (typeof patch.theta === "number") {
+            thetaTarget = null;
+            state.theta = patch.theta;
+          }
+          if (typeof patch.section === "number" && sectionSpec) setSection(patch.section, false);
+          if (patch.params && typeof patch.params === "object") {
+            for (const [pk, pv] of Object.entries(patch.params)) {
+              setParam(pk, pv, false);
+            }
+          }
+          if (typeof patch.cameraView === "string" && patch.cameraView !== activeCameraViewId) {
+            applyCameraView(patch.cameraView, false);
+          }
+          if (typeof patch.trigger === "string") {
+            fireTrigger(patch.trigger, { fromTour: true });
+          }
+        }
+      }
+
+      if (tourCutawayTarget !== null && tourCutawayTarget !== state.cutaway) {
+        state.cutaway = tourCutawayTarget;
+        if (cutawayBtn) cutawayBtn.classList.toggle("active", state.cutaway);
+      }
+
+      rotX += (targetRotX - rotX) * 0.2;
+      rotY += (targetRotY - rotY) * 0.2;
+      panX += (targetPanX - panX) * 0.22;
+      panY += (targetPanY - panY) * 0.22;
+      if (Math.abs(targetZoom - zoomFactor) > 0.0004) {
+        zoomFactor += (targetZoom - zoomFactor) * 0.22;
+        updateCameraSize();
+      }
+
+      const wantExplode = tourExplodeTarget !== null ? tourExplodeTarget : (features.explode && state.exploded ? 1.0 : 0.0);
+      stepSpring(explodeSpring, wantExplode, dt, 150, 19);
+      if (!paramSprings.rpm) {
+        stepSpring(rpmSpring, state.rpm, dt, 110, 16);
+      }
+      for (const c of controlDefs) {
+        stepSpring(paramSprings[c.id], state.params[c.id], dt, 120, 17);
+      }
+      if (paramSprings.rpm) {
+        state.rpm = state.params.rpm;
+      }
+      if (sectionSpec) {
+        stepSpring(sectionSpring, targetSection, dt, 140, 18);
+      }
+      const wantShader = tourShaderTarget !== null ? tourShaderTarget : (features.shader && state.shaderEnabled ? 1.0 : 0.0);
+      stepSpring(shaderEnvSpring, wantShader, dt, 140, 18);
+
+      const speedMult = state.slowModes[state.slowIndex];
+      const effectiveRpm = rpmSpring.at * speedMult;
+      const isUserCranking =
+        activePointers.size === 1 &&
+        !activeInteractable &&
+        (state.crankMode || (features.crank && speedMult === 0));
+
+      if (thetaTarget !== null) {
+        state.theta += (thetaTarget - state.theta) * Math.min(1, dt * 8.5);
+        if (Math.abs(thetaTarget - state.theta) < 0.001) {
+          state.theta = thetaTarget;
+          thetaTarget = null;
+        }
+      } else if (simulationMode === "timeline" && paramSprings.timeline) {
+        state.theta = paramSprings.timeline.at * Math.PI * 2;
+      } else if (isContinuous && !isUserCranking) {
+        const omegaShaft = (effectiveRpm * Math.PI * 2) / 60;
+        state.theta -= omegaShaft * dt * 0.12;
+      } else if (!isContinuous && features.rpm && effectiveRpm > 0 && !isUserCranking) {
+        const omegaShaft = (effectiveRpm * Math.PI * 2) / 60;
+        state.theta -= omegaShaft * dt * 0.12;
+      }
+      stepSceneAndRender(effectiveRpm, dt);
+    } else {
+      stepSceneAndRender(0, 0);
+    }
+  }
+
+  requestAnimationFrame(animate);
+
+  /* ==========================================================================
+   * VISUAL HARNESS HOOK (window.__ANATOMY_DEBUG__)
+   * ========================================================================== */
+  window.__ANATOMY_DEBUG__ = {
+    setCamera(
+      elevDeg,
+      azimDeg,
+      zoom = spec.initialZoom || 1.0,
+      panXY = [0, spec.initialPanY !== undefined ? spec.initialPanY : 0.16]
+    ) {
+      state.debugPaused = true;
+      rotX = targetRotX = (elevDeg * Math.PI) / 180;
+      rotY = targetRotY = (azimDeg * Math.PI) / 180;
+      targetZoom = zoomFactor = zoom;
+      panX = targetPanX = panXY[0];
+      panY = targetPanY = panXY[1];
+      setCameraViewSelectionUI(null);
+      updateCameraSize();
+      stepSceneAndRender(0);
+      return { elevDeg, azimDeg, zoom, panXY };
+    },
+
+    setOrthoView(viewName) {
+      const defZoom = spec.initialZoom || 1.0;
+      const defPanY = spec.initialPanY !== undefined ? spec.initialPanY : 0.16;
+      const views = {
+        front: [0, 0, defZoom, [0, defPanY * 0.5]],
+        right: [0, -90, defZoom, [0, defPanY * 0.5]],
+        left:  [0, 90, defZoom, [0, defPanY * 0.5]],
+        top:   [90, 0, defZoom * 0.96, [0, 0]],
+        iso:   [
+          spec.isoElevDeg !== undefined ? spec.isoElevDeg : 30,
+          spec.isoAzimDeg !== undefined ? spec.isoAzimDeg : -36,
+          defZoom,
+          [0, defPanY]
+        ]
+      };
+      const v = views[viewName] || views.iso;
+      return this.setCamera(v[0], v[1], v[2], v[3]);
+    },
+
+    setCameraView(viewIdOrIndex) {
+      state.debugPaused = true;
+      const view = applyCameraView(viewIdOrIndex, true);
+      if (!view) {
+        throw new Error(`Unknown camera view "${viewIdOrIndex}"`);
+      }
+      stepSceneAndRender(0);
+      return view;
+    },
+
+    setSection(val) {
+      if (!sectionSpec) return null;
+      state.debugPaused = true;
+      setSection(val, true);
+      stepSceneAndRender(0);
+      return state.section;
+    },
+
+    fireTrigger(id) {
+      const ok = fireTrigger(id);
+      if (state.debugPaused) {
+        stepSceneAndRender(0);
+      }
+      return { id, ok, value: triggerValues[id] ?? 0 };
+    },
+
+    advanceStep() {
+      const step = applyStep(state.stepIndex + 1);
+      if (step && step.theta !== undefined) {
+        state.theta = step.theta;
+        thetaTarget = null;
+      }
+      if (state.debugPaused) stepSceneAndRender(0);
+      return { stepIndex: state.stepIndex, step };
+    },
+
+    isolate(filter) {
+      state.debugPaused = true;
+      reg.isolate(filter, state.cutaway, explodeSpring.at);
+      stepSceneAndRender(0);
+      return filter;
+    },
+
+    setPose(opts = {}) {
+      state.debugPaused = opts.paused !== undefined ? opts.paused : true;
+      if (opts.theta !== undefined) {
+        thetaTarget = null;
+        state.theta = opts.theta;
+      }
+      if (opts.explode !== undefined) {
+        state.exploded = features.explode && opts.explode > 0.5;
+        explodeSpring.at = features.explode ? opts.explode : 0;
+        explodeSpring.rate = 0;
+        if (explodeBtn) explodeBtn.classList.toggle("active", state.exploded);
+      }
+      if (opts.cutaway !== undefined) {
+        state.cutaway = features.cutaway ? Boolean(opts.cutaway) : Boolean(spec.initialCutaway);
+        if (cutawayBtn) cutawayBtn.classList.toggle("active", state.cutaway);
+      }
+      if (opts.shader !== undefined) {
+        state.shaderEnabled = features.shader ? Boolean(opts.shader) : false;
+        shaderEnvSpring.at = state.shaderEnabled ? 1.0 : 0.0;
+        shaderEnvSpring.rate = 0;
+        if (shaderBtn) shaderBtn.classList.toggle("active", state.shaderEnabled);
+      }
+      if (opts.rpm !== undefined) {
+        state.rpm = opts.rpm;
+        if (paramSprings.rpm) {
+          setParam("rpm", opts.rpm, true);
+        } else {
+          rpmSpring.at = opts.rpm;
+          rpmSpring.rate = 0;
+        }
+      }
+      if (opts.section !== undefined && sectionSpec) {
+        setSection(opts.section, true);
+      }
+      if (opts.cameraView !== undefined) {
+        applyCameraView(opts.cameraView, true);
+      }
+      if (opts.trigger) {
+        fireTrigger(opts.trigger);
+      }
+      if (opts.params && typeof opts.params === "object") {
+        for (const [pk, pv] of Object.entries(opts.params)) {
+          setParam(pk, pv, true);
+        }
+      }
+      for (const c of controlDefs) {
+        if (opts[c.id] !== undefined) {
+          setParam(c.id, opts[c.id], true);
+        }
+      }
+      if (opts.hud !== undefined) {
+        setHudVisible(Boolean(opts.hud));
+      }
+      if (opts.theme) {
+        applyTheme(opts.theme);
+      }
+      reg.applyExplode(explodeSpring.at, state.cutaway);
+      stepSceneAndRender(state.rpm);
+      return {
+        theta: state.theta,
+        explode: explodeSpring.at,
+        cutaway: state.cutaway,
+        shader: state.shaderEnabled,
+        section: state.section,
+        hud: state.hudVisible,
+        theme: kit.currentTheme.id,
+        params: { ...state.params }
+      };
+    },
+
+    focusJoint(anchorId, zoom = 2.8, elevDeg = 30, azimDeg = -36) {
+      const jointObj = reg.joints.get(anchorId);
+      if (!jointObj) {
+        throw new Error(`Unknown joint anchor "${anchorId}". Available: ${Array.from(reg.joints.keys()).join(", ")}`);
+      }
+      state.debugPaused = true;
+      rotX = targetRotX = (elevDeg * Math.PI) / 180;
+      rotY = targetRotY = (azimDeg * Math.PI) / 180;
+      panX = targetPanX = 0;
+      panY = targetPanY = 0;
+      targetZoom = zoomFactor = zoom;
+      updateCameraSize();
+      stepSceneAndRender(0);
+
+      const pWorld = jointObj.getWorldPosition(new THREE.Vector3());
+      panX = targetPanX = -pWorld.x;
+      panY = targetPanY = -pWorld.y;
+      stepSceneAndRender(0);
+
+      const finalWorld = jointObj.getWorldPosition(new THREE.Vector3());
+      const screen = projectWorldPointToScreen(finalWorld);
+      return { anchorId, world: [pWorld.x, pWorld.y, pWorld.z], screen };
+    },
+
+    getJoints() {
+      worldGroup.updateMatrixWorld(true);
+      const out = [];
+      for (const [id, obj] of reg.joints) {
+        const w = obj.getWorldPosition(new THREE.Vector3());
+        const s = projectWorldPointToScreen(w);
+        out.push({
+          id,
+          world: [+w.x.toFixed(3), +w.y.toFixed(3), +w.z.toFixed(3)],
+          screen: [+s.x.toFixed(1), +s.y.toFixed(1)]
+        });
+      }
+      return out;
+    },
+
+    getSummary() {
+      return {
+        archetype: spec.archetype || "bench",
+        simulationMode,
+        toneMode: spec.toneMode || "single-lit",
+        parts: reg.parts.size,
+        tubes: reg.tubes.length,
+        joints: Array.from(reg.joints.keys()),
+        screensCount: reg.screens ? reg.screens.size : 0,
+        themes: kit.THEMES.map((t) => t.id),
+        features,
+        section: sectionSpec ? { ...sectionSpec, current: state.section } : null,
+        cameraViews: cameraViews.map((v) => v.id),
+        triggers: triggerDefs.map((t) => t.id),
+        stepsCount: stepDefs.length,
+        controls: controlDefs.map((c) => c.id),
+        interactables: reg.interactables.map((i) => i.id),
+        drivePoses: spec.drivePoses || null
+      };
+    }
+  };
+}
+
+
+/* --- figure/model.mjs --- */
+const SPEC = {
+  archetype: "free-space",
+  simulationMode: "sandbox",
+  toneMode: "multi-channel",
+
+  // Optical bench bedplate dimensions
+  BASE_W: 6.2,
+  BASE_D: 4.0,
+  BASE_H: 0.24,
+  BASE_Y: -1.88,
+  topSurfaceY: -1.88 + 0.24 + 0.025, // -1.615
+
+  railBridgeHeight: 0.23,
+  railTopY: -1.88 + 0.24 + 0.025 + 0.23, // -1.385
+  railRodY: -1.88 + 0.24 + 0.025 + 0.16, // -1.455
+  railRodOffsetZ: 0.36,
+
+  opticalAxisY: -0.14,
+  opticalAxisZ: -0.12,
+  focalMinMm: 24,
+  focalMaxMm: 70,
+  irisX: 0.66,
+  g4X: 0.94,
+  sensorPlaneX: 1.66,
+
+  // Feature flags: multi-group sliding cam tracks on guide rods -> cutaway & section yes, explode no
+  features: {
+    explode: false,
+    cutaway: true,
+    shader: true,
+    crank: false,
+    slow: false,
+    section: true
+  },
+
+  interactionHint: "Drag brass zoom cam barrel, G2 variator, servo rocker, or USM dial",
+
+  controls: [
+    {
+      id: "focal",
+      label: "ZOOM",
+      min: 24,
+      max: 70,
+      step: 1,
+      initial: 35,
+      title: "Focal length in mm (24mm wide-angle to 70mm telephoto)"
+    },
+    {
+      id: "focusDist",
+      label: "FOCUS",
+      min: 0.38,
+      max: 8.0,
+      step: 0.05,
+      initial: 1.5,
+      title: "Subject focus distance in meters (0.38m close focus to 8m / infinity)"
+    },
+    {
+      id: "fstop",
+      label: "F-STOP",
+      min: 2.8,
+      max: 22.0,
+      step: 0.2,
+      initial: 2.8,
+      title: "Constant-aperture diaphragm setting (f/2.8 to f/22)"
+    }
+  ],
+
+  triggers: [
+    {
+      id: "snapWide",
+      label: "SNAP 24mm",
+      rise: 0.08,
+      fall: 0.80,
+      title: "Drive servo zoom to 24mm wide-angle & pulse parfocal ray bundle",
+      onTrigger: ({ setParam }) => setParam("focal", 24)
+    },
+    {
+      id: "snapTele",
+      label: "SNAP 70mm",
+      rise: 0.08,
+      fall: 0.80,
+      title: "Drive servo zoom to 70mm telephoto & pulse parfocal ray bundle",
+      onTrigger: ({ setParam }) => setParam("focal", 70)
+    }
+  ],
+
+  section: {
+    axis: "z",
+    min: -0.82,
+    max: 1.02,
+    initial: 1.02,
+    label: "SECT",
+    title: "Slice zoom cam barrel, guide rods, and 4-group optical carriages along Z"
+  },
+
+  cameraViews: [
+    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 1.02, pan: [0, 0.30] },
+    { id: "cams", label: "CAM TRACKS", elev: 22, azim: -18, zoom: 1.24, pan: [-0.10, 0.26] },
+    { id: "section", label: "OPTICAL", elev: 5, azim: -4, zoom: 1.12, pan: [-0.04, 0.24] },
+    { id: "top", label: "TOP PLAN", elev: 88, azim: 0, zoom: 0.98, pan: [0.10, 0] }
+  ],
+
+  // Canonical framing
+  initialTheta: 0,
+  initialRpm: 0,
+  isoElevDeg: 30,
+  isoAzimDeg: -36,
+  initialZoom: 1.02,
+  initialPanY: 0.30,
+  minVertSpan: 5.7,
+  minHorizSpan: 7.9,
+
+  // 5 Audit poses across zoom, focus, and aperture extremes (no explode pose since explode: false)
+  auditPoses: [
+    {
+      name: "rest (35mm, f/2.8, 1.5m)",
+      theta: 0,
+      explode: 0,
+      params: { focal: 35, focusDist: 1.5, fstop: 2.8 }
+    },
+    {
+      name: "wide 24mm close-focus",
+      theta: 0,
+      explode: 0,
+      params: { focal: 24, focusDist: 0.38, fstop: 2.8 }
+    },
+    {
+      name: "mid 45mm compensator inflection",
+      theta: 0,
+      explode: 0,
+      params: { focal: 45, focusDist: 1.5, fstop: 5.6 }
+    },
+    {
+      name: "tele 70mm stopped-down",
+      theta: 0,
+      explode: 0,
+      params: { focal: 70, focusDist: 8.0, fstop: 22.0 }
+    },
+    {
+      name: "wide 24mm stopped-down f/16",
+      theta: 0,
+      explode: 0,
+      params: { focal: 24, focusDist: 8.0, fstop: 16.0 }
+    }
+  ],
+
+  // 8-state interactive drive sheet poses
+  drivePoses: [
+    {
+      label: "1. 24mm WIDE · f/2.8 (84° FOV)",
+      pose: { cutaway: true, shader: true, hud: true, theme: "light", params: { focal: 24, focusDist: 1.5, fstop: 2.8 } }
+    },
+    {
+      label: "2. 45mm MID · PEAK",
+      pose: { cutaway: true, shader: true, hud: true, theme: "light", params: { focal: 45, focusDist: 1.5, fstop: 2.8 } }
+    },
+    {
+      label: "3. 70mm TELE · f/2.8 (34° FOV)",
+      pose: { cutaway: true, shader: true, hud: true, theme: "light", params: { focal: 70, focusDist: 1.5, fstop: 2.8 } }
+    },
+    {
+      label: "4. CLOSE FOCUS 0.38m · G1 EXT",
+      pose: { cutaway: true, shader: true, hud: true, theme: "light", params: { focal: 35, focusDist: 0.38, fstop: 4.0 } }
+    },
+    {
+      label: "5. STOPPED DOWN · f/22 IRIS",
+      pose: { cutaway: true, shader: true, hud: true, theme: "light", params: { focal: 50, focusDist: 2.0, fstop: 22.0 } }
+    },
+    {
+      label: "6. CUTAWAY OFF · FULL BARREL",
+      pose: { cutaway: false, shader: true, hud: true, theme: "light", params: { focal: 35, focusDist: 1.5, fstop: 2.8 } }
+    },
+    {
+      label: "7. DARK THEME · Z-SECTION SLICE",
+      pose: { cutaway: true, shader: true, section: -0.06, hud: true, theme: "dark", params: { focal: 55, focusDist: 1.2, fstop: 2.8 } }
+    },
+    {
+      label: "8. BLUEPRINT THEME",
+      pose: { cutaway: true, shader: true, section: 1.02, hud: true, theme: "blueprint", params: { focal: 28, focusDist: 1.5, fstop: 5.6 } }
+    }
+  ]
+};
+const ANCHORS = {
+  baseTop: [0, SPEC.topSurfaceY, 0],
+  railBridgeFront: [-1.52, SPEC.railTopY, SPEC.opticalAxisZ],
+  railBridgeRear: [1.74, SPEC.railTopY, SPEC.opticalAxisZ],
+  cradleFrontMount: [-0.94, SPEC.railTopY, SPEC.opticalAxisZ],
+  cradleRearMount: [1.06, SPEC.railTopY, SPEC.opticalAxisZ],
+  sensorTowerMount: [1.74, SPEC.railTopY, SPEC.opticalAxisZ],
+  zoomRockerMount: [-1.52, SPEC.topSurfaceY + 0.08, 0.68],
+  usmCtrlMount: [0.48, SPEC.topSurfaceY + 0.08, 0.72],
+  camScreenMount: [2.26, SPEC.topSurfaceY + 0.08, 0.84],
+  plaqueCenter: [-0.58, SPEC.topSurfaceY + 0.08, 0.72]
+};
+
+/**
+ * Evaluates pure 4-group parfocal zoom cam laws (G1 Collector, G2 Variator,
+ * G3 Compensator, G4 Relay + Iris) and optical field metrics.
+ */
+function getZoomState(params = {}, triggers = {}) {
+  const focal = Math.max(SPEC.focalMinMm, Math.min(SPEC.focalMaxMm, params.focal ?? 35));
+  const focusDist = Math.max(0.38, Math.min(8.0, params.focusDist ?? 1.5));
+  const fstop = Math.max(2.8, Math.min(22.0, params.fstop ?? 2.8));
+
+  const zoomNorm = (focal - SPEC.focalMinMm) / (SPEC.focalMaxMm - SPEC.focalMinMm);
+  const focusNorm = 1 - (focusDist - 0.38) / (8.0 - 0.38);
+
+  // Group 1 (Front Collector / Focus Group): advances toward -X for close focus
+  const xG1 = -1.26 - 0.16 * focusNorm;
+
+  // Group 2 (Variator, negative optical power): monotonic cam curve toward +X as focal increases
+  const xG2 = -0.72 + 0.60 * (0.85 * zoomNorm + 0.15 * zoomNorm * zoomNorm);
+
+  // Group 3 (Compensator, positive optical power): U-shaped reciprocating locus keeping BFL = const
+  const xG3 = 0.34 - 0.22 * Math.sin(Math.PI * zoomNorm) + 0.08 * zoomNorm;
+
+  // Group 4 (Rear Master Relay): stationary
+  const xG4 = SPEC.g4X;
+
+  // Cam barrel angular rotation (rad)
+  const camRotRad = zoomNorm * 1.18;
+  const focusRingRad = focusNorm * 1.65;
+
+  // Constant-aperture f/2.8 pupil radius (scales gently with entrance pupil magnification, bounded by physical iris)
+  const fNorm = Math.log(fstop / 2.8) / Math.log(22.0 / 2.8);
+  const pupilOpenR = 0.33;
+  const pupilClosedR = 0.068;
+  const rPupil = pupilOpenR * Math.pow(pupilClosedR / pupilOpenR, Math.max(0, Math.min(1, fNorm)));
+  const pupilNorm = (rPupil - pupilClosedR) / (pupilOpenR - pupilClosedR);
+  const bladeSwingRad = (1 - pupilNorm) * 0.68;
+
+  // Full-frame 43.27mm diagonal field of view
+  const fovDiagDeg = (2 * Math.atan(21.63 / focal) * 180) / Math.PI;
+  const magRatio = focal / SPEC.focalMinMm;
+
+  const pulseEnv = Math.max(triggers.snapWide ?? 0, triggers.snapTele ?? 0);
+
+  let regime = "MID ZOOM · PARFOCAL TRACKING";
+  if (pulseEnv > 0.2) regime = "SERVO ZOOM · CAM SLEWING";
+  else if (focal <= 27) regime = "24mm WIDE · 84° FIELD";
+  else if (focal >= 65) regime = "70mm TELE · 34° FIELD";
+  else if (focal >= 38 && focal <= 52) regime = "COMPENSATOR · ΔBFL 0";
+
+  return {
+    focal,
+    focusDist,
+    fstop,
+    zoomNorm,
+    focusNorm,
+    xG1,
+    xG2,
+    xG3,
+    xG4,
+    camRotRad,
+    focusRingRad,
+    rPupil,
+    pupilNorm,
+    bladeSwingRad,
+    fovDiagDeg,
+    magRatio,
+    pulseEnv,
+    bflErrorMm: 0.0,
+    regime
+  };
+}
+function formatReadout({ params, triggers }) {
+  const st = getZoomState(params, triggers);
+  const distStr = st.focusDist >= 7.8 ? "∞" : `${st.focusDist.toFixed(2)}m`;
+  return {
+    readout: `${Math.round(st.focal)}mm f/${st.fstop.toFixed(1)} · FOV ${st.fovDiagDeg.toFixed(1)}° · d ${distStr} · G2/G3 Δ ${(st.xG3 - st.xG2).toFixed(2)} · ΔBFL 0.00mm`,
+    phase: st.regime
+  };
+}
+
+
+/* --- figure/base.mjs --- */
+function buildBase(reg, kit) {
+  const baseGroup = reg.group("base.group", { stage: "base" });
+
+  const {
+    topSurfaceY,
+    railBridgeHeight,
+    railRodY,
+    railRodOffsetZ,
+    opticalAxisZ
+  } = SPEC;
+
+  const DECK_H = 0.08;
+  const DECK_Y = topSurfaceY + DECK_H;
+
+  // 1. Soft ground shadow halo + ultra-light datum grid (no heavy bedplate or corner feet)
+  const haloMesh = makeHaloMesh(5.6, 2.8, 0.38, [0.22, topSurfaceY - 0.015, 0.10], kit);
+  reg.detail("base.halo", haloMesh, { parent: baseGroup, stage: "base" });
+
+  const datumGrid = makeDatumGrid(5.4, 2.6, 18, 10, topSurfaceY - 0.005, kit, "faint");
+  datumGrid.position.set(0.22, 0, 0.10);
+  reg.detail("base.datumGrid", datumGrid, { parent: baseGroup, stage: "base" });
+
+  // Register mounting anchors on rail bridges and machined outriggers
+  reg.anchor("base.top", ...ANCHORS.baseTop, baseGroup);
+  reg.anchor("rail.bridge.front", ...ANCHORS.railBridgeFront, baseGroup);
+  reg.anchor("rail.bridge.rear", ...ANCHORS.railBridgeRear, baseGroup);
+  reg.anchor("cradle.front.mount", ...ANCHORS.cradleFrontMount, baseGroup);
+  reg.anchor("cradle.rear.mount", ...ANCHORS.cradleRearMount, baseGroup);
+  reg.anchor("sensor.tower.mount", ...ANCHORS.sensorTowerMount, baseGroup);
+  reg.anchor("zoomRocker.mount", ...ANCHORS.zoomRockerMount, baseGroup);
+  reg.anchor("usmCtrl.mount", ...ANCHORS.usmCtrlMount, baseGroup);
+  reg.anchor("camScreen.mount", ...ANCHORS.camScreenMount, baseGroup);
+
+  // 2. Front & Rear Optical Bench Rail Bridges (directly grounded on datum plane)
+  const bridgeGeo = new THREE.BoxGeometry(0.32, railBridgeHeight, 0.98);
+  const bridgePositions = [
+    { name: "base.railBridge.front", x: ANCHORS.railBridgeFront[0] },
+    { name: "base.railBridge.rear", x: ANCHORS.railBridgeRear[0] }
+  ];
+
+  bridgePositions.forEach((b) => {
+    reg.part(b.name, bridgeGeo, {
+      parent: baseGroup,
+      pos: [b.x, topSurfaceY + railBridgeHeight * 0.5, opticalAxisZ],
+      ramp: "mid",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "ground"
+    });
+    reg.detail(
+      `${b.name}.screwR`,
+      makeScrewDetail(b.x, topSurfaceY + railBridgeHeight + 0.002, opticalAxisZ - 0.36, 0.036, "y", kit),
+      { parent: baseGroup }
+    );
+    reg.detail(
+      `${b.name}.screwF`,
+      makeScrewDetail(b.x, topSurfaceY + railBridgeHeight + 0.002, opticalAxisZ + 0.36, 0.036, "y", kit),
+      { parent: baseGroup }
+    );
+  });
+
+  // 3. Twin 15mm Precision Optical Matte-Steel Support Rods spanning bridges
+  const rodLen = (ANCHORS.railBridgeRear[0] - ANCHORS.railBridgeFront[0]) + 0.44;
+  const rodCenterX = (ANCHORS.railBridgeRear[0] + ANCHORS.railBridgeFront[0]) * 0.5;
+  const rodGeo = buildCylinderGeometry(0.052, 0.052, rodLen, { segments: 20, axis: "x" });
+
+  [
+    { id: "R", z: opticalAxisZ - railRodOffsetZ },
+    { id: "F", z: opticalAxisZ + railRodOffsetZ }
+  ].forEach((rod) => {
+    reg.part(`base.railRod.${rod.id}`, rodGeo, {
+      parent: baseGroup,
+      pos: [rodCenterX, railRodY, rod.z],
+      ramp: "hi",
+      outline: "mid",
+      crease: "faint",
+      mountOn: "base.railBridge.front",
+      allowOverlap: ["base.railBridge.rear"]
+    });
+  });
+
+  // 4. Compact Machined Outriggers for Servo Rocker, Spec Plaque, USM Dial & Monitor
+  reg.part("base.outrigger.rocker", new THREE.BoxGeometry(0.46, DECK_H, 0.66), {
+    parent: baseGroup,
+    pos: [ANCHORS.zoomRockerMount[0], topSurfaceY + DECK_H * 0.5, 0.63],
+    ramp: "mid",
+    outline: "lo",
+    crease: "lo",
+    mountOn: "base.railBridge.front"
+  });
+
+  const clampGeo = new THREE.BoxGeometry(0.24, 0.16, 0.18);
+  const frontRodZ = opticalAxisZ + railRodOffsetZ;
+
+  reg.part("base.clamp.plaque", clampGeo, {
+    parent: baseGroup,
+    pos: [ANCHORS.plaqueCenter[0], topSurfaceY + 0.12, frontRodZ],
+    ramp: "mid",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "base.railRod.F"
+  });
+
+  reg.part("base.outrigger.plaque", new THREE.BoxGeometry(1.18, DECK_H, 0.72), {
+    parent: baseGroup,
+    pos: [ANCHORS.plaqueCenter[0], topSurfaceY + DECK_H * 0.5, 0.56],
+    ramp: "mid",
+    outline: "lo",
+    crease: "lo",
+    mountOn: "base.clamp.plaque",
+    allowOverlap: ["base.railRod.F"]
+  });
+
+  reg.part("base.clamp.usm", clampGeo, {
+    parent: baseGroup,
+    pos: [ANCHORS.usmCtrlMount[0], topSurfaceY + 0.12, frontRodZ],
+    ramp: "mid",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "base.railRod.F"
+  });
+
+  reg.part("base.outrigger.usm", new THREE.BoxGeometry(0.72, DECK_H, 0.86), {
+    parent: baseGroup,
+    pos: [ANCHORS.usmCtrlMount[0], topSurfaceY + DECK_H * 0.5, 0.62],
+    ramp: "mid",
+    outline: "lo",
+    crease: "lo",
+    mountOn: "base.clamp.usm",
+    allowOverlap: ["base.railRod.F"]
+  });
+
+  reg.part("base.outrigger.screen", new THREE.BoxGeometry(0.92, DECK_H, 0.62), {
+    parent: baseGroup,
+    pos: [2.02, topSurfaceY + DECK_H * 0.5, 0.61],
+    ramp: "mid",
+    outline: "lo",
+    crease: "lo",
+    mountOn: "base.railBridge.rear"
+  });
+
+  // 5. Compact Brass Spec Plaque
+  const [pqX, , pqZ] = ANCHORS.plaqueCenter;
+  const plaqueGeo = buildSlabGeometry(1.06, 0.36, 0.04, {
+    radius: 0.05,
+    bevel: true,
+    bevelSize: 0.008,
+    bevelThickness: 0.008,
+    bevelSegments: 1
+  });
+  reg.part("base.plaque", plaqueGeo, {
+    parent: baseGroup,
+    pos: [pqX, DECK_Y + 0.04, pqZ],
+    ramp: "brass",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.outrigger.plaque"
+  });
+
+  [
+    [-0.44, -0.11],
+    [ 0.44, -0.11],
+    [-0.44,  0.11],
+    [ 0.44,  0.11]
+  ].forEach(([dx, dz], idx) => {
+    reg.detail(
+      `base.plaque.screw.${idx}`,
+      makeScrewDetail(pqX + dx, DECK_Y + 0.042, pqZ + dz, 0.024, "y", kit),
+      { parent: baseGroup }
+    );
+  });
+
+  reg.tag("tag-plate", "24–70mm f/2.8 · CAM", pqX, DECK_Y + 0.06, pqZ + 0.02);
+}
+
+
+/* --- figure/structure.mjs --- */
+
+
+
+/**
+ * Builds a watertight, outward-wound revolved solid sector (or full 360° annulus)
+ * revolved around the +X optical axis from profile rings [{ x, rInner, rOuter }...].
+ */
+function buildAxialSectorGeometry(rings, phiStart, phiLength, segsPhi = 36) {
+  const isFull = phiLength >= Math.PI * 2 - 1e-4;
+  const actualPhiLen = isFull ? Math.PI * 2 : phiLength;
+  const nx = rings.length;
+
+  const positions = [];
+  const indices = [];
+
+  function addGridFace(getPt, nu, nv, flipWinding) {
+    const base = positions.length / 3;
+    for (let u = 0; u < nu; u++) {
+      for (let v = 0; v < nv; v++) {
+        const p = getPt(u, v);
+        positions.push(p[0], p[1], p[2]);
+      }
+    }
+    for (let u = 0; u < nu - 1; u++) {
+      for (let v = 0; v < nv - 1; v++) {
+        const a = base + u * nv + v;
+        const b = base + (u + 1) * nv + v;
+        const c = base + (u + 1) * nv + (v + 1);
+        const d = base + u * nv + (v + 1);
+        if (!flipWinding) {
+          indices.push(a, c, b, a, d, c);
+        } else {
+          indices.push(a, b, c, a, c, d);
+        }
+      }
+    }
+  }
+
+  const phiAt = (j) => phiStart + (j / segsPhi) * actualPhiLen;
+
+  addGridFace(
+    (i, j) => {
+      const a = phiAt(j);
+      const r = rings[i].rOuter;
+      return [rings[i].x, r * Math.sin(a), r * Math.cos(a)];
+    },
+    nx,
+    segsPhi + 1,
+    true
+  );
+
+  addGridFace(
+    (i, j) => {
+      const a = phiAt(j);
+      const r = rings[i].rInner;
+      return [rings[i].x, r * Math.sin(a), r * Math.cos(a)];
+    },
+    nx,
+    segsPhi + 1,
+    false
+  );
+
+  const rightRing = rings[nx - 1];
+  addGridFace(
+    (k, j) => {
+      const a = phiAt(j);
+      const r = k === 0 ? rightRing.rInner : rightRing.rOuter;
+      return [rightRing.x, r * Math.sin(a), r * Math.cos(a)];
+    },
+    2,
+    segsPhi + 1,
+    false
+  );
+
+  const leftRing = rings[0];
+  addGridFace(
+    (k, j) => {
+      const a = phiAt(j);
+      const r = k === 0 ? leftRing.rInner : leftRing.rOuter;
+      return [leftRing.x, r * Math.sin(a), r * Math.cos(a)];
+    },
+    2,
+    segsPhi + 1,
+    true
+  );
+
+  if (!isFull) {
+    addGridFace(
+      (i, k) => {
+        const r = k === 0 ? rings[i].rInner : rings[i].rOuter;
+        return [rings[i].x, r * Math.sin(phiStart), r * Math.cos(phiStart)];
+      },
+      nx,
+      2,
+      true
+    );
+    const phiEnd = phiStart + actualPhiLen;
+    addGridFace(
+      (i, k) => {
+        const r = k === 0 ? rings[i].rInner : rings[i].rOuter;
+        return [rings[i].x, r * Math.sin(phiEnd), r * Math.cos(phiEnd)];
+      },
+      nx,
+      2,
+      false
+    );
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function buildRailCradleGeometry(cradleR, yBase, halfW, thickness) {
+  const shape = new THREE.Shape();
+  const aLeft = -Math.PI * 0.5 - 0.70;
+  const aRight = -Math.PI * 0.5 + 0.70;
+  const cheekTopY = Math.sin(aRight) * cradleR;
+
+  shape.moveTo(-halfW, yBase);
+  shape.lineTo(halfW, yBase);
+  shape.lineTo(halfW, cheekTopY + 0.04);
+  shape.lineTo(Math.cos(aRight) * cradleR, cheekTopY);
+
+  const arcSegs = 20;
+  for (let i = 1; i <= arcSegs; i++) {
+    const a = aRight + (i / arcSegs) * (aLeft - aRight);
+    shape.lineTo(Math.cos(a) * cradleR, Math.sin(a) * cradleR);
+  }
+  shape.lineTo(-halfW, cheekTopY + 0.04);
+  shape.closePath();
+
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelSegments: 1,
+    steps: 1,
+    bevelSize: 0.012,
+    bevelThickness: 0.012,
+    curveSegments: 16
+  });
+  geo.translate(0, 0, -thickness * 0.5);
+  geo.rotateY(Math.PI / 2);
+  return geo;
+}
+function buildStructure(reg, kit) {
+  const { railRodY, railTopY, opticalAxisY, opticalAxisZ } = SPEC;
+  const structGroup = reg.group("structure.group", { stage: "structure" });
+
+  const zoomAxisGroup = reg.group("zoom.axisGroup", {
+    parent: structGroup,
+    pos: [0, opticalAxisY, opticalAxisZ],
+    stage: "structure"
+  });
+
+  // 1. Twin Rod-Mounted Lens Support Saddles clamping onto 15mm studio rails
+  const yRodClampBase = railRodY - 0.055 - opticalAxisY; // wraps below rod centerline
+  const cradleGeo = buildRailCradleGeometry(0.775, yRodClampBase, 0.56, 0.24);
+  const cradleSpecs = [
+    { id: "cradle.front", x: -0.96 },
+    { id: "cradle.rear", x: 0.94 }
+  ];
+  for (const c of cradleSpecs) {
+    reg.part(c.id, cradleGeo, {
+      parent: zoomAxisGroup,
+      pos: [c.x, 0, 0],
+      ramp: "lo",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "base.railRod.F",
+      allowOverlap: ["base.railRod.R", "barrel.outer.back", "barrel.outer.front", "cam.barrel"]
+    });
+    [-0.46, 0.46].forEach((cz, idx) => {
+      reg.detail(
+        `${c.id}.bolt.${idx}`,
+        makeScrewDetail(c.x, yRodClampBase + 0.28, cz, 0.025, "y", kit),
+        { parent: zoomAxisGroup }
+      );
+    });
+  }
+
+  // 2. Stationary Outer Zoom Chassis Barrel (cutaway window toward +Z/+Y)
+  const phiCutStart = -0.40;
+  const phiCutLen = 2.08;
+  const phiBackStart = phiCutStart + phiCutLen;
+  const phiBackLen = Math.PI * 2 - phiCutLen;
+
+  const outerRings = [
+    { x: -1.54, rInner: 0.72, rOuter: 0.80 },
+    { x: -1.04, rInner: 0.72, rOuter: 0.80 },
+    { x: -1.03, rInner: 0.72, rOuter: 0.76 },
+    { x: 0.54, rInner: 0.72, rOuter: 0.76 },
+    { x: 0.55, rInner: 0.60, rOuter: 0.785 },
+    { x: 1.14, rInner: 0.60, rOuter: 0.785 }
+  ];
+
+  const barrelBackGeo = buildAxialSectorGeometry(outerRings, phiBackStart, phiBackLen, 36);
+  reg.part("barrel.outer.back", barrelBackGeo, {
+    parent: zoomAxisGroup,
+    ramp: "mid",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.018,
+    clippable: true,
+    mountOn: "cradle.front",
+    allowOverlap: [
+      "cradle.rear",
+      "barrel.frontHood",
+      "mount.bayonet",
+      "guide.bulkhead.front",
+      "guide.bulkhead.rear",
+      "guide.rod.top",
+      "guide.rod.bot",
+      "cam.barrel",
+      "zoom.ring.back",
+      "zoom.ring.front",
+      "zoom.g1.cell",
+      "zoom.g2.carriage",
+      "zoom.g3.carriage",
+      "zoom.g4.cell",
+      "zoom.iris.ring"
+    ]
+  });
+
+  const barrelFrontGeo = buildAxialSectorGeometry(outerRings, phiCutStart, phiCutLen, 20);
+  reg.part("barrel.outer.front", barrelFrontGeo, {
+    parent: zoomAxisGroup,
+    ramp: "mid",
+    outline: "mid",
+    crease: "lo",
+    cutawayHide: true,
+    mountOn: "barrel.outer.back",
+    allowOverlap: [
+      "cradle.front",
+      "cradle.rear",
+      "barrel.frontHood",
+      "mount.bayonet",
+      "cam.barrel",
+      "zoom.ring.back",
+      "zoom.g2.carriage",
+      "zoom.g3.carriage",
+      "zoom.g4.cell",
+      "zoom.iris.ring"
+    ]
+  });
+
+  // Front Filter & Hood Flange Ring
+  const hoodRings = [
+    { x: -1.68, rInner: 0.67, rOuter: 0.825 },
+    { x: -1.53, rInner: 0.67, rOuter: 0.825 }
+  ];
+  const hoodGeo = buildAxialSectorGeometry(hoodRings, 0, Math.PI * 2, 40);
+  reg.part("barrel.frontHood", hoodGeo, {
+    parent: zoomAxisGroup,
+    ramp: "lo",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.017,
+    mountOn: "barrel.outer.back",
+    allowOverlap: ["barrel.outer.front"]
+  });
+
+  // Servo zoom port boss on stationary front barrel skirt (clear of rotating zoom ring)
+  const zoomBossGeo = buildCylinderGeometry(0.065, 0.075, 0.12, { segments: 16, axis: "y" });
+  reg.part("barrel.zoomBoss", zoomBossGeo, {
+    parent: zoomAxisGroup,
+    pos: [-1.30, -0.76, 0.24],
+    rot: [0.35, 0, 0],
+    ramp: "brass",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "barrel.outer.back"
+  });
+  reg.anchor("barrel.port.zoom", -1.30, -0.82, 0.26, zoomAxisGroup, { dir: [0, -0.94, 0.34] });
+
+  // 3. Internal Twin Precision Linear Guide Rods for G2 Variator & G3 Compensator
+  const rodAngles = [
+    { id: "top", phi: 1.86 },
+    { id: "bot", phi: -0.66 }
+  ];
+  const bulkheadGeo = buildAxialSectorGeometry(
+    [
+      { x: -0.98, rInner: 0.50, rOuter: 0.72 },
+      { x: -0.90, rInner: 0.50, rOuter: 0.72 }
+    ],
+    phiBackStart,
+    phiBackLen,
+    28
+  );
+  reg.part("guide.bulkhead.front", bulkheadGeo, {
+    parent: zoomAxisGroup,
+    ramp: "lo",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "barrel.outer.back",
+    allowOverlap: ["cam.barrel", "barrel.outer.front", "cradle.front"]
+  });
+
+  const bulkheadRearGeo = buildAxialSectorGeometry(
+    [
+      { x: 0.50, rInner: 0.50, rOuter: 0.72 },
+      { x: 0.58, rInner: 0.50, rOuter: 0.72 }
+    ],
+    phiBackStart,
+    phiBackLen,
+    28
+  );
+  reg.part("guide.bulkhead.rear", bulkheadRearGeo, {
+    parent: zoomAxisGroup,
+    ramp: "lo",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "barrel.outer.back",
+    allowOverlap: ["cam.barrel", "zoom.iris.ring", "barrel.outer.front", "cradle.rear"]
+  });
+
+  const guideRodR = 0.54;
+  const guideLen = 1.50;
+  const guideGeo = buildCylinderGeometry(0.024, 0.024, guideLen, { segments: 14, axis: "x" });
+  for (const ra of rodAngles) {
+    reg.part(`guide.rod.${ra.id}`, guideGeo, {
+      parent: zoomAxisGroup,
+      pos: [-0.20, Math.sin(ra.phi) * guideRodR, Math.cos(ra.phi) * guideRodR],
+      ramp: "hi",
+      outline: "lo",
+      crease: "faint",
+      noCrease: true,
+      mountOn: "guide.bulkhead.front",
+      allowOverlap: [
+        "guide.bulkhead.rear",
+        "barrel.outer.back",
+        "cam.barrel",
+        "zoom.g2.carriage",
+        "zoom.g3.carriage"
+      ]
+    });
+  }
+
+  // 4. Rear Brass Bayonet Flange & Electronic Contacts
+  const bayonetRings = [
+    { x: 1.14, rInner: 0.54, rOuter: 0.79 },
+    { x: 1.28, rInner: 0.54, rOuter: 0.79 }
+  ];
+  const bayonetGeo = buildAxialSectorGeometry(bayonetRings, 0, Math.PI * 2, 40);
+  reg.part("mount.bayonet", bayonetGeo, {
+    parent: zoomAxisGroup,
+    ramp: "brass",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.017,
+    mountOn: "barrel.outer.back",
+    allowOverlap: ["barrel.outer.front", "sensor.throat.back", "sensor.throat.front"]
+  });
+
+  for (let i = 0; i < 6; i++) {
+    const a = -Math.PI * 0.5 - 0.40 + (i / 5) * 0.80;
+    const pinGeo = buildCylinderGeometry(0.016, 0.016, 0.04, { segments: 10, axis: "x" });
+    reg.part(`mount.contactPin.${i}`, pinGeo, {
+      parent: zoomAxisGroup,
+      pos: [1.285, Math.sin(a) * 0.61, Math.cos(a) * 0.61],
+      ramp: "brass",
+      outline: "lo",
+      crease: "faint",
+      detail: true,
+      mountOn: "mount.bayonet"
+    });
+  }
+
+  // 5. Rear Flange Throat & Full-Frame CMOS Sensor Chamber
+  const throatRings = [
+    { x: 1.28, rInner: 0.54, rOuter: 0.69 },
+    { x: 1.65, rInner: 0.54, rOuter: 0.69 }
+  ];
+  const throatBackGeo = buildAxialSectorGeometry(throatRings, phiBackStart, phiBackLen, 36);
+  reg.part("sensor.throat.back", throatBackGeo, {
+    parent: zoomAxisGroup,
+    ramp: "lo",
+    outline: "mid",
+    crease: "lo",
+    clippable: true,
+    mountOn: "mount.bayonet",
+    allowOverlap: ["sensor.housing"]
+  });
+
+  const throatFrontGeo = buildAxialSectorGeometry(throatRings, phiCutStart, phiCutLen, 18);
+  reg.part("sensor.throat.front", throatFrontGeo, {
+    parent: zoomAxisGroup,
+    ramp: "lo",
+    outline: "mid",
+    crease: "lo",
+    cutawayHide: true,
+    mountOn: "sensor.throat.back"
+  });
+
+  // Sensor Pedestal seated on rear rail bridge (flush with sensor.housing front x=1.66)
+  const yBridgeLocal = railTopY - opticalAxisY; // -1.385 - (-0.14) = -1.245
+  const sensorPedH = 0.68; // rises to -0.565 (touches sensor.housing bottom -0.58)
+  const sensorPedGeo = new THREE.BoxGeometry(0.24, sensorPedH, 0.94);
+  reg.part("sensor.pedestal", sensorPedGeo, {
+    parent: zoomAxisGroup,
+    pos: [1.79, yBridgeLocal + sensorPedH * 0.5, 0],
+    ramp: "lo",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.railBridge.rear"
+  });
+
+  const housingGeo = new THREE.BoxGeometry(0.28, 1.18, 1.34);
+  reg.part("sensor.housing", housingGeo, {
+    parent: zoomAxisGroup,
+    pos: [1.79, 0, 0],
+    ramp: "mid",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.018,
+    clippable: true,
+    mountOn: "sensor.pedestal",
+    allowOverlap: ["sensor.throat.back", "sensor.throat.front"]
+  });
+
+  const cmosGeo = new THREE.BoxGeometry(0.026, 0.48, 0.72);
+  reg.part("sensor.cmosDie", cmosGeo, {
+    parent: zoomAxisGroup,
+    pos: [1.64, 0, 0],
+    ramp: "intake",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.014,
+    mountOn: "sensor.housing"
+  });
+
+  const olpfGeo = new THREE.BoxGeometry(0.020, 0.54, 0.78);
+  reg.part("sensor.glassFilter", olpfGeo, {
+    parent: zoomAxisGroup,
+    pos: [1.614, 0, 0],
+    ramp: "glass",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "sensor.cmosDie",
+    allowOverlap: ["sensor.housing"]
+  });
+
+  for (let i = -3; i <= 3; i++) {
+    const finGeo = new THREE.BoxGeometry(0.055, 0.96, 0.045);
+    reg.part(`sensor.heatsink.${i + 3}`, finGeo, {
+      parent: zoomAxisGroup,
+      pos: [1.955, 0, i * 0.16],
+      ramp: "lo",
+      outline: "lo",
+      crease: "faint",
+      detail: true,
+      mountOn: "sensor.housing"
+    });
+  }
+
+  const dataPortGeo = buildCylinderGeometry(0.055, 0.06, 0.08, { segments: 14, axis: "z" });
+  reg.part("sensor.portBoss", dataPortGeo, {
+    parent: zoomAxisGroup,
+    pos: [1.79, -0.36, 0.69],
+    ramp: "copper",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "sensor.housing"
+  });
+  reg.anchor("sensor.port.in", 1.79, -0.36, 0.73, zoomAxisGroup, { dir: [0, 0, 1] });
+}
+
+
+/* --- figure/subject.mjs --- */
+function buildZoomOpticalLensGeometry({
+  xCenter = 0,
+  rOuter = 0.45,
+  tCenter = 0.10,
+  r1 = 1.2,
+  r2 = -1.2,
+  radialSegs = 12,
+  phiSegs = 36
+}) {
+  const sag = (r, R) => {
+    if (!Number.isFinite(R) || Math.abs(R) > 50) return 0;
+    const absR = Math.max(Math.abs(R), rOuter * 1.03);
+    const s = absR - Math.sqrt(Math.max(0, absR * absR - r * r));
+    return Math.sign(R) * s;
+  };
+
+  const x1 = xCenter - tCenter * 0.5;
+  const x2 = xCenter + tCenter * 0.5;
+
+  const frontXs = [];
+  const backXs = [];
+  const radii = [];
+  for (let i = 0; i <= radialSegs; i++) {
+    const r = (i / radialSegs) * rOuter;
+    radii.push(r);
+    const xf = x1 + sag(r, r1);
+    let xb = x2 + sag(r, r2);
+    if (xb - xf < 0.024) xb = xf + 0.024;
+    frontXs.push(xf);
+    backXs.push(xb);
+  }
+
+  const positions = [];
+  const indices = [];
+
+  function addGridFace(getPt, nu, nv, flipWinding) {
+    const base = positions.length / 3;
+    for (let u = 0; u < nu; u++) {
+      for (let v = 0; v < nv; v++) {
+        const p = getPt(u, v);
+        positions.push(p[0], p[1], p[2]);
+      }
+    }
+    for (let u = 0; u < nu - 1; u++) {
+      for (let v = 0; v < nv - 1; v++) {
+        const a = base + u * nv + v;
+        const b = base + (u + 1) * nv + v;
+        const c = base + (u + 1) * nv + (v + 1);
+        const d = base + u * nv + (v + 1);
+        if (!flipWinding) {
+          indices.push(a, c, b, a, d, c);
+        } else {
+          indices.push(a, b, c, a, c, d);
+        }
+      }
+    }
+  }
+
+  const phiAt = (j) => (j / phiSegs) * Math.PI * 2;
+
+  addGridFace(
+    (i, j) => {
+      const a = phiAt(j);
+      const r = radii[i];
+      return [frontXs[i], r * Math.sin(a), r * Math.cos(a)];
+    },
+    radialSegs + 1,
+    phiSegs + 1,
+    true
+  );
+
+  addGridFace(
+    (i, j) => {
+      const a = phiAt(j);
+      const r = radii[i];
+      return [backXs[i], r * Math.sin(a), r * Math.cos(a)];
+    },
+    radialSegs + 1,
+    phiSegs + 1,
+    false
+  );
+
+  const xRimFront = frontXs[radialSegs];
+  const xRimBack = backXs[radialSegs];
+  addGridFace(
+    (u, j) => {
+      const a = phiAt(j);
+      const x = u === 0 ? xRimFront : xRimBack;
+      return [x, rOuter * Math.sin(a), rOuter * Math.cos(a)];
+    },
+    2,
+    phiSegs + 1,
+    true
+  );
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function buildZoomIrisBladeGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.025, -0.025);
+  shape.lineTo(0.25, 0.01);
+  shape.quadraticCurveTo(0.30, 0.13, 0.17, 0.22);
+  shape.quadraticCurveTo(0.03, 0.15, -0.025, -0.025);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.012,
+    bevelEnabled: false,
+    curveSegments: 10
+  });
+  geo.translate(0, 0, -0.006);
+  geo.rotateY(Math.PI / 2);
+  return geo;
+}
+function buildSubject(reg, kit) {
+  const { irisX, g4X } = SPEC;
+  const zoomAxisGroup = reg.groups.get("zoom.axisGroup")?.group || reg.root;
+
+  const subjectRoot = reg.group("subject.group", {
+    parent: zoomAxisGroup,
+    pos: [0, 0, 0],
+    stage: "subject"
+  });
+
+  const phiCutStart = -0.40;
+  const phiCutLen = 2.08;
+  const phiBackStart = phiCutStart + phiCutLen;
+  const phiBackLen = Math.PI * 2 - phiCutLen;
+
+  // ---------------------------------------------------------------------------
+  // 1. Rotating Slotted Brass Zoom Cam Barrel & Outer Knurled Zoom Ring
+  // ---------------------------------------------------------------------------
+  const camBarrelGroup = reg.group("cam.barrelGroup", {
+    parent: subjectRoot,
+    pos: [0, 0, 0],
+    stage: "subject"
+  });
+
+  const zoomRingGeoBack = buildAxialSectorGeometry(
+    [
+      { x: -0.92, rInner: 0.764, rOuter: 0.835 },
+      { x: 0.36, rInner: 0.764, rOuter: 0.835 }
+    ],
+    phiBackStart,
+    phiBackLen,
+    36
+  );
+  reg.part("zoom.ring.back", zoomRingGeoBack, {
+    parent: camBarrelGroup,
+    ramp: "hi",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.017,
+    clippable: true,
+    mountOn: "barrel.outer.back",
+    allowOverlap: ["barrel.outer.front", "cam.barrel", "cradle.front"]
+  });
+
+  const zoomRingGeoFront = buildAxialSectorGeometry(
+    [
+      { x: -0.92, rInner: 0.764, rOuter: 0.835 },
+      { x: 0.36, rInner: 0.764, rOuter: 0.835 }
+    ],
+    phiCutStart,
+    phiCutLen,
+    20
+  );
+  reg.part("zoom.ring.front", zoomRingGeoFront, {
+    parent: camBarrelGroup,
+    ramp: "hi",
+    outline: "mid",
+    crease: "lo",
+    cutawayHide: true,
+    mountOn: "zoom.ring.back",
+    allowOverlap: ["barrel.outer.front", "cam.barrel", "cradle.front", "guide.bulkhead.front", "guide.bulkhead.rear"]
+  });
+
+  const knurlPts = [];
+  for (let i = 0; i <= 36; i++) {
+    const a = phiBackStart + (i / 36) * phiBackLen;
+    const r = 0.838;
+    knurlPts.push(
+      new THREE.Vector3(-0.86, Math.sin(a) * r, Math.cos(a) * r),
+      new THREE.Vector3(0.30, Math.sin(a) * r, Math.cos(a) * r)
+    );
+  }
+  reg.detail(
+    "zoom.ring.knurl",
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(knurlPts), kit.lineMaterials.lo),
+    { parent: camBarrelGroup }
+  );
+
+  // Brass slotted cam drum inside outer barrel
+  const camDrumGeo = buildAxialSectorGeometry(
+    [
+      { x: -0.92, rInner: 0.63, rOuter: 0.71 },
+      { x: 0.50, rInner: 0.63, rOuter: 0.71 }
+    ],
+    phiBackStart,
+    phiBackLen,
+    36
+  );
+  reg.part("cam.barrel", camDrumGeo, {
+    parent: camBarrelGroup,
+    ramp: "brass",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.016,
+    clippable: true,
+    mountOn: "barrel.outer.back",
+    allowOverlap: [
+      "guide.bulkhead.front",
+      "guide.bulkhead.rear",
+      "guide.rod.top",
+      "guide.rod.bot",
+      "zoom.ring.back",
+      "zoom.g2.carriage",
+      "zoom.g3.carriage"
+    ]
+  });
+
+  // Engraved helical variator cam track & parabolic compensator cam track along brass drum inner wall
+  const camTrackPts = [];
+  const trackR = 0.626;
+  for (let k = 0; k < 24; k++) {
+    const u0 = k / 24;
+    const u1 = (k + 1) / 24;
+    // Variator track (phi spans 2.4 -> 3.55 along back wall)
+    const xV0 = -0.72 + 0.60 * (0.85 * u0 + 0.15 * u0 * u0);
+    const xV1 = -0.72 + 0.60 * (0.85 * u1 + 0.15 * u1 * u1);
+    const phiV0 = 2.45 + u0 * 1.18;
+    const phiV1 = 2.45 + u1 * 1.18;
+    camTrackPts.push(
+      new THREE.Vector3(xV0, Math.sin(phiV0) * trackR, Math.cos(phiV0) * trackR),
+      new THREE.Vector3(xV1, Math.sin(phiV1) * trackR, Math.cos(phiV1) * trackR)
+    );
+    // Compensator parabolic U-track
+    const xC0 = 0.34 - 0.22 * Math.sin(Math.PI * u0) + 0.08 * u0;
+    const xC1 = 0.34 - 0.22 * Math.sin(Math.PI * u1) + 0.08 * u1;
+    const phiC0 = 2.45 + u0 * 1.18;
+    const phiC1 = 2.45 + u1 * 1.18;
+    camTrackPts.push(
+      new THREE.Vector3(xC0, Math.sin(phiC0) * trackR, Math.cos(phiC0) * trackR),
+      new THREE.Vector3(xC1, Math.sin(phiC1) * trackR, Math.cos(phiC1) * trackR)
+    );
+  }
+  reg.detail(
+    "cam.tracks",
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(camTrackPts), kit.lineMaterials.hi),
+    { parent: camBarrelGroup }
+  );
+
+  // ---------------------------------------------------------------------------
+  // 2. Group 1 — Front Collector & Focus Group (translates with focusDist)
+  // ---------------------------------------------------------------------------
+  const g1Group = reg.group("zoom.g1.group", {
+    parent: subjectRoot,
+    pos: [-1.26, 0, 0],
+    stage: "subject"
+  });
+
+  const g1CellGeo = buildAxialSectorGeometry(
+    [
+      { x: -0.13, rInner: 0.56, rOuter: 0.65 },
+      { x: 0.15, rInner: 0.56, rOuter: 0.65 }
+    ],
+    phiBackStart,
+    phiBackLen,
+    32
+  );
+  reg.part("zoom.g1.cell", g1CellGeo, {
+    parent: g1Group,
+    ramp: "intake",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.016,
+    clippable: true,
+    mountOn: "barrel.outer.back",
+    allowOverlap: ["barrel.frontHood", "g1.el1", "g1.el2"]
+  });
+
+  reg.part(
+    "g1.el1",
+    buildZoomOpticalLensGeometry({
+      xCenter: -0.05,
+      rOuter: 0.565,
+      tCenter: 0.06,
+      r1: 1.85,
+      r2: 0.72
+    }),
+    {
+      parent: g1Group,
+      ramp: "glass",
+      outline: "lo",
+      outlineWidth: 0.009,
+      crease: "faint",
+      clippable: true,
+      mountOn: "zoom.g1.cell"
+    }
+  );
+
+  reg.part(
+    "g1.el2",
+    buildZoomOpticalLensGeometry({
+      xCenter: 0.09,
+      rOuter: 0.555,
+      tCenter: 0.13,
+      r1: 0.92,
+      r2: -2.40
+    }),
+    {
+      parent: g1Group,
+      ramp: "glass",
+      outline: "lo",
+      outlineWidth: 0.009,
+      crease: "faint",
+      clippable: true,
+      mountOn: "zoom.g1.cell",
+      allowOverlap: ["g1.el1"]
+    }
+  );
+  reg.anchor("zoom.g1.center", 0, 0, 0, g1Group);
+
+  // ---------------------------------------------------------------------------
+  // 3. Group 2 — Lit Variator Carriage sliding on Twin Guide Rods
+  // ---------------------------------------------------------------------------
+  const g2Group = reg.group("zoom.g2.group", {
+    parent: subjectRoot,
+    pos: [-0.56, 0, 0],
+    stage: "subject"
+  });
+
+  const g2CarriageGeo = buildAxialSectorGeometry(
+    [
+      { x: -0.12, rInner: 0.415, rOuter: 0.49 },
+      { x: 0.12, rInner: 0.415, rOuter: 0.49 }
+    ],
+    phiBackStart,
+    phiBackLen,
+    32
+  );
+  reg.part("zoom.g2.carriage", g2CarriageGeo, {
+    parent: g2Group,
+    ramp: "lit",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.018,
+    clippable: true,
+    mountOn: "guide.rod.bot",
+    allowOverlap: ["guide.rod.top", "barrel.outer.back", "cam.barrel", "g2.el1", "g2.el2", "g2.el3"]
+  });
+
+  const bushingGeo = buildCylinderGeometry(0.044, 0.044, 0.22, { segments: 14, axis: "x" });
+  [
+    { id: "top", phi: 1.86 },
+    { id: "bot", phi: -0.66 }
+  ].forEach((b) => {
+    reg.part(`g2.bushing.${b.id}`, bushingGeo, {
+      parent: g2Group,
+      pos: [0, Math.sin(b.phi) * 0.54, Math.cos(b.phi) * 0.54],
+      ramp: "brass",
+      outline: "lo",
+      crease: "faint",
+      detail: true,
+      mountOn: "zoom.g2.carriage"
+    });
+  });
+
+  // Radial brass cam follower pin riding in variator slot
+  const followerGeo = buildCylinderGeometry(0.026, 0.026, 0.16, { segments: 12, axis: "y" });
+  reg.part("g2.camFollower", followerGeo, {
+    parent: g2Group,
+    pos: [0, 0.55, 0],
+    ramp: "brass",
+    outline: "lo",
+    crease: "faint",
+    detail: true,
+    mountOn: "zoom.g2.carriage"
+  });
+
+  reg.part(
+    "g2.el1",
+    buildZoomOpticalLensGeometry({ xCenter: -0.08, rOuter: 0.415, tCenter: 0.048, r1: -0.95, r2: 0.85 }),
+    {
+      parent: g2Group,
+      ramp: "glass",
+      outline: "lo",
+      outlineWidth: 0.009,
+      crease: "faint",
+      clippable: true,
+      mountOn: "zoom.g2.carriage"
+    }
+  );
+  reg.part(
+    "g2.el2",
+    buildZoomOpticalLensGeometry({ xCenter: 0.01, rOuter: 0.41, tCenter: 0.052, r1: 1.40, r2: 0.65 }),
+    {
+      parent: g2Group,
+      ramp: "glass",
+      outline: "lo",
+      outlineWidth: 0.009,
+      crease: "faint",
+      clippable: true,
+      mountOn: "zoom.g2.carriage",
+      allowOverlap: ["g2.el1"]
+    }
+  );
+  reg.part(
+    "g2.el3",
+    buildZoomOpticalLensGeometry({ xCenter: 0.09, rOuter: 0.415, tCenter: 0.075, r1: 0.78, r2: 2.20 }),
+    {
+      parent: g2Group,
+      ramp: "glass",
+      outline: "lo",
+      outlineWidth: 0.009,
+      crease: "faint",
+      clippable: true,
+      mountOn: "zoom.g2.carriage",
+      allowOverlap: ["g2.el2"]
+    }
+  );
+  reg.anchor("zoom.g2.center", 0, 0, 0, g2Group);
+
+  // ---------------------------------------------------------------------------
+  // 4. Group 3 — Lit Parabolic Compensator Carriage sliding on Twin Guide Rods
+  // ---------------------------------------------------------------------------
+  const g3Group = reg.group("zoom.g3.group", {
+    parent: subjectRoot,
+    pos: [0.22, 0, 0],
+    stage: "subject"
+  });
+
+  const g3CarriageGeo = buildAxialSectorGeometry(
+    [
+      { x: -0.09, rInner: 0.43, rOuter: 0.50 },
+      { x: 0.09, rInner: 0.43, rOuter: 0.50 }
+    ],
+    phiBackStart,
+    phiBackLen,
+    32
+  );
+  reg.part("zoom.g3.carriage", g3CarriageGeo, {
+    parent: g3Group,
+    ramp: "lit",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.018,
+    clippable: true,
+    mountOn: "guide.rod.bot",
+    allowOverlap: ["guide.rod.top", "barrel.outer.back", "cam.barrel", "g3.el1", "g3.el2"]
+  });
+
+  [
+    { id: "top", phi: 1.86 },
+    { id: "bot", phi: -0.66 }
+  ].forEach((b) => {
+    reg.part(`g3.bushing.${b.id}`, bushingGeo, {
+      parent: g3Group,
+      pos: [0, Math.sin(b.phi) * 0.54, Math.cos(b.phi) * 0.54],
+      ramp: "brass",
+      outline: "lo",
+      crease: "faint",
+      detail: true,
+      mountOn: "zoom.g3.carriage"
+    });
+  });
+
+  reg.part("g3.camFollower", followerGeo, {
+    parent: g3Group,
+    pos: [0, 0.56, 0],
+    ramp: "brass",
+    outline: "lo",
+    crease: "faint",
+    detail: true,
+    mountOn: "zoom.g3.carriage"
+  });
+
+  reg.part(
+    "g3.el1",
+    buildZoomOpticalLensGeometry({ xCenter: -0.035, rOuter: 0.43, tCenter: 0.095, r1: 0.85, r2: -1.10 }),
+    {
+      parent: g3Group,
+      ramp: "glass",
+      outline: "lo",
+      outlineWidth: 0.009,
+      crease: "faint",
+      clippable: true,
+      mountOn: "zoom.g3.carriage"
+    }
+  );
+  reg.part(
+    "g3.el2",
+    buildZoomOpticalLensGeometry({ xCenter: 0.05, rOuter: 0.43, tCenter: 0.055, r1: -1.10, r2: 1.95 }),
+    {
+      parent: g3Group,
+      ramp: "glass",
+      outline: "lo",
+      outlineWidth: 0.009,
+      crease: "faint",
+      clippable: true,
+      mountOn: "zoom.g3.carriage",
+      allowOverlap: ["g3.el1", "guide.bulkhead.rear"]
+    }
+  );
+  reg.anchor("zoom.g3.center", 0, 0, 0, g3Group);
+
+  // ---------------------------------------------------------------------------
+  // 5. EMD 9-Blade Iris Stop & Group 4 Rear Master Relay
+  // ---------------------------------------------------------------------------
+  const irisGroup = reg.group("zoom.iris.group", {
+    parent: subjectRoot,
+    pos: [irisX, 0, 0],
+    stage: "subject"
+  });
+
+  const irisRingGeo = buildAxialSectorGeometry(
+    [
+      { x: -0.04, rInner: 0.35, rOuter: 0.595 },
+      { x: 0.04, rInner: 0.35, rOuter: 0.595 }
+    ],
+    0,
+    Math.PI * 2,
+    36
+  );
+  reg.part("zoom.iris.ring", irisRingGeo, {
+    parent: irisGroup,
+    ramp: "brass",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.016,
+    clippable: true,
+    mountOn: "barrel.outer.back",
+    allowOverlap: ["guide.bulkhead.rear"]
+  });
+
+  const bladeGeo = buildZoomIrisBladeGeometry();
+  for (let b = 0; b < 9; b++) {
+    const az = (b / 9) * Math.PI * 2;
+    const pivotGroup = reg.group(`zoom.iris.bladePivot.${b}`, {
+      parent: irisGroup,
+      pos: [((b % 2) - 0.5) * 0.014, Math.sin(az) * 0.39, Math.cos(az) * 0.39],
+      rot: [-az, 0, 0],
+      stage: "subject"
+    });
+    reg.part(`zoom.iris.blade.${b}`, bladeGeo, {
+      parent: pivotGroup,
+      ramp: "lit",
+      outline: "lo",
+      crease: "faint",
+      detail: true,
+      mountOn: "zoom.iris.ring"
+    });
+  }
+  reg.anchor("zoom.iris.center", 0, 0, 0, irisGroup);
+
+  const g4Group = reg.group("zoom.g4.group", {
+    parent: subjectRoot,
+    pos: [g4X, 0, 0],
+    stage: "subject"
+  });
+
+  const g4CellGeo = buildAxialSectorGeometry(
+    [
+      { x: -0.15, rInner: 0.455, rOuter: 0.595 },
+      { x: 0.16, rInner: 0.455, rOuter: 0.595 }
+    ],
+    phiBackStart,
+    phiBackLen,
+    32
+  );
+  reg.part("zoom.g4.cell", g4CellGeo, {
+    parent: g4Group,
+    ramp: "comp",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.016,
+    clippable: true,
+    mountOn: "barrel.outer.back",
+    allowOverlap: ["g4.el1", "g4.el2"]
+  });
+
+  reg.part(
+    "g4.el1",
+    buildZoomOpticalLensGeometry({ xCenter: -0.06, rOuter: 0.455, tCenter: 0.115, r1: 1.05, r2: -1.60 }),
+    {
+      parent: g4Group,
+      ramp: "glass",
+      outline: "lo",
+      outlineWidth: 0.009,
+      crease: "faint",
+      clippable: true,
+      mountOn: "zoom.g4.cell"
+    }
+  );
+  reg.part(
+    "g4.el2",
+    buildZoomOpticalLensGeometry({ xCenter: 0.09, rOuter: 0.465, tCenter: 0.09, r1: -1.45, r2: -0.95 }),
+    {
+      parent: g4Group,
+      ramp: "glass",
+      outline: "lo",
+      outlineWidth: 0.009,
+      crease: "faint",
+      clippable: true,
+      mountOn: "zoom.g4.cell",
+      allowOverlap: ["g4.el1"]
+    }
+  );
+}
+
+
+/* --- figure/mechanism.mjs --- */
+
+
+
+const ZOOM_CAM_N_SAMPLES = 40;
+
+function buildZoomQuadrantArcGeometry(rInner = 0.14, rOuter = 0.25, depth = 0.09) {
+  const shape = new THREE.Shape();
+  const aStart = -Math.PI * 0.03;
+  const aEnd = Math.PI * 1.03;
+  shape.absarc(0, 0, rOuter, aStart, aEnd, false);
+  shape.absarc(0, 0, rInner, aEnd, aStart, true);
+  shape.closePath();
+
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 1,
+    steps: 1,
+    bevelSize: 0.006,
+    bevelThickness: 0.006,
+    curveSegments: 24
+  });
+  geo.translate(0, 0, -depth * 0.5);
+  geo.rotateY(Math.PI / 2);
+  return geo;
+}
+
+function drawZoomCamScreen(ctx, canvas, state, theme) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const css = (theme && theme.css) || {};
+  const ch = (theme && theme.channels) || {};
+
+  const bgCol = css.card || "#181a1f";
+  const textCol = css.text || "#f4efe4";
+  const mutedCol = css.muted || "#8c877c";
+  const litCol = css.lit || "#f59e0b";
+  const g2Col = ch.intake || "#38bdf8";
+  const g3Col = ch.comb || "#fb923c";
+
+  const st = getZoomState(state?.params || state, state?.triggers || {});
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = bgCol;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = mutedCol;
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(6, 6, w - 12, h - 12);
+  ctx.globalAlpha = 1;
+
+  // Header
+  ctx.fillStyle = textCol;
+  ctx.font = "600 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.fillText("PARFOCAL CAM LOCUS", 12, 22);
+
+  ctx.fillStyle = litCol;
+  ctx.font = "700 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.textAlign = "right";
+  ctx.fillText(`${Math.round(st.focal)}mm f/${st.fstop.toFixed(1)}`, w - 12, 22);
+  ctx.textAlign = "left";
+
+  // Cam locus plot (u = 0..1 across 24mm..70mm; vertical = axial cam travel X)
+  const gx = 16;
+  const gy = 34;
+  const gw = w - 32;
+  const gh = 80;
+
+  ctx.strokeStyle = mutedCol;
+  ctx.globalAlpha = 0.25;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(gx, gy, gw, gh);
+  // 24 / 35 / 50 / 70 vertical guides
+  [24, 35, 50, 70].forEach((fMark) => {
+    const u = (fMark - 24) / (70 - 24);
+    const px = gx + u * gw;
+    ctx.beginPath();
+    ctx.moveTo(px, gy);
+    ctx.lineTo(px, gy + gh);
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+
+  // Map normalized cam travel [-0.85, +0.45] to screen Y
+  const mapX = (xVal) => gy + gh * (1 - (xVal + 0.82) / 1.32);
+
+  // Plot G2 Variator curve (monotonic sweep)
+  ctx.strokeStyle = g2Col;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  for (let i = 0; i <= ZOOM_CAM_N_SAMPLES; i++) {
+    const u = i / ZOOM_CAM_N_SAMPLES;
+    const xG2Curve = -0.72 + 0.60 * (0.85 * u + 0.15 * u * u);
+    const px = gx + u * gw;
+    const py = mapX(xG2Curve);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // Plot G3 Compensator curve (parabolic U-locus)
+  ctx.strokeStyle = g3Col;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  for (let i = 0; i <= ZOOM_CAM_N_SAMPLES; i++) {
+    const u = i / ZOOM_CAM_N_SAMPLES;
+    const xG3Curve = 0.34 - 0.22 * Math.sin(Math.PI * u) + 0.08 * u;
+    const px = gx + u * gw;
+    const py = mapX(xG3Curve);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // Active focal length cursor
+  const cx = gx + st.zoomNorm * gw;
+  ctx.strokeStyle = litCol;
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(cx, gy);
+  ctx.lineTo(cx, gy + gh);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = g2Col;
+  ctx.beginPath();
+  ctx.arc(cx, mapX(st.xG2), 4.0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = g3Col;
+  ctx.beginPath();
+  ctx.arc(cx, mapX(st.xG3), 4.0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Curve legend labels inside plot
+  ctx.font = "600 9.5px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.fillStyle = g3Col;
+  ctx.fillText("G3 COMP", gx + 4, gy + 12);
+  ctx.fillStyle = g2Col;
+  ctx.fillText("G2 VAR", gx + 4, gy + gh - 5);
+
+  // Bottom telemetry readouts
+  ctx.fillStyle = textCol;
+  ctx.font = "600 10px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.fillText(`FOV ${st.fovDiagDeg.toFixed(1)}°`, 16, 134);
+
+  ctx.fillStyle = mutedCol;
+  ctx.textAlign = "right";
+  ctx.fillText(`MAG ${st.magRatio.toFixed(2)}×`, w - 16, 134);
+  ctx.textAlign = "left";
+
+  ctx.fillStyle = litCol;
+  ctx.font = "700 10px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.fillText("ΔBFL 0.00 mm (LOCKED)", 16, 152);
+}
+function buildMechanism(reg, kit) {
+  const { topSurfaceY } = SPEC;
+  const baseGroup = reg.groups.get("base.group")?.group || reg.root;
+  const mechGroup = reg.group("mechanism.group", { parent: baseGroup, stage: "mechanism" });
+
+  // ---------------------------------------------------------------------------
+  // 1. Broadcast Servo Zoom Rocker & Focal Quadrant (Front-Left Outrigger)
+  // ---------------------------------------------------------------------------
+  const [rkX, rkY, rkZ] = ANCHORS.zoomRockerMount;
+  const rockerGroup = reg.group("zoomRocker.group", {
+    parent: mechGroup,
+    pos: [rkX, rkY, rkZ],
+    stage: "mechanism"
+  });
+
+  const rkBaseGeo = new THREE.BoxGeometry(0.38, 0.18, 0.56);
+  reg.part("zoomRocker.base", rkBaseGeo, {
+    parent: rockerGroup,
+    pos: [0, 0.09, 0],
+    ramp: "mid",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.outrigger.rocker"
+  });
+
+  reg.part("zoomRocker.arc", buildZoomQuadrantArcGeometry(0.14, 0.25, 0.09), {
+    parent: rockerGroup,
+    pos: [0, 0.18, 0],
+    ramp: "brass",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "zoomRocker.base"
+  });
+
+  const rkTickPts = [];
+  for (let i = 0; i <= 8; i++) {
+    const a = Math.PI * 0.22 + (i / 8) * (Math.PI * 0.56);
+    const r0 = 0.21;
+    const r1 = i % 2 === 0 ? 0.265 : 0.245;
+    rkTickPts.push(
+      new THREE.Vector3(0.052, 0.18 + Math.sin(a) * r0, Math.cos(a) * r0),
+      new THREE.Vector3(0.052, 0.18 + Math.sin(a) * r1, Math.cos(a) * r1)
+    );
+  }
+  reg.detail(
+    "zoomRocker.ticks",
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(rkTickPts), kit.lineMaterials.hi),
+    { parent: rockerGroup }
+  );
+
+  const rkLeverGroup = reg.group("zoomRocker.leverGroup", {
+    parent: rockerGroup,
+    pos: [0, 0.18, 0],
+    stage: "mechanism"
+  });
+
+  reg.part("zoomRocker.hub", buildCylinderGeometry(0.055, 0.055, 0.16, { segments: 18, axis: "x" }), {
+    parent: rkLeverGroup,
+    ramp: "brass",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "zoomRocker.base",
+    allowOverlap: ["zoomRocker.arc"]
+  });
+
+  reg.part("zoomRocker.arm", new THREE.BoxGeometry(0.040, 0.40, 0.044), {
+    parent: rkLeverGroup,
+    pos: [0, 0.22, 0],
+    ramp: "hi",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "zoomRocker.hub",
+    allowOverlap: ["zoomRocker.arc"]
+  });
+
+  reg.part("zoomRocker.grip", buildCylinderGeometry(0.042, 0.042, 0.24, { segments: 18, axis: "x" }), {
+    parent: rkLeverGroup,
+    pos: [0, 0.43, 0],
+    ramp: "lit",
+    outline: "mid",
+    crease: "faint",
+    mountOn: "zoomRocker.arm"
+  });
+
+  const rkBossGeo = buildCylinderGeometry(0.046, 0.056, 0.10, { segments: 16, axis: "x" });
+  reg.part("zoomRocker.boss", rkBossGeo, {
+    parent: rockerGroup,
+    pos: [0.22, 0.10, -0.08],
+    ramp: "brass",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "zoomRocker.base"
+  });
+  reg.anchor("zoomRocker.port", 0.27, 0.10, -0.08, rockerGroup, { dir: [0.82, 0.18, -0.54] });
+
+  reg.tag("tag-zoom", "24 · 35 · 50 · 70", rkX - 0.10, rkY + 0.56, rkZ - 0.16);
+
+  // Servo Zoom Drive Harness: zoomRocker.port -> barrel.port.zoom
+  reg.tube(
+    "cable.servoZoom",
+    "zoomRocker.port",
+    [[-1.12, rkY + 0.24, 0.44]],
+    "barrel.port.zoom",
+    {
+      parent: mechGroup,
+      radius: 0.022,
+      segments: 34,
+      radialSegments: 10,
+      leadOut: 0.14,
+      leadIn: 0.16,
+      ramp: "brass",
+      outline: "lo",
+      fromPart: "zoomRocker.boss",
+      toPart: "barrel.zoomBoss",
+      allowOverlap: ["zoomRocker.base", "barrel.outer.back", "barrel.frontHood", "cradle.front"]
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // 2. Ring-USM Focus Control Dial & Harness (Front-Center Outrigger)
+  // ---------------------------------------------------------------------------
+  const [usmX, usmY, usmZ] = ANCHORS.usmCtrlMount;
+  const usmGroup = reg.group("usmCtrl.group", {
+    parent: mechGroup,
+    pos: [usmX, usmY, usmZ],
+    stage: "mechanism"
+  });
+
+  reg.part("usmCtrl.boss", buildCylinderGeometry(0.28, 0.32, 0.12, { segments: 28, axis: "y" }), {
+    parent: usmGroup,
+    pos: [0, 0.06, 0],
+    ramp: "lo",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.outrigger.usm"
+  });
+
+  const usmDialGroup = reg.group("usmCtrl.dialGroup", {
+    parent: usmGroup,
+    pos: [0, 0.24, 0],
+    stage: "mechanism"
+  });
+
+  reg.part("usmCtrl.drum", buildCylinderGeometry(0.22, 0.22, 0.24, { segments: 32, axis: "y" }), {
+    parent: usmDialGroup,
+    ramp: "hi",
+    outline: "hi",
+    crease: "lo",
+    outlineWidth: 0.016,
+    mountOn: "usmCtrl.boss"
+  });
+
+  reg.detail(
+    "usmCtrl.knurl",
+    makeKnurlLines(0.22, -0.09, 0.09, 26, kit, {
+      tone: "lo",
+      pointer: { y: 0.123, z0: 0.06, z1: 0.20 }
+    }),
+    { parent: usmDialGroup }
+  );
+  reg.detail("usmCtrl.screw", makeScrewDetail(0, 0.123, 0, 0.06, "y", kit), { parent: usmDialGroup });
+
+  reg.part("usmCtrl.cableBoss", buildCylinderGeometry(0.045, 0.055, 0.10, { segments: 14, axis: "x" }), {
+    parent: usmGroup,
+    pos: [0.33, 0.06, -0.04],
+    ramp: "copper",
+    outline: "lo",
+    crease: "faint",
+    mountOn: "usmCtrl.boss"
+  });
+  reg.anchor("usmCtrl.port", 0.38, 0.06, -0.04, usmGroup, { dir: [0.88, 0.22, -0.42] });
+
+  // USM Focus / Telemetry Harness: usmCtrl.port -> sensor.port.in
+  reg.tube(
+    "cable.usmFocus",
+    "usmCtrl.port",
+    [[1.20, -1.32, 0.64], [1.48, -0.96, 0.84]],
+    "sensor.port.in",
+    {
+      parent: mechGroup,
+      radius: 0.022,
+      segments: 36,
+      radialSegments: 10,
+      leadOut: 0.16,
+      leadIn: 0.18,
+      ramp: "copper",
+      outline: "lo",
+      fromPart: "usmCtrl.cableBoss",
+      toPart: "sensor.portBoss",
+      allowOverlap: ["usmCtrl.boss", "sensor.housing", "sensor.pedestal", "cradle.rear", "base.outrigger.usm"]
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // 3. Diegetic Parfocal Cam-Curve & FOV Monitor (Front-Right Outrigger)
+  // ---------------------------------------------------------------------------
+  const [scrX, scrY, scrZ] = ANCHORS.camScreenMount;
+  const scrGroup = reg.group("camScreen.group", {
+    parent: mechGroup,
+    pos: [scrX, scrY, scrZ],
+    stage: "mechanism"
+  });
+
+  reg.part("camScreen.pedestal", buildCylinderGeometry(0.11, 0.17, 0.42, { segments: 24, axis: "y" }), {
+    parent: scrGroup,
+    pos: [0, 0.21, -0.10],
+    ramp: "lo",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.outrigger.screen"
+  });
+
+  reg.screen("zoom.camScreen", {
+    parent: scrGroup,
+    pos: [0, 0.66, 0.02],
+    rot: [-0.24, 0.42, 0],
+    width: 1.04,
+    height: 0.68,
+    depth: 0.08,
+    resolution: [288, 192],
+    ramp: "mid",
+    outline: "hi",
+    mountOn: "camScreen.pedestal",
+    draw: drawZoomCamScreen
+  });
+
+  // ---------------------------------------------------------------------------
+  // 4. Direct 3D Interactions
+  // ---------------------------------------------------------------------------
+  reg.interactable("cam.barrelGroup", {
+    cursor: "grab",
+    hint: "Drag brass zoom cam barrel to sweep 24–70mm focal length",
+    onDrag: ({ dx, dy, state, setParam }) => {
+      setParam("focal", (state.params.focal ?? 35) + (dx - dy * 0.5) * 0.22);
+    }
+  });
+
+  reg.interactable("zoom.g2.group", {
+    cursor: "grab",
+    hint: "Slide G2 variator horizontally to drive 24–70mm parfocal zoom",
+    onDrag: ({ dx, state, setParam }) => {
+      setParam("focal", (state.params.focal ?? 35) + dx * 0.28);
+    }
+  });
+
+  reg.interactable("zoom.g1.group", {
+    cursor: "grab",
+    hint: "Slide G1 focus collector horizontally for close focus (0.38m – 8m)",
+    onDrag: ({ dx, state, setParam }) => {
+      const curD = state.params.focusDist ?? 1.5;
+      setParam("focusDist", curD * Math.exp(dx * 0.01));
+    }
+  });
+
+  reg.interactable("zoomRocker.leverGroup", {
+    cursor: "grab",
+    hint: "Pull servo zoom rocker to command 24–70mm focal length",
+    onDrag: ({ dy, state, setParam }) => {
+      setParam("focal", (state.params.focal ?? 35) - dy * 0.28);
+    }
+  });
+
+  reg.interactable("usmCtrl.dialGroup", {
+    cursor: "grab",
+    hint: "Turn USM focus dial to shift G1 close-focus group",
+    onDrag: ({ dx, dy, state, setParam }) => {
+      const curD = state.params.focusDist ?? 1.5;
+      setParam("focusDist", curD * Math.exp((dx - dy) * 0.01));
+    }
+  });
+}
+function updateKinematics(reg, state) {
+  const params = state.params || state;
+  const triggers = state.triggers || {};
+  const st = getZoomState(params, triggers);
+
+  // 1. Brass Cam Barrel Rotation & 4-Group Optical Displacements
+  const camBarrel = reg.groups.get("cam.barrelGroup")?.group;
+  if (camBarrel) {
+    camBarrel.rotation.x = st.camRotRad;
+  }
+
+  const g1 = reg.groups.get("zoom.g1.group")?.group;
+  if (g1) {
+    g1.position.x = st.xG1;
+  }
+
+  const g2 = reg.groups.get("zoom.g2.group")?.group;
+  if (g2) {
+    g2.position.x = st.xG2;
+  }
+
+  const g3 = reg.groups.get("zoom.g3.group")?.group;
+  if (g3) {
+    g3.position.x = st.xG3;
+  }
+
+  // 2. EMD 9-Blade Constant-Aperture Iris Diaphragm
+  for (let b = 0; b < 9; b++) {
+    const pivot = reg.groups.get(`zoom.iris.bladePivot.${b}`)?.group;
+    if (pivot) {
+      const az = (b / 9) * Math.PI * 2;
+      pivot.rotation.x = -az + 0.25 - st.bladeSwingRad;
+    }
+  }
+
+  // 3. Broadcast Servo Rocker Lever & USM Focus Dial
+  const rkLever = reg.groups.get("zoomRocker.leverGroup")?.group;
+  if (rkLever) {
+    rkLever.rotation.x = -0.52 + st.zoomNorm * 1.04;
+  }
+
+  const usmDial = reg.groups.get("usmCtrl.dialGroup")?.group;
+  if (usmDial) {
+    usmDial.rotation.y = -st.focusRingRad;
+  }
+
+  // 4. Stage 6 Parfocal Optical Ray Shader Uniforms
+  const rayGroup = reg.groups.get("zoom.rayShader")?.group || reg.root.getObjectByName("zoom.rayShader");
+  if (rayGroup) {
+    const effEnv = state.shaderEnv !== undefined ? state.shaderEnv : 1.0;
+    rayGroup.traverse((child) => {
+      if (child.material && child.material.uniforms) {
+        const u = child.material.uniforms;
+        if (u.uTime) u.uTime.value = state.theta || 0;
+        if (u.uZoomNorm) u.uZoomNorm.value = st.zoomNorm;
+        if (u.uXG1) u.uXG1.value = st.xG1;
+        if (u.uXG2) u.uXG2.value = st.xG2;
+        if (u.uXG3) u.uXG3.value = st.xG3;
+        if (u.uRPupil) u.uRPupil.value = st.rPupil;
+        if (u.uPupilNorm) u.uPupilNorm.value = st.pupilNorm;
+        if (u.uPulseEnv) u.uPulseEnv.value = st.pulseEnv;
+        if (u.uCutaway) u.uCutaway.value = state.cutaway ? 1.0 : 0.0;
+        if (u.uEnvelope) u.uEnvelope.value = effEnv;
+      }
+    });
+  }
+}
+function tourAt(clock, _state) {
+  const c = ((clock % 1) + 1) % 1;
+  if (c < 0.24) {
+    const t = c / 0.24;
+    const s = t * t * (3 - 2 * t);
+    return {
+      caption: "24mm -> 70mm PARFOCAL CAM SWEEP · G2 & G3 IN SYNCH",
+      params: { focal: 24 + 46 * s, focusDist: 1.5, fstop: 2.8 },
+      cutaway: true
+    };
+  }
+  if (c < 0.44) {
+    const t = (c - 0.24) / 0.20;
+    const s = t * t * (3 - 2 * t);
+    return {
+      caption: "PARABOLIC COMPENSATOR PEAK · 45mm ΔBFL = 0.00mm",
+      params: { focal: 70 - 35 * s, focusDist: 1.5, fstop: 2.8 },
+      cutaway: true
+    };
+  }
+  if (c < 0.64) {
+    const t = (c - 0.44) / 0.20;
+    const s = Math.sin(t * Math.PI);
+    return {
+      caption: "GROUP 1 CLOSE FOCUS · HELICAL FRONT EXTENSION (0.38m)",
+      params: { focal: 35, focusDist: 1.5 - 1.12 * s, fstop: 2.8 },
+      cutaway: true
+    };
+  }
+  if (c < 0.82) {
+    const t = (c - 0.64) / 0.18;
+    const s = Math.sin(t * Math.PI);
+    return {
+      caption: "CONSTANT-APERTURE EMD IRIS & Z-SECTION CAM TRACKS",
+      params: { focal: 50, focusDist: 1.2, fstop: 2.8 + 15.2 * s },
+      cutaway: true,
+      section: 1.02 - 1.12 * s
+    };
+  }
+  return {
+    caption: "FULL CHASSIS · STUDIO 24–70mm f/2.8 PARFOCAL ZOOM",
+    params: { focal: 35, focusDist: 1.5, fstop: 2.8 },
+    cutaway: false,
+    section: 1.02
+  };
+}
+
+
+/* --- figure/shader.mjs --- */
+function buildShader(reg, kit) {
+  const zoomAxisGroup = reg.groups.get("zoom.axisGroup")?.group || reg.root;
+  const theme = kit.currentTheme;
+  const initSt = getZoomState({ focal: 35, focusDist: 1.5, fstop: 2.8 });
+
+  const zoomRayMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    uniforms: {
+      uTime: { value: SPEC.initialTheta },
+      uZoomNorm: { value: initSt.zoomNorm },
+      uXG1: { value: initSt.xG1 },
+      uXG2: { value: initSt.xG2 },
+      uXG3: { value: initSt.xG3 },
+      uRPupil: { value: initSt.rPupil },
+      uPupilNorm: { value: initSt.pupilNorm },
+      uIrisX: { value: SPEC.irisX },
+      uG4X: { value: SPEC.g4X },
+      uSensorX: { value: SPEC.sensorPlaneX },
+      uPulseEnv: { value: 0.0 },
+      uCutaway: { value: 1.0 },
+      uEnvelope: { value: 1.0 },
+      uIsDark: { value: theme.isDark ? 1.0 : 0.0 },
+      uColIntake: { value: new THREE.Color(theme.channels.intake) },
+      uColComp: { value: new THREE.Color(theme.channels.comp) },
+      uColComb: { value: new THREE.Color(theme.channels.comb) }
+    },
+    vertexShader: `
+      varying vec3 vAxisPos;
+      varying float vViewWeight;
+
+      void main() {
+        vAxisPos = position;
+        vec3 viewN = normalize(normalMatrix * normal);
+        vViewWeight = smoothstep(0.10, 0.65, abs(viewN.z));
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uZoomNorm;
+      uniform float uXG1;
+      uniform float uXG2;
+      uniform float uXG3;
+      uniform float uRPupil;
+      uniform float uPupilNorm;
+      uniform float uIrisX;
+      uniform float uG4X;
+      uniform float uSensorX;
+      uniform float uPulseEnv;
+      uniform float uCutaway;
+      uniform float uEnvelope;
+      uniform float uIsDark;
+      uniform vec3 uColIntake;
+      uniform vec3 uColComp;
+      uniform vec3 uColComb;
+
+      varying vec3 vAxisPos;
+      varying float vViewWeight;
+
+      float smoothMix(float a, float b, float t) {
+        float s = clamp(t, 0.0, 1.0);
+        return mix(a, b, s * s * (3.0 - 2.0 * s));
+      }
+
+      // Parfocal 4-group beam radius tracking live G1, G2, G3 cam positions to fixed sensor plane
+      float evalZoomBeamRadius(float x) {
+        float xEnt = -1.78;
+        float x1 = uXG1;
+        float x2 = uXG2;
+        float x3 = uXG3;
+        float xStop = uIrisX;
+        float x4 = uG4X;
+        float xImg = uSensorX;
+
+        // At 24mm wide, marginal/field envelope flares wide at front element & pinches at G2;
+        // at 70mm tele, entrance bundle is narrower/collimated & expands smoothly into G3/G4.
+        float rEnt = mix(0.51, 0.37, uZoomNorm);
+        float r1 = mix(0.45, 0.36, uZoomNorm);
+        float r2 = mix(0.24, 0.30, uZoomNorm);
+        float r3 = mix(0.32, 0.35, uZoomNorm);
+        float rStop = max(0.065, uRPupil * 0.96);
+        float r4 = clamp(max(rStop * 1.06, mix(0.26, 0.31, uZoomNorm) * mix(0.38, 1.0, uPupilNorm)), 0.08, 0.35);
+        float rImg = 0.022 + 0.012 * uPupilNorm;
+
+        if (x <= x1) {
+          return smoothMix(rEnt, r1, (x - xEnt) / max(0.02, x1 - xEnt));
+        }
+        if (x <= x2) {
+          return smoothMix(r1, r2, (x - x1) / max(0.02, x2 - x1));
+        }
+        if (x <= x3) {
+          return smoothMix(r2, r3, (x - x2) / max(0.02, x3 - x2));
+        }
+        if (x <= xStop) {
+          return smoothMix(r3, rStop, (x - x3) / max(0.02, xStop - x3));
+        }
+        if (x <= x4) {
+          return smoothMix(rStop, r4, (x - xStop) / max(0.02, x4 - xStop));
+        }
+        return smoothMix(r4, rImg, (x - x4) / max(0.02, xImg - x4));
+      }
+
+      void main() {
+        if (uEnvelope < 0.002) discard;
+
+        float x = vAxisPos.x;
+        float leftFade = smoothstep(-1.78, -1.56, x);
+        float rightFade = 1.0 - smoothstep(uSensorX - 0.03, uSensorX + 0.015, x);
+        float barrelMask = mix(1.0 - smoothstep(-1.68, -1.42, x), 1.0, uCutaway);
+        if (leftFade < 0.003 || rightFade < 0.003 || barrelMask < 0.003) discard;
+
+        float beamR = evalZoomBeamRadius(x);
+        float distAxis = length(vAxisPos.yz);
+        float rNorm = distAxis / max(beamR, 0.01);
+        if (rNorm > 1.06) discard;
+
+        float coneBody = (1.0 - smoothstep(0.65, 1.02, rNorm)) * 0.36;
+        float rayCenter = exp(-pow(rNorm / 0.08, 2.0)) * 0.54;
+        float rayMid = exp(-pow((rNorm - 0.50) / 0.055, 2.0)) * 0.42;
+        float rayEdge = exp(-pow((rNorm - 0.90) / 0.048, 2.0)) * 0.58;
+        float rays = rayCenter + rayMid + rayEdge;
+
+        float phaseWave = 0.90 + 0.10 * sin(x * 15.0 - uTime * 3.0);
+        float slewPulse = uPulseEnv * exp(-pow(mod(x + 1.8 - uPulseEnv * 2.8, 1.4) - 0.7, 2.0) / 0.05);
+
+        // Color progression across G1/G2/G3 cam zone -> iris -> parfocal sensor convergence
+        float camZone = smoothstep(uXG1, uXG3, x);
+        float postIris = smoothstep(uIrisX - 0.12, uSensorX - 0.25, x);
+        float focalGlow = smoothstep(uSensorX - 0.32, uSensorX - 0.02, x);
+
+        vec3 variatorCol = mix(uColIntake, uColComp, camZone * 0.65);
+        vec3 relayCol = mix(uColComb, vec3(1.0, 0.96, 0.86), (0.35 * focalGlow + slewPulse * 0.4) * (0.4 + 0.6 * uIsDark));
+        vec3 col = mix(variatorCol, relayCol, clamp(postIris * 0.86 + focalGlow * 0.25, 0.0, 1.0));
+
+        float rawAlpha = (coneBody + rays * 0.74 + focalGlow * 0.34 * (1.0 - smoothstep(0.4, 1.0, rNorm))) * phaseWave;
+        rawAlpha *= leftFade * rightFade * barrelMask;
+
+        float maxA = uIsDark > 0.5 ? 0.74 : 0.56;
+        float alpha = clamp(rawAlpha * vViewWeight * uEnvelope * (1.0 + 0.28 * uPulseEnv), 0.0, maxA);
+        if (alpha < 0.004) discard;
+
+        gl_FragColor = vec4(col, alpha);
+      }
+    `
+  });
+
+  kit.onThemeChange((nextTheme) => {
+    zoomRayMat.uniforms.uIsDark.value = nextTheme.isDark ? 1.0 : 0.0;
+    zoomRayMat.uniforms.uColIntake.value.set(nextTheme.channels.intake);
+    zoomRayMat.uniforms.uColComp.value.set(nextTheme.channels.comp);
+    zoomRayMat.uniforms.uColComb.value.set(nextTheme.channels.comb);
+  });
+
+  const rayGroup = new THREE.Group();
+  rayGroup.name = "zoom.rayShader";
+
+  const basePlaneGeo = new THREE.PlaneGeometry(3.48, 1.14, 60, 1);
+  basePlaneGeo.translate(-0.04, 0, 0); // spans [-1.78, +1.70] along X
+  [0, Math.PI / 3, (2 * Math.PI) / 3].forEach((ang, idx) => {
+    const planeGeo = basePlaneGeo.clone();
+    planeGeo.rotateX(ang);
+    const mesh = new THREE.Mesh(planeGeo, zoomRayMat);
+    mesh.name = `zoom.rayPlane.${idx}`;
+    mesh.renderOrder = 10;
+    rayGroup.add(mesh);
+  });
+
+  reg.detail("zoom.rayShader", rayGroup, { parent: zoomAxisGroup, stage: "shader" });
+}
+
+
+
+/* --- mount --- */
+mountAnatomyFigure({
+  spec: SPEC,
+  buildBase: typeof buildBase !== "undefined" ? buildBase : null,
+  buildStructure: typeof buildStructure !== "undefined" ? buildStructure : null,
+  buildSubject: typeof buildSubject !== "undefined" ? buildSubject : null,
+  buildMechanism: typeof buildMechanism !== "undefined" ? buildMechanism : null,
+  buildShader: typeof buildShader !== "undefined" ? buildShader : null,
+  updateKinematics: typeof updateKinematics !== "undefined" ? updateKinematics : null,
+  formatReadout: typeof formatReadout !== "undefined" ? formatReadout : null,
+  tourAt: typeof tourAt !== "undefined" ? tourAt : (SPEC.tour || null)
+});
+
+    })();
+  </script>
+</body>
+</html>

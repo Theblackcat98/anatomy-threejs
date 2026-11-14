@@ -66,7 +66,10 @@ Before creating files or writing Stage 1 code, explore the best physical realiza
      - `"gantry"` / `"test-stand"`: Vertical launch stand, flame trench, or structural frame carrying suspended thrust/load rigs.
      - `"cabinet"` / `"enclosure"`: Self-contained industrial, musical, consumer, or optical body (`buildEnclosureBoxGeometry` — arcade cabinet, synthesizer, camera body, pin-tumbler lock, CPU rack) where the outer casing itself grounds the figure.
      - `"section"` / `"diorama"`: Sliced architectural, geological, optical, or wave-tank block where terrain/chamber cross-sections form the base (`makeDatumGrid`).
-     - `"free-space"`: Orbital spacecraft, satellites, molecular assemblies, or zero-g mechanisms suspended over a minimal `makeGimbalDatumRing` or `makeDatumGrid`.
+     - `"free-space"`: Orbital spacecraft, satellites, molecular assemblies, optical barrels/camera lenses, or zero-g/self-contained mechanisms suspended over a compact rail rig, `makeGimbalDatumRing`, or `makeDatumGrid`.
+
+   > **Note — The bottom plate with four feet is NOT always necessary**: Do not force every apparatus onto a heavy rectangular tabletop bedplate (`base.plate`) with four corner feet (`base.foot.*`). Self-contained instruments—such as camera lenses, cylindrical optics, handheld hardware, enclosures, or aerospace mechanisms—often read far cleaner and fill the viewport with higher impact when mounted directly on compact support rails/outriggers, a minimal `makeDatumGrid`, or a soft `makeHaloMesh` shadow without slab clutter. Reserve the 4-foot bedplate for multi-module benchtop rigs that genuinely need a table deck.
+
    - Choose `SPEC.toneMode`:
      - `"single-lit"` *(default)*: One primary hero sub-assembly in `stage: "subject"` owns `ramp: "lit"`.
      - `"multi-channel"`: Permits `"lit"`, `"glass"`, and semantic channel ramps (`"intake"`/`"channelA"`, `"comp"`/`"channelB"`, `"comb"`/`"channelC"`, `"exhaust"`/`"channelD"`) across multiple stages for multi-flow, optical, or computing diagrams.
@@ -118,11 +121,11 @@ Pass criteria: Exits `0` with all anchors finite, `SPEC` enums valid, and `forma
 ### Stage 2 — The Base (`base.mjs`)
 
 Build the grounding layer appropriate for `SPEC.archetype`:
-- **`"bench"` *(default bench-top rig)***: `makeHaloMesh` ground shadow, beveled `buildSlabGeometry(BASE_W, BASE_D, BASE_H, { radius: 0.26, bevel: true, bevelSize: 0.025, bevelThickness: 0.025 })` at `ramp: "lo"`, `mountOn: "ground"` with `topSurfaceY = BASE_Y + BASE_H + 0.025`, 4 turned corner feet, inset `makePlanOutline`, graduated `base.ruler`, and front-apron `brass` plaque (`reg.tag("tag-plate", ...)`).
+- **`"bench"` *(tabletop rig only — optional)***: `makeHaloMesh` ground shadow, beveled `buildSlabGeometry(BASE_W, BASE_D, BASE_H, { radius: 0.26, bevel: true, bevelSize: 0.025, bevelThickness: 0.025 })` at `ramp: "lo"`, `mountOn: "ground"` with `topSurfaceY = BASE_Y + BASE_H + 0.025`, 4 turned corner feet, inset `makePlanOutline`, graduated `base.ruler`, and front-apron `brass` plaque (`reg.tag("tag-plate", ...)`). Skip this heavy slab + 4 feet whenever the mechanism itself provides a cleaner silhouette!
 - **`"gantry"` / `"test-stand"`**: Flame trench pad, concrete pier apron, or base hold-down ring + blast deflector deck (`makeDatumGrid` optional beneath).
 - **`"cabinet"` / `"enclosure"`**: Rubberized leveling pads + recessed chassis floor / `buildEnclosureBoxGeometry` mounting rails or lower plinth.
 - **`"section"` / `"diorama"`**: Clean bedrock/terrain/tank floor slab or sliced tray rim (`makeDatumGrid` reference lines underneath).
-- **`"free-space"`**: Minimal non-intrusive spatial reference (`makeGimbalDatumRing` and/or `makeDatumGrid`) with an ultra-subtle ground anchor dot/halo so orbiting orbital/molecular machines feel unencumbered.
+- **`"free-space"` *(or no bottom plate)***: Minimal non-intrusive spatial reference (`makeGimbalDatumRing`, `makeDatumGrid`, `makeHaloMesh`, and/or compact rail/bridge outriggers grounded with `mountOn: "ground"`) so self-contained optics, barrels, orbital assemblies, or portable instruments sit cleanly without tabletop slab clutter.
 In every archetype, register Stage 2 mounting anchors via `reg.anchor(...)` so Stages 3 and 5 snap directly without hardcoded coordinates.
 
 **Stage 2 Gate**:

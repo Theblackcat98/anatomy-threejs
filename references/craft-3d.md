@@ -16,7 +16,9 @@ Do not squeeze every prompt into a generic cast-iron tabletop plate with a singl
 | `"gantry"` / `"test-stand"` | Launch pad slab, flame trench/blast deck, or structural steel pier footings + optional `makeDatumGrid` | Static-fire rocket stands, cranes, wind tunnels, vertical rigs |
 | `"cabinet"` / `"enclosure"` | Leveling feet + hollow front-cutaway shell (`buildEnclosureBoxGeometry`) | Synthesizers, CRT/oscilloscopes, pin-tumbler locks, cameras, racks |
 | `"section"` / `"diorama"` | Terrain/masonry/fluid tank slab rim + `makeDatumGrid` underneath | Wave tanks, geological strata, optical paths, architecture |
-| `"free-space"` | Minimal spatial reference (`makeGimbalDatumRing` and/or `makeDatumGrid`) | Satellites, orbital mechanics, zero-g mechanisms, molecular lattices |
+| `"free-space"` | Minimal spatial reference (`makeGimbalDatumRing` / `makeDatumGrid` + subtle `makeHaloMesh`, or compact rail outriggers) | Satellites, camera lenses, optical barrels, zero-g mechanisms, molecular lattices |
+
+   > **Skipping the Bottom Plate & Four Corner Feet**: A heavy beveled slab (`base.plate`) with four corner feet (`base.foot.*`) is **not** always necessary. For self-contained instruments—especially cylindrical optical lenses on `15mm` rods or dovetail rails, portable hardware, and free-space mechanisms—omitting the bottom plate lets the apparatus itself dominate the canvas at a tighter `initialZoom` (~`1.02–1.10`) without distracting slab edges or empty tabletop margins. Anchor compact control pods and telemetry screens on machined outrigger arms attached to the rails/housing, backed by a light `makeDatumGrid` and `makeHaloMesh`.
 
 3. Select **`SPEC.simulationMode`**:
    - `"continuous"`: Rotary/periodic loop driven by `RPM` / `theta` (`CRANK` + `SLOW` shown).
@@ -43,7 +45,7 @@ All geometry lives in a right-handed Three.js coordinate system (`+X` right, `+Y
   1. **Cutaway Window faces `+Z`**: When a machine has an enclosing housing (`features.cutaway: true`), orient its open cutaway face toward `+Z` so the interior bore and hero subject stay visible from the canonical isometric camera.
   2. **Front Apron is `+Z`**: Place primary operator controls (`cyclicMount`, `collectiveMount`, `knobMount`, etc.), graduated scales (`rulerCenter`), and brass specification plaques (`plaqueCenter`) along the front apron (`z > +0.8`) where nothing occludes them.
   3. **Left-Side Instruments need `+Z` bias**: Because `-0.588 z` shifts negative-`z` objects rightward behind the central apparatus in `CANONICAL ISO`, mount left-side instruments (`x < -1.4`) at positive `z` or clear radial separation so their scales and needles stand unobstructed.
-  4. **Framing**: Set `initialZoom` (`~0.86–0.98`) and `initialPanY` in `model.mjs` so all four corner feet of the bedplate and the top of the assembly have comfortable breathing room inside `#figure-card`.
+  4. **Framing**: Set `initialZoom` (`~0.86–1.10`) and `initialPanY` in `model.mjs` so the full grounded envelope—either the four bedplate feet on `"bench"` rigs or the full apparatus, rail outriggers, and datum grid on plateless figures—has comfortable breathing room inside `#figure-card`.
 
 ---
 
@@ -88,7 +90,7 @@ Compose each figure from clear physical layers matched to its `SPEC.archetype`:
    - **`"gantry"` / `"test-stand"`**: Flame trench pad, concrete deck, hold-down ring, and structural baseplates.
    - **`"cabinet"` / `"enclosure"`**: Leveling feet + recessed chassis floor / `buildEnclosureBoxGeometry` mounting plinth.
    - **`"section"` / `"diorama"`**: Cutaway terrain/fluid tray rim + optional `makeDatumGrid`.
-   - **`"free-space"`**: `makeGimbalDatumRing` and/or `makeDatumGrid` so orbital/molecular machines float cleanly without tabletop slab clutter.
+   - **`"free-space"` *(or plateless rail rig)***: `makeGimbalDatumRing`, `makeDatumGrid`, and/or compact rail/bridge outriggers grounded with `mountOn: "ground"` so orbital, molecular, or cylindrical optical mechanisms float cleanly without tabletop slab clutter.
 
 2. **Load-Bearing Structure (`structure.mjs`)**:
    - Pedestals, frames, cabinet shells, optical chambers (`ramp: "glass"`), and cutaway housings.
@@ -116,6 +118,7 @@ Compose each figure from clear physical layers matched to its `SPEC.archetype`:
 
 ## 4. 3D Anti-Patterns to Avoid
 
+- **Unnecessary Bottom Plate & Four Corner Feet on Self-Contained Instruments**: Do not wrap a camera lens barrel, handheld device, optical assembly, or self-contained enclosure on a generic rectangular bedplate with four corner feet just out of habit. Whenever the subject stands cleanly on compact support rails, a housing chassis, or a subtle `makeDatumGrid` + `makeHaloMesh`, omit the slab and feet so the mechanism itself commands the frame.
 - **Cloning Stock Controls & Gauges Across Unrelated Machines**: Never copy a Wankel engine's knurled RPM knob, hydraulic manifold box, or tall Bourdon pressure dial onto an unrelated figure (such as a helicopter swashplate or optical interferometer). Design bespoke controls, levers, and telemetry indicators that physically drive and measure the actual domain variables.
 - **Passive-Only Figures When Direct 3D Dragging Fits**: If the reader sees a swashplate, lever, carriage, or lens mirror, they expect to drag it directly in 3D and see the linked blades/beams respond — even when time/RPM is paused.
 - **Forced Exploded Views on Open Linkages**: Do not invent arbitrary explode vectors for open ball-joint linkages or rods that look broken when pulled apart; set `features.explode = false`.
