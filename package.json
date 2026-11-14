@@ -8,7 +8,12 @@
     "test:wankel": "node figures/wankel-engine/build.mjs --test-model",
     "audit:wankel": "node figures/wankel-engine/build.mjs --audit",
     "inspect:wankel": "node scripts/inspect.mjs figures/wankel-engine/dist/wankel-engine.html",
-    "drive:wankel": "node scripts/drive.mjs figures/wankel-engine/dist/wankel-engine.html"
+    "drive:wankel": "node scripts/drive.mjs figures/wankel-engine/dist/wankel-engine.html",
+    "build:typewriter": "node figures/manual-typewriter/build.mjs",
+    "test:typewriter": "node figures/manual-typewriter/build.mjs --test-model",
+    "audit:typewriter": "node figures/manual-typewriter/build.mjs --audit",
+    "inspect:typewriter": "node scripts/inspect.mjs figures/manual-typewriter/dist/manual-typewriter.html",
+    "drive:typewriter": "node scripts/drive.mjs figures/manual-typewriter/dist/manual-typewriter.html --out figures/manual-typewriter/dist/"
   },
   "dependencies": {
     "three": "^0.128.0"
