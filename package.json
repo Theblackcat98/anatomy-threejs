@@ -18,7 +18,12 @@
     "test:zoom": "node figures/zoom-lens-24-70/build.mjs --test-model",
     "audit:zoom": "node figures/zoom-lens-24-70/build.mjs --audit",
     "inspect:zoom": "node scripts/inspect.mjs figures/zoom-lens-24-70/dist/zoom-lens-24-70.html",
-    "drive:zoom": "node scripts/drive.mjs figures/zoom-lens-24-70/dist/zoom-lens-24-70.html"
+    "drive:zoom": "node scripts/drive.mjs figures/zoom-lens-24-70/dist/zoom-lens-24-70.html",
+    "build:p1s": "node figures/bambu-p1s/build.mjs",
+    "test:p1s": "node figures/bambu-p1s/build.mjs --test-model",
+    "audit:p1s": "node figures/bambu-p1s/build.mjs --audit",
+    "inspect:p1s": "node scripts/inspect.mjs figures/bambu-p1s/dist/bambu-p1s.html",
+    "drive:p1s": "node scripts/drive.mjs figures/bambu-p1s/dist/bambu-p1s.html"
   },
   "dependencies": {
     "three": "^0.128.0"
