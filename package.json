@@ -38,7 +38,12 @@
     "test:p1s": "node figures/bambu-p1s/build.mjs --test-model",
     "audit:p1s": "node figures/bambu-p1s/build.mjs --audit",
     "inspect:p1s": "node scripts/inspect.mjs figures/bambu-p1s/dist/bambu-p1s.html",
-    "drive:p1s": "node scripts/drive.mjs figures/bambu-p1s/dist/bambu-p1s.html"
+    "drive:p1s": "node scripts/drive.mjs figures/bambu-p1s/dist/bambu-p1s.html",
+    "build:m64": "node figures/m64-twin-turbo/build.mjs",
+    "test:m64": "node figures/m64-twin-turbo/build.mjs --test-model",
+    "audit:m64": "node figures/m64-twin-turbo/build.mjs --audit",
+    "inspect:m64": "node scripts/inspect.mjs figures/m64-twin-turbo/dist/m64-twin-turbo.html",
+    "drive:m64": "node scripts/drive.mjs figures/m64-twin-turbo/dist/m64-twin-turbo.html"
   },
   "dependencies": {
     "three": "^0.128.0"
