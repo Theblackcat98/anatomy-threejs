@@ -43,7 +43,12 @@
     "test:m64": "node figures/m64-twin-turbo/build.mjs --test-model",
     "audit:m64": "node figures/m64-twin-turbo/build.mjs --audit",
     "inspect:m64": "node scripts/inspect.mjs figures/m64-twin-turbo/dist/m64-twin-turbo.html",
-    "drive:m64": "node scripts/drive.mjs figures/m64-twin-turbo/dist/m64-twin-turbo.html"
+    "drive:m64": "node scripts/drive.mjs figures/m64-twin-turbo/dist/m64-twin-turbo.html",
+    "build:porsche": "node figures/porsche-m64-boxer/build.mjs",
+    "test:porsche": "node figures/porsche-m64-boxer/build.mjs --test-model",
+    "audit:porsche": "node figures/porsche-m64-boxer/build.mjs --audit",
+    "inspect:porsche": "node scripts/inspect.mjs figures/porsche-m64-boxer/dist/porsche-m64-boxer.html",
+    "drive:porsche": "node scripts/drive.mjs figures/porsche-m64-boxer/dist/porsche-m64-boxer.html"
   },
   "dependencies": {
     "three": "^0.128.0"

@@ -130,6 +130,7 @@ export function buildAndVerifyFigure(config) {
 
     const auditErrors = runGeometryAudit(reg, stepPoseFn, {
       features: model.SPEC?.features,
+      section: model.SPEC?.section,
       poses: auditPoses,
       archetype: model.SPEC?.archetype,
       toneMode: model.SPEC?.toneMode,

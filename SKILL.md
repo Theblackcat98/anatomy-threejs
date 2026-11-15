@@ -79,12 +79,23 @@ Before creating files or writing Stage 1 code, explore the best physical realiza
      - `"sequence"`: Event- and state-driven stepped machine (`SPEC.steps` + `STEP` button, `SPEC.triggers` buttons armed via `burst()`/`settle()`, no forced RPM slider). Ideal for locks, algorithms, staging, or state machines.
      - `"timeline"`: Scrubbable `0..1` timeline curve (`TIME` slider) for multi-phase stories or trajectories.
      - `"sandbox"`: Rests quietly until the user drags 3D parts directly (`reg.interactable`) or fires impulse buttons (`PLUCK`, `DROP`, `PULSE`).
-   - Optionally specify a scripted idle tour (`tourAt(clock, state)` or `SPEC.tour`) that demonstrates the apparatus automatically after ~1.6–3.6s of inactivity and yields immediately on user input.
-4. **Domain Controls, Section Slicing, Screens & Camera Views**:
-   - Pick bespoke `SPEC.controls` sliders, `SPEC.triggers`, optional `SPEC.section` (live 3D `THREE.Plane` cross-section slicer on `clippable: true` shells), optional `reg.screen()` diegetic 2D-in-3D displays, and `SPEC.cameraViews` bookmarks (`1`–`9` keys + top pills).
-   - Enable `SPEC.features` flags (`explode`, `cutaway`, `shader`, `crank`, `slow`) **only** when they genuinely clarify this apparatus.
+   - **Auto-tour (`tourAt`)**: Omit `tourAt` by default on `"continuous"` figures (they already move on load). Only include a gentle idle tour when explicitly helpful for a static/sequence showcase, and never let it override user-set controls after interaction.
+4. **Control Integrity, Cutaway, Section & Pre-Build Presentation Gate**:
+   - **Every control must drive the drawing (no dead, conflicting, or redundant controls)**:
+     - Every slider in `SPEC.controls`, button in `SPEC.triggers`, and 3D `reg.interactable` must visibly move a **named 3D part or shader** in `updateKinematics`. If a control doesn't change the 3D drawing, omit it.
+     - **Independent inputs only**: Never expose derived physical quantities as input sliders or competing draggable controls (e.g., if `RPM` and `Throttle` are inputs, `Boost`, `Power`, `Torque`, and `EGT` are **derived consequences** rendered as readouts, gauges, or actuated rods—never a separate `Boost` slider that fights `RPM`/`Throttle`).
+     - Avoid superfluous impulse trigger buttons unless they produce a clear, distinct 3D action.
+   - **Meaningful Cutaway & Section Slicing**:
+     - If `features.cutaway` is `true`, `cutawayHide: true` must uncover the **primary working mechanism** (pistons, crank, cams, impellers, gears), not merely pop off tiny decorative lids over solid opaque blocks.
+     - If `features.section` / `SPEC.section` is enabled, housings and barrels along the slice axis must carry `clippable: true` so the `SECT` slider actually slices the geometry.
+   - **Pre-Build Presentation Recommendation (Required before Stage 1)**:
+     After research/ideation and before writing Stage 1 code, present a **short itemized recommendation** (recommended option listed first for each item—not an open-ended questionnaire) so the user can approve or adjust preferences up front:
+     1. **Fixture / Archetype** — bottom plate with 4 feet (`"bench"`), stand/gantry, enclosure, or rail/plateless rig, plus what sits on the fixture.
+     2. **Controls, Instruments & Screens** — each slider, lever, button, gauge, and diegetic screen by name, stating what 3D part/shader it drives (explicitly separating independent inputs from derived readouts/gauges).
+     3. **Cutaway & Section** — what `Cutaway (C)` reveals vs keeps hidden, and whether live `SECT` slicing is enabled.
+     4. **Explode & Auto-Tour** — whether `Explode (E)` is included (and how layers separate cleanly), plus confirmation that auto-tour is off unless requested.
 
-**Stage 0 Gate**: User confirms or refines the brief (or explicitly instructed an immediate non-interactive build).
+**Stage 0 Gate**: User confirms or adjusts the itemized presentation recommendation (skip waiting only if the user explicitly instructed an immediate non-interactive build).
 
 ---
 
@@ -101,7 +112,7 @@ Translate the agreed brief into a pure physical math module before touching Thre
    - `SPEC.toneMode`: `"single-lit"` | `"multi-channel"`.
    - `SPEC.features`: `{ explode, cutaway, shader, crank, slow, section, timeline }` matching Stage 0.
    - `SPEC.interactionHint`: Short hint shown in the bottom-left corner telling the user what 3D parts/actions they can interact with directly.
-   - `SPEC.controls` / `SPEC.triggers` / `SPEC.steps`: Domain-specific sliders (`{ id, label, min, max, step, initial, title }`), one-shot impulse triggers (`{ id, label, rise, fall, title }`), and/or sequence steps (`{ id, label, theta, params }`).
+   - `SPEC.controls` / `SPEC.triggers` / `SPEC.steps`: Domain-specific independent input sliders (`{ id, label, min, max, step, initial, title }`), one-shot impulse triggers (`{ id, label, rise, fall, title }`), and/or sequence steps (`{ id, label, theta, params }`). Complete a **Control-Integrity Check** before moving to Stage 2: for every slider/trigger, name the exact 3D element it moves/drives in `mechanism.mjs` / `shader.mjs`, and verify no slider represents a derived output.
    - `SPEC.section`: Optional live 3D slicing plane `{ axis: "x"|"y"|"z", min, max, initial, label, invert? }`.
    - `SPEC.cameraViews`: Optional array of `{ id, label, elev, azim, zoom, pan }` bookmarks rendered as top pills and mapped to digit keys `1`–`9`.
    - `SPEC.auditPoses` & `SPEC.drivePoses`: Domain-representative poses (extreme control angles, paused manipulation, cutaway/section/theme checks) used by `--audit` and `scripts/drive.mjs`.
@@ -178,7 +189,7 @@ Connect the subject to domain-authentic operator controls, telemetry instruments
 2. **Mount telemetry indicators or diegetic 3D screens**: Use mechanical dials/arcs OR `reg.screen(id, { width, height, resolution, draw })` to project live waveforms, pressure-volume loops, buffer graphs, or packet queues right inside the 3D scene.
 3. **Register direct 3D manipulation** with `reg.interactable(targetId, { cursor, hint, onDrag })` so the user can drag 3D assemblies directly in the viewport via `setParam(...)`, `fireTrigger(...)`, or `applyStep(...)`, even when animation is paused.
 4. **Route all pipes and cables** using `reg.tube(id, fromAnchorId, waypoints, toAnchorId, opts)` with smooth 3D arch waypoints (`length / chord >= 1.12`) and coaxial `dir` normals.
-5. Implement `export function updateKinematics(reg, state)` driven by `state.theta`, `state.params` (`state.<controlId>`), `state.triggers` / `state.triggerAges` (backed by `burst()`, `settle()`, `smooth()` from `kit/runtime.mjs`), `state.timeline`, `state.stepIndex`, `state.section`, and `state.shaderEnv`. Optionally export `tourAt(clock, state)` for a gentle idle demonstration tour.
+5. Implement `export function updateKinematics(reg, state)` driven by `state.theta`, `state.params` (`state.<controlId>`), `state.triggers` / `state.triggerAges` (backed by `burst()`, `settle()`, `smooth()` from `kit/runtime.mjs`), `state.timeline`, `state.stepIndex`, `state.section`, and `state.shaderEnv`. Verify every control in `SPEC.controls` and `SPEC.triggers` moves a visible 3D part, gauge, or shader (no dead controls), and keep derived outputs (like boost pressure) read-only on gauges/screens. Omit `tourAt` unless explicitly needed for a static/sequence showcase.
 
 **Stage 5 Gate**:
 ```bash
@@ -205,5 +216,5 @@ node scripts/drive.mjs figures/<slug>/dist/<slug>.html --out figures/<slug>/dist
 ```
 Read `figures/<slug>/dist/inspect-drive.png`, `hero-light.png`, `hero-dark.png` (plus `hero-exploded.png` if `features.explode` is `true`), and `mobile-390.png`:
 - Confirm `console: clean` and `scrolls sideways: no`.
-- Check every panel of `inspect-drive.png` (populated from `SPEC.drivePoses` or the default poses): verify that manipulating each domain control visibly moves the mechanism, physical control hardware, and telemetry indicator, and that hidden disabled features (`APART`, `CUTAWAY`, `SHADER`) do not appear in the UI.
+- Check every panel of `inspect-drive.png` (populated from `SPEC.drivePoses` or the default poses): verify that manipulating each domain control visibly moves the mechanism, physical control hardware, and telemetry indicator, that `Cutaway (C)` genuinely uncovers the internal working mechanism, that `SECT` slices housings cleanly if enabled, and that hidden disabled features (`APART`, `CUTAWAY`, `SHADER`) do not appear in the UI.
 - Check `mobile-390.png` to confirm the header, telemetry bar, and footer controls stack cleanly at `390px` width without overlapping the 3D figure.

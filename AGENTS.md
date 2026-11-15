@@ -34,3 +34,4 @@ Current reference & experimental figures under `figures/`:
    - `node scripts/drive.mjs figures/<slug>/dist/<slug>.html`
    - Inspect all generated PNGs (`inspect-ortho.png`, `inspect-joints.png`, `hero-*.png`, `inspect-drive.png`, `mobile-390.png`) directly with your file-reading tool before finishing.
 4. **Add or verify npm scripts in `package.json`** (`build:<slug>`, `test:<slug>`, `audit:<slug>`, `inspect:<slug>`, `drive:<slug>`) when introducing a new experimental figure.
+5. **Every user correction updates the skill too**: Whenever the user reports a bug, visual defect, control issue, or presentation preference on a figure, do not only patch that figure—distill and encode the underlying rule, anti-pattern, or audit check into [`SKILL.md`](SKILL.md), [`references/`](references/craft-3d.md), and (where generalizable) `kit/` so future figures do not repeat the mistake.

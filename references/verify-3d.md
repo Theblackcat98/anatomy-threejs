@@ -21,7 +21,8 @@ node figures/<slug>/build.mjs --audit
 
 | Audit Tag | Meaning | How to Fix |
 | :--- | :--- | :--- |
-| `[MODEL]` | Invalid `SPEC` enum (`archetype`, `simulationMode`, `toneMode`, `section`, `controls`, `triggers`, `cameraViews`), non-finite anchor coordinates, or `formatReadout` returns `NaN`/`undefined`. | Fix the malformed `SPEC` field or `ANCHORS` entry in `model.mjs`, or guard divide-by-zero in `formatReadout`. |
+| `[MODEL]` | Invalid `SPEC` enum (`archetype`, `simulationMode`, `toneMode`, `section`, `controls`, `triggers`, `cameraViews`), duplicate control/trigger IDs, non-finite anchor coordinates, or `formatReadout` returns `NaN`/`undefined`. | Fix the malformed `SPEC` field or `ANCHORS` entry in `model.mjs`, or guard divide-by-zero in `formatReadout`. |
+| `[SECTION]` | `SPEC.section` is enabled, but `0` parts have `clippable: true`. | Pass `clippable: true` on the outer housings, barrels, and shrouds that `SECT` should slice through, or set `features.section: false` and remove `SPEC.section`. |
 | `[TONE]` | In `"single-lit"` mode: `stage: "subject"` has 0 `lit` parts or `lit` appears outside `"subject"`; in `"multi-channel"` mode: 0 parts use `lit`, `glass`, or channel ramps. | Assign `ramp: "lit"` to the hero subject, or set `SPEC.toneMode: "multi-channel"` in `model.mjs` when multiple flows/stages use `lit`, `glass`, or `channelA..D` ramps. |
 | `[UNMOUNTED]` | A non-detail part has no `mountOn` target. | Pass `mountOn: "<supportingPartId>"` (or `"ground"` for the bedplate, primary rail/bridge supports when omitting a bottom plate, or stator; or `"coaxial"` for the main shaft). |
 | `[MOUNT]` | `mountOn` references a part ID that does not exist. | Check spelling of the target part ID in `reg.part(...)`. |

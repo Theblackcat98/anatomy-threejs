@@ -946,8 +946,7 @@ export function mountAnatomyFigure(config) {
       let tourExplodeTarget = null;
       let tourCutawayTarget = null;
       let tourShaderTarget = null;
-      const idleThresholdMs = hasUserInteracted ? 3600 : 1600;
-      if (typeof tourFn === "function" && (now - lastInteractionMs) > idleThresholdMs && activePointers.size === 0) {
+      if (!hasUserInteracted && typeof tourFn === "function" && (now - lastInteractionMs) > 1600 && activePointers.size === 0) {
         tourClock += dt;
         const patch = tourFn(tourClock, {
           theta: state.theta,

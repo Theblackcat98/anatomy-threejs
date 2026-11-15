@@ -186,11 +186,16 @@ export function runModelAudit(model) {
       );
     }
     if (Array.isArray(SPEC.controls)) {
+      const seenControlIds = new Set();
       for (const c of SPEC.controls) {
         if (!c || typeof c.id !== "string" || typeof c.label !== "string") {
           errors.push("[MODEL] Each SPEC.controls entry must have string id and label");
           break;
         }
+        if (seenControlIds.has(c.id)) {
+          errors.push(`[MODEL] Duplicate SPEC.controls id "${c.id}"`);
+        }
+        seenControlIds.add(c.id);
         if (!Number.isFinite(c.min) || !Number.isFinite(c.max) || c.min >= c.max || !Number.isFinite(c.initial)) {
           errors.push(`[MODEL] SPEC.controls "${c.id}" has invalid min/max/initial bounds`);
         }
@@ -212,12 +217,20 @@ export function runModelAudit(model) {
       }
     }
     if (Array.isArray(SPEC.triggers)) {
+      const seenTriggerIds = new Set();
       for (const t of SPEC.triggers) {
         if (!t || typeof t.id !== "string" || typeof t.label !== "string") {
           errors.push("[MODEL] Each SPEC.triggers entry must have string id and label");
           break;
         }
+        if (seenTriggerIds.has(t.id)) {
+          errors.push(`[MODEL] Duplicate SPEC.triggers id "${t.id}"`);
+        }
+        seenTriggerIds.add(t.id);
       }
+    }
+    if (SPEC.features?.section === true && !SPEC.section) {
+      errors.push("[MODEL] SPEC.features.section is true, but SPEC.section is missing");
     }
     if (SPEC.section && typeof SPEC.section === "object") {
       const axis = SPEC.section.axis || "z";
@@ -314,13 +327,15 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
   const poses = Array.isArray(options.poses) && options.poses.length > 0 ? options.poses : defaultPoses;
   const restPose = poses.find((p) => !p.explode) || poses[0];
 
-  // 0. TONE HIERARCHY & MOUNT METADATA CHECK
+  // 0. TONE HIERARCHY, SECTION CLIPPING & MOUNT METADATA CHECK
   const toneMode = options.toneMode || "single-lit";
   let litCount = 0;
   let accentCount = 0;
+  let clippableCount = 0;
   let hasSubjectStage = false;
   for (const [id, item] of reg.parts) {
     if (item.opts.stage === "subject") hasSubjectStage = true;
+    if (item.opts.clippable) clippableCount++;
     const ramp = item.opts.ramp;
     if (ACCENT_RAMPS.has(ramp)) accentCount++;
     if (ramp === "lit") {
@@ -332,6 +347,9 @@ export function runGeometryAudit(reg, stepModelFn, options = {}) {
     if (!item.opts.detail && !item.opts.mountOn) {
       errors.push(`[UNMOUNTED] "${id}" is missing a mountOn property (specify parent part ID, "ground", or "coaxial")`);
     }
+  }
+  if (options.section && options.features?.section !== false && clippableCount === 0) {
+    errors.push(`[SECTION] SPEC.section is enabled, but 0 parts have clippable: true`);
   }
   if (hasSubjectStage) {
     if (toneMode === "multi-channel") {
