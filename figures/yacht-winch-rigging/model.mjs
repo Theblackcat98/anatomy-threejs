@@ -1,277 +1,391 @@
+export const TAU = Math.PI * 2;
+
+function clamp(x, lo, hi) {
+  return Math.max(lo, Math.min(hi, x));
+}
+
+function clampUnit(x) {
+  return Math.max(0, Math.min(1, x));
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
 export const SPEC = {
   archetype: "section",
   simulationMode: "continuous",
   toneMode: "multi-channel",
 
-  // Sculpted yacht foredeck & cockpit section dimensions
-  deckW: 5.0,
-  deckD: 2.65,
-  deckH: 0.22,
-  deckY: -1.62,
-  topSurfaceY: -1.62 + 0.22 + 0.025, // -1.375
+  // Yacht Deck Section Envelope
+  DECK_W: 4.60,
+  DECK_D: 3.30,
+  DECK_H: 0.28,
+  FLOOR_Y: -1.75,
+  DECK_SLAB_Y: -1.445,    // With bevelThickness 0.025 -> bottom = -1.75, top = -1.42
+  topSurfaceY: -1.42,
 
-  // Mast, spreaders & boom coordinates
-  mastX: -1.32,
-  mastZ: -0.16,
-  mastHeight: 2.84,
-  spreaderY: 0.24,
-  spreaderHalfSpan: 0.58,
-  boomY: -0.68,
-  boomLength: 1.82,
+  // Starboard 46ST 2-Speed Self-Tailing Winch Coordinates
+  WINCH_CX: 1.12,
+  WINCH_CZ: 0.18,
+  WINCH_PLINTH_H: 0.24,
+  WINCH_BASE_Y: -1.18,    // Top of base.winchPlinth (-1.42 + 0.24)
+  SKIRT_H: 0.18,          // struct.winchBaseSkirt: -1.18 .. -1.00
+  CARRIER_Y: -0.58,       // Planetary carrier plate center Y
+  PLANET_Y: -0.42,        // Planetary gear & internal ring gear plane Y
+  COMPOUND_Y: -0.82,      // 2nd-speed compound reduction gear plane Y
+  DRUM_R_TOP: 0.58,
+  DRUM_R_BOT: 0.64,
+  DRUM_H: 0.96,           // Drum shell spans y in [-0.80, +0.16]
+  JAWS_Y: 0.23,           // Self-tailing ribbed brass jaw crown center Y
+  STRIPPER_Y: 0.32,       // Stationary chrome stripper arm center Y
+  HANDLE_Y: 0.54,         // Lock-in winch handle socket plane (clears stripper arm!)
+  HANDLE_LEN: 0.68,
 
-  // Hero 2-speed self-tailing planetary winch (coaming top at topSurfaceY + 0.24 = -1.135)
-  // Exact involute pitch math (module m = 0.025): rSun + 2*rPlanet = 0.150 + 0.375 = 0.525 = rRing
-  winchX: 1.40,
-  winchZ: 0.40,
-  winchBaseY: -1.135,
-  sunTeeth: 12,
-  planetTeeth: 15,
-  ringTeeth: 42,
-  rSun: 0.150,
-  rPlanet: 0.1875,
-  rRing: 0.525,
-  gearToothDepth: 0.036,
-  gearRatioLow: 3.5, // 42 / 12 exact planetary reduction
+  // 46ST Gear Ratios & Capstan Constants
+  GEAR1_RATIO: 2.60,      // CW Handle -> Fast Trim (13.5:1 power ratio)
+  GEAR2_RATIO: 9.20,      // CCW Handle -> Low-Speed Grind (46.0:1 power ratio)
+  POWER_RATIO_1: 13.5,
+  POWER_RATIO_2: 46.0,
+  CAPSTAN_MU: 0.33,
+  CAPSTAN_TURNS: 3.25,
+
+  // Masthead Rig, Spreaders, Boom & Sail Foil Coordinates
+  MAST_X: -1.18,
+  MAST_Z: -0.18,
+  MAST_STEP_Y: -1.30,
+  GOOSENECK_Y: -0.82,
+  SPREADER_Y: 0.60,
+  SPREADER_SPAN: 0.96,    // Each spreader extends 0.96 u in +Z and -Z
+  MASTHEAD_Y: 2.28,
+  BOOM_LEN: 1.48,
+  SAIL_LUFF_H: 2.92,
+  SAIL_FOOT_W: 1.40,
+  CHAINPLATE_Z_WIND: 1.12,
+  CHAINPLATE_Z_LEE: -1.42,
+  STEMHEAD_X: -2.08,
+  STERN_BACKSTAY_X: -0.22,
 
   features: {
-    explode: true,
-    cutaway: true,
-    shader: true,
-    crank: true,
-    slow: true,
-    section: true
+    explode: false,   // Open rigging + cutaway winch drum -> explode disabled to keep shrouds & tubes intact
+    cutaway: true,    // Hides front half of winch drum barrel & upper gear housing cover to expose planetary + compound gears
+    shader: true,     // GLSL aerodynamic windward pressure + leeward suction slot streamlines across sail camber
+    crank: true,      // Manual handle cranking in viewport
+    slow: true,       // 1x, 1/5x, 1/20x, PAUSED
+    section: false    // Cutaway already opens the +Z front winch drum cleanly
   },
 
-  interactionHint: "Drag winch handle to crank (CW 1:1 / CCW 3.5:1), or drag boom/wind vane",
+  interactionHint: "Drag handle to crank or sail/boom to trim",
 
   controls: [
     {
       id: "rpm",
       label: "CRANK",
-      min: -60,
-      max: 60,
-      step: 4,
-      initial: -32,
-      title: "Winch handle speed (CW + = 1:1 High Speed, CCW - = 3.5:1 Planetary Power, 0 = Hold)"
+      min: 15,
+      max: 120,
+      step: 5,
+      initial: 55,
+      title: "Winch handle cranking cadence (RPM)"
     },
     {
-      id: "wind",
-      label: "WIND",
-      min: 4,
-      max: 36,
+      id: "gearMode",
+      label: "GEAR (1/2)",
+      min: 1,
+      max: 2,
+      step: 1,
+      initial: 1,
+      title: "1 = CW Handle (Fast 2.6:1 Trim) · 2 = CCW Handle (High-Torque 9.2:1 Grind)"
+    },
+    {
+      id: "windKt",
+      label: "WIND KT",
+      min: 6,
+      max: 32,
       step: 1,
       initial: 18,
-      title: "Apparent wind speed (knots) — drives sail camber & shroud load"
+      title: "Apparent wind speed (knots) — drives sail camber, shroud kN load & mast bend"
     },
     {
-      id: "trim",
-      label: "SHEET",
-      min: 0,
+      id: "backstay",
+      label: "BACKSTAY",
+      min: 10,
       max: 100,
-      step: 2,
-      initial: 58,
-      title: "Mainsheet trim (0% eased off -> 100% close-hauled)"
+      step: 5,
+      initial: 45,
+      title: "Hydraulic backstay tension (%) — bends mast & flattens mid-sail draft camber"
     }
   ],
 
   triggers: [
     {
-      id: "fastCw",
-      label: "1:1 CW",
-      rise: 0.05,
-      fall: 0.55,
-      title: "Switch winch handle clockwise to 1:1 direct high-speed gear",
-      onTrigger: ({ setParam }) => setParam("rpm", 44)
-    },
-    {
-      id: "powerCcw",
-      label: "3.5:1 CCW",
-      rise: 0.05,
-      fall: 0.55,
-      title: "Reverse winch handle counter-clockwise to engage 3.5:1 planetary reduction",
-      onTrigger: ({ setParam }) => setParam("rpm", -36)
+      id: "reverseGear",
+      label: "SHIFT 2ND GEAR",
+      rise: 0.14,
+      fall: 1.60,
+      title: "Reverse handle rotation into 2nd-speed compound reduction (46:1 high-load grind)"
     },
     {
       id: "gust",
-      label: "GUST +14kn",
-      rise: 0.08,
+      label: "WIND GUST",
+      rise: 0.12,
       fall: 1.25,
-      title: "Simulate sudden wind gust — spikes sail camber and windward shroud tension"
+      title: "Hit rig with a 10-knot wind gust — deepens sail draft, spikes windward shroud load & deflects masthead"
     }
   ],
 
-  section: {
-    axis: "z",
-    min: -0.95,
-    max: 1.15,
-    initial: 1.15,
-    label: "SECT",
-    title: "Slice planetary winch housing, deck coaming, and mast partner along Z"
-  },
-
   cameraViews: [
-    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 1.00, pan: [0, 0.04] },
-    { id: "winch", label: "WINCH", elev: 28, azim: -26, zoom: 1.62, pan: [-1.10, 0.58] },
-    { id: "rig", label: "RIG", elev: 18, azim: -48, zoom: 1.08, pan: [0.60, -0.20] },
-    { id: "top", label: "DECK", elev: 86, azim: 0, zoom: 0.98, pan: [0, 0] }
+    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.88, pan: [0.02, 0.14] },
+    { id: "winch", label: "PLANETARY", elev: 24, azim: -28, zoom: 1.58, pan: [-0.82, 0.36] },
+    { id: "jaws", label: "SELF-TAILER", elev: 42, azim: -16, zoom: 1.72, pan: [-0.88, 0.08] },
+    { id: "rig", label: "MAST & SAIL", elev: 22, azim: -48, zoom: 1.08, pan: [0.68, -0.14] },
+    { id: "top", label: "DECK PLAN", elev: 88, azim: 0, zoom: 0.94, pan: [0.0, 0.0] }
   ],
 
-  initialTheta: 0.45,
-  initialRpm: -32,
+  initialTheta: 1.85,
+  initialRpm: 55,
   isoElevDeg: 30,
   isoAzimDeg: -36,
-  initialZoom: 1.00,
-  initialPanY: 0.04,
-  minVertSpan: 5.5,
-  minHorizSpan: 7.2,
+  initialZoom: 0.88,
+  initialPanY: 0.14,
+  minVertSpan: 5.8,
+  minHorizSpan: 7.4,
 
   auditPoses: [
-    { name: "3.5:1 CCW power (θ=0°)", theta: 0, explode: 0, params: { rpm: -32, wind: 18, trim: 58 } },
-    { name: "1:1 CW fast (θ=90°)", theta: Math.PI * 0.5, explode: 0, params: { rpm: 44, wind: 12, trim: 85 } },
-    { name: "eased light air (θ=180°)", theta: Math.PI, explode: 0, params: { rpm: 0, wind: 6, trim: 15 } },
-    { name: "heavy gust close-hauled (θ=270°)", theta: Math.PI * 1.5, explode: 0, params: { rpm: -48, wind: 36, trim: 95 } },
-    { name: "exploded (E=1)", theta: 0.45, explode: 1, params: { rpm: -32, wind: 18, trim: 58 } }
+    {
+      name: "gear 1 fast trim (18 kt wind)",
+      theta: 1.85,
+      explode: 0,
+      params: { rpm: 55, gearMode: 1, windKt: 18, backstay: 45 }
+    },
+    {
+      name: "gear 2 high-torque grind (26 kt wind)",
+      theta: Math.PI * 0.75,
+      explode: 0,
+      params: { rpm: 70, gearMode: 2, windKt: 26, backstay: 75 }
+    },
+    {
+      name: "light air full camber (8 kt, low backstay)",
+      theta: Math.PI * 1.35,
+      explode: 0,
+      params: { rpm: 40, gearMode: 1, windKt: 8, backstay: 15 }
+    },
+    {
+      name: "storm flattened trim (32 kt, max backstay)",
+      theta: Math.PI * 1.90,
+      explode: 0,
+      params: { rpm: 95, gearMode: 2, windKt: 32, backstay: 100 }
+    },
+    {
+      name: "gust & shift trigger active",
+      theta: 2.40,
+      explode: 0,
+      params: { rpm: 65, gearMode: 1, windKt: 22, backstay: 60 },
+      triggers: { reverseGear: 1.0, gust: 1.0 }
+    }
   ],
 
   drivePoses: [
     {
-      label: "1. 3.5:1 CCW PLANETARY",
-      pose: { theta: 0.45, explode: 0, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: -32, wind: 18, trim: 58 } }
+      label: "1. GEAR 1 (CW) · FAST SHEET TRIM (13.5:1)",
+      pose: { theta: 1.85, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 55, gearMode: 1, windKt: 16, backstay: 35 } }
     },
     {
-      label: "2. 1:1 CW DIRECT SPEED",
-      pose: { theta: 1.2, explode: 0, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 44, wind: 14, trim: 78 } }
+      label: "2. GEAR 2 (CCW) · COMPOUND GRIND (46:1)",
+      pose: { theta: 3.40, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 65, gearMode: 2, windKt: 26, backstay: 70 } }
     },
     {
-      label: "3. HEAVY WIND · 34 KN",
-      pose: { theta: 2.0, explode: 0, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: -40, wind: 34, trim: 92 } }
+      label: "3. LIGHT AIR (8 KT) · DEEP 16% SAIL CAMBER",
+      pose: { theta: 0.65, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 40, gearMode: 1, windKt: 8, backstay: 15 } }
     },
     {
-      label: "4. EASED REACH · 10% TRIM",
-      pose: { theta: 2.8, explode: 0, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 20, wind: 16, trim: 10 } }
+      label: "4. HEAVY AIR (32 KT) + MAX BACKSTAY BEND",
+      pose: { theta: 4.80, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 90, gearMode: 2, windKt: 32, backstay: 100 } }
     },
     {
-      label: "5. EXPLODED PLANETARY",
-      pose: { theta: 0.45, explode: 1, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: -32, wind: 18, trim: 58 } }
+      label: "5. WIND GUST PULSE · SHROUD PEAK LOAD",
+      pose: { theta: 2.60, cutaway: true, shader: true, trigger: "gust", hud: true, theme: "light", params: { rpm: 70, gearMode: 2, windKt: 24, backstay: 55 } }
     },
     {
-      label: "6. CUTAWAY OFF (CLOSED DRUM)",
-      pose: { theta: 0.45, explode: 0, cutaway: false, shader: true, hud: true, theme: "light", params: { rpm: -32, wind: 18, trim: 58 } }
+      label: "6. CUTAWAY OFF · ENCLOSED 46ST DRUM",
+      pose: { theta: 2.10, cutaway: false, shader: true, hud: true, theme: "light", params: { rpm: 55, gearMode: 1, windKt: 18, backstay: 45 } }
     },
     {
-      label: "7. DARK THEME · Z-SLICE",
-      pose: { theta: 1.0, explode: 0, cutaway: true, shader: true, section: 0.46, hud: true, theme: "dark", params: { rpm: -36, wind: 26, trim: 72 } }
+      label: "7. DARK THEME · AERODYNAMIC SLOT FLOW",
+      pose: { theta: 3.90, cutaway: true, shader: true, hud: true, theme: "dark", params: { rpm: 65, gearMode: 2, windKt: 24, backstay: 65 } }
     },
     {
-      label: "8. BLUEPRINT THEME",
-      pose: { theta: 2.2, explode: 0, cutaway: true, shader: true, hud: true, theme: "blueprint", params: { rpm: 32, wind: 20, trim: 60 } }
+      label: "8. BLUEPRINT THEME · RIG & PLANETARY PLAN",
+      pose: { theta: 1.20, cutaway: true, shader: true, hud: true, theme: "blueprint", params: { rpm: 55, gearMode: 1, windKt: 20, backstay: 50 } }
     }
   ]
 };
 
-const TOP_Y = SPEC.topSurfaceY;
-
 export const ANCHORS = {
-  baseTop: [0, TOP_Y, 0],
-  mastStep: [SPEC.mastX, TOP_Y, SPEC.mastZ],
-  shroudPort: [SPEC.mastX, TOP_Y, -1.10],
-  shroudStbd: [SPEC.mastX, TOP_Y, 0.78],
-  forestayDeck: [-2.30, TOP_Y, SPEC.mastZ],
-  backstayDeck: [0.54, TOP_Y, -1.10],
-  travelerCenter: [0.22, TOP_Y, -0.02],
-  turningBlock: [0.42, TOP_Y, 0.52],
-  winchBase: [SPEC.winchX, SPEC.winchBaseY, SPEC.winchZ],
-  screenMount: [-1.86, TOP_Y, 0.84],
-  plaqueCenter: [-0.04, TOP_Y, 1.03]
+  winchCenter: [SPEC.WINCH_CX, SPEC.WINCH_BASE_Y, SPEC.WINCH_CZ],
+  mastStepCenter: [SPEC.MAST_X, SPEC.MAST_STEP_Y, SPEC.MAST_Z],
+  gooseneckPivot: [-1.06, SPEC.GOOSENECK_Y, SPEC.MAST_Z],
+  spreaderRoot: [SPEC.MAST_X, SPEC.SPREADER_Y, SPEC.MAST_Z],
+  mastheadTop: [SPEC.MAST_X, SPEC.MASTHEAD_Y, SPEC.MAST_Z],
+  windwardChainplate: [SPEC.MAST_X, -1.26, SPEC.CHAINPLATE_Z_WIND],
+  leewardChainplate: [SPEC.MAST_X, -1.26, SPEC.CHAINPLATE_Z_LEE],
+  stemheadFitting: [SPEC.STEMHEAD_X, -1.26, SPEC.MAST_Z],
+  sternBackstayPad: [SPEC.STERN_BACKSTAY_X, -1.26, SPEC.MAST_Z],
+  turningBlockOut: [-0.44, -1.22, 0.88],
+  winchSheetIn: [0.34, -0.96, 0.56],
+  stripperTailOut: [1.12, 0.26, 0.82],
+  cockpitCleatIn: [1.92, -1.28, 1.02],
+  screenMount: [-0.04, -1.15, 1.34],
+  plaqueCenter: [1.16, -1.38, 1.42]
 };
 
 /**
- * Computes exact planetary winch kinematics & aerodynamic rigging loads.
- * Right-handed +Y rotation sign convention (runtime.mjs steps theta -= omega * dt):
- * - rpm > 0 (CW crank): d(theta)/dt < 0 -> handleRotY = theta turns CW; 1:1 ratchet locks carrier & drum together (CW).
- * - rpm < 0 (CCW crank): d(theta)/dt > 0 -> handleRotY = theta turns CCW; base ratchet holds carrier fixed,
- *   sun turns CCW (+theta), 3x planets spin CW (-theta * 12/15), and ring/drum turns CW (-theta / 3.5)!
+ * Computes exact NACA-style sail camber offset (+Z leeward/windward billow)
+ * for normalized chord xi in [0..1] (0 = mast luff, 1 = leech)
+ * and normalized span eta in [0..1] (0 = boom foot, 1 = masthead peak).
  */
-export function getRigState(state = {}) {
-  const rpm = state.params?.rpm ?? state.rpm ?? SPEC.initialRpm;
-  const wind = Math.max(4, Math.min(36, state.wind ?? state.params?.wind ?? 18));
-  const trim = Math.max(0, Math.min(100, state.trim ?? state.params?.trim ?? 58));
-  const gust = state.triggers?.gust ?? 0;
-  const theta = state.theta ?? SPEC.initialTheta;
+export function computeSailSurfaceOffset(xi, eta, camberRatio, twistRad, mastPreBend) {
+  // Peak draft positioned at 38% chord (xi = 0.38)
+  const p = 0.38;
+  const camberProfile =
+    xi < p
+      ? (2 * p * xi - xi * xi) / (p * p)
+      : (1 - 2 * p + 2 * p * xi - xi * xi) / ((1 - p) * (1 - p));
 
-  const effWind = wind + gust * 14;
-  const isLowGear = rpm < -0.5;
-  const isHold = Math.abs(rpm) <= 0.5;
-  const ratio = isLowGear ? SPEC.gearRatioLow : 1.0;
+  // Camber builds from foot/head toward mid-span and scales with camberRatio
+  const spanEnvelope = 0.35 + 0.65 * Math.sin(Math.PI * clampUnit(eta * 0.92 + 0.04));
+  // Sail billows toward -Z (leeward) under wind coming from +Z (windward)
+  const billowZ = -camberRatio * 1.65 * camberProfile * spanEnvelope;
 
-  const handleRotY = theta;
-  let carrierRotY = 0;
-  let planetSelfRot = 0;
-  let drumRotY = 0;
+  // Spanwise leech twist opens upper leech toward -Z
+  const twistZ = -Math.sin(twistRad * Math.pow(eta, 1.25)) * xi * 0.62;
 
-  if (isLowGear) {
-    // Sun turns CCW (+theta), carrier held stationary by base ratchet,
-    // planets spin CW (-theta * Zs/Zp), ring & drum turn CW (-theta * Zs/Zr).
-    carrierRotY = 0;
-    planetSelfRot = -theta * (SPEC.sunTeeth / SPEC.planetTeeth);
-    drumRotY = -theta / SPEC.gearRatioLow;
-  } else {
-    // 1:1 Direct CW lock: carrier, planets, ring & drum turn rigidly with handle/sun.
-    carrierRotY = theta;
-    planetSelfRot = 0;
-    drumRotY = theta;
-  }
-
-  // Boom ease angle (rad around Y): trim=100% -> -0.05 rad (close-hauled), trim=0% -> -0.68 rad (eased toward +Z)
-  const trimNorm = trim / 100;
-  const windPush = Math.min(1, effWind / 36) * 0.14 * (1 - 0.65 * trimNorm);
-  const boomAngleY = -(0.05 + (1 - trimNorm) * 0.52 + windPush);
-
-  // Traveler car z-offset responds gently to sheet trim
-  const travelerCarZ = 0.24 - trimNorm * 0.34;
-
-  // Sail dynamic camber depth (0.10 .. 0.36)
-  const camber = (0.09 + 0.22 * Math.pow(effWind / 36, 0.85)) * (1.12 - 0.38 * trimNorm);
-
-  // Shroud tension (kN): windward shroud carries primary load, leeward goes slack
-  const totalLoadKn = 1.4 + 0.022 * effWind * effWind * (0.45 + 0.55 * trimNorm);
-  const windwardShroudKn = totalLoadKn * 0.84;
-  const leewardShroudKn = Math.max(0.4, totalLoadKn * 0.16);
-  const sheetLoadKn = totalLoadKn * 0.34;
-
-  // Apparent wind vane angle (steers toward aft-port with wind speed)
-  const windVaneYaw = 0.42 + (effWind / 36) * 0.35;
-
-  const gearLabel = isHold ? "RATCHET HOLD" : isLowGear ? "3.5:1 PLANETARY" : "1:1 DIRECT";
+  // Luff tracks mast pre-bend along X
+  const luffBendX = mastPreBend * Math.sin(Math.PI * eta) * (1 - xi);
 
   return {
-    rpm,
-    effWind,
-    trim,
-    trimNorm,
-    gust,
-    isLowGear,
-    isHold,
-    ratio,
-    gearLabel,
-    handleRotY,
-    carrierRotY,
-    planetSelfRot,
-    drumRotY,
-    boomAngleY,
-    travelerCarZ,
-    camber,
-    windwardShroudKn,
-    leewardShroudKn,
-    sheetLoadKn,
-    windVaneYaw
+    dx: luffBendX,
+    dz: billowZ + twistZ
   };
 }
 
-export function formatReadout(state) {
-  const r = getRigState(state);
+export function getRigState(theta = SPEC.initialTheta, params = {}, triggers = {}) {
+  const crankRpm = clamp(params.rpm ?? 55, 15, 120);
+  const rawGear = params.gearMode ?? 1;
+  const shiftEnv = clampUnit(triggers.reverseGear ?? 0);
+  const gustEnv = clampUnit(triggers.gust ?? 0);
+
+  // Active gear: Gear 2 engages either via slider (gearMode >= 1.5) or SHIFT 2ND GEAR trigger
+  const gearBlend = clampUnit(Math.max(rawGear - 1, shiftEnv));
+  const isGear2 = gearBlend >= 0.5;
+  const activeGear = isGear2 ? 2 : 1;
+  const gearRatio = lerp(SPEC.GEAR1_RATIO, SPEC.GEAR2_RATIO, gearBlend);
+  const powerRatio = lerp(SPEC.POWER_RATIO_1, SPEC.POWER_RATIO_2, gearBlend);
+
+  // Effective wind speed including gust impulse (+10 kt peak)
+  const baseWindKt = clamp(params.windKt ?? 18, 6, 32);
+  const effWindKt = clamp(baseWindKt + gustEnv * 10.0, 6, 38);
+  const windNorm = clampUnit((effWindKt - 6) / 28);
+
+  // Hydraulic backstay tension (%)
+  const backstayPct = clamp(params.backstay ?? 45, 10, 100);
+  const backstayNorm = (backstayPct - 10) / 90;
+
+  // Winch kinematics (kit/runtime.mjs decrements state.theta as time advances, so d(theta)/dt < 0):
+  // In right-handed +Y coords, decreasing rotation.y = clockwise (CW) viewed from above.
+  // - Gear 1 (handleDir = +1): handleRad = +theta turns CW; drumRad = +theta/2.6 turns CW.
+  // - Gear 2 (handleDir = -1): handleRad = -theta turns CCW; drumRad = +theta/9.2 STILL turns CW!
+  const handleDir = isGear2 ? -1 : 1;
+  const handleRad = theta * handleDir;
+  const drumRad = theta / gearRatio;
+  const carrierRad = isGear2 ? drumRad * 1.45 : handleRad * 0.52;
+  const planetSelfRad = (handleRad - carrierRad) * 2.2;
+  const compoundRad = isGear2 ? -handleRad * (10 / 18) : -handleRad * 0.25;
+
+  // Periodic sheet trim cycle coupled to drum rotation + wind/backstay
+  // Smoothly cycles sheet trim between 0.15 (eased) and 0.95 (sheeted hard in)
+  const trimWave = 0.52 + 0.43 * Math.sin(theta * 0.45);
+  const sheetTrim = clampUnit(trimWave + backstayNorm * 0.08 - gustEnv * 0.10);
+
+  // Boom trim angle (close-hauled ~9 deg = 0.16 rad when sheetTrim=1; eased ~36 deg = 0.63 rad when sheetTrim=0)
+  const boomAngleRad = lerp(0.62, 0.15, sheetTrim) + gustEnv * 0.05;
+
+  // Dynamic Sail Camber (f/c ratio: 6.2% flattened up to 17.5% deep draft)
+  // Wind pressure deepens draft; sheet tension and hydraulic backstay mast-bend flatten draft!
+  const camberRatio = clamp(
+    0.115 + windNorm * 0.055 + gustEnv * 0.028 - sheetTrim * 0.042 - backstayNorm * 0.038,
+    0.062,
+    0.178
+  );
+  const camberPct = camberRatio * 100;
+
+  // Spanwise leech twist (radians)
+  const twistRad = clamp(0.18 + windNorm * 0.16 - sheetTrim * 0.14 + gustEnv * 0.08, 0.08, 0.42);
+
+  // Masthead deflection & pre-bend
+  const mastPreBend = 0.035 + backstayNorm * 0.065 + sheetTrim * 0.02;
+  const mastAftBendRad = 0.015 + backstayNorm * 0.042;
+  const mastLeewardDropRad = 0.012 + windNorm * 0.045 + gustEnv * 0.022;
+
+  // Forces: Sheet Load (kN), Tail Load (N), Windward Cap Shroud V1 Load (kN), Backstay Load (kN)
+  const dynamicPressure = (effWindKt / 18) * (effWindKt / 18);
+  const sheetLoadKn = clamp(1.4 + dynamicPressure * (3.2 + sheetTrim * 2.8), 0.8, 9.8);
+  const capstanFactor = Math.exp(SPEC.CAPSTAN_MU * SPEC.CAPSTAN_TURNS * TAU); // ~843
+  const tailLoadN = (sheetLoadKn * 1000) / capstanFactor;
+  const handleForceN = Math.round((sheetLoadKn * 1000) / powerRatio);
+
+  const windwardShroudKn = clamp(3.5 + dynamicPressure * 6.8 + backstayNorm * 3.2, 2.5, 18.5);
+  const leewardShroudKn = clamp(2.2 - windNorm * 1.6 + backstayNorm * 1.1, 0.3, 4.0);
+  const backstayKn = clamp(1.8 + backstayNorm * 10.4 + windNorm * 2.2, 1.5, 14.2);
+
+  const modeLabel =
+    gustEnv > 0.25
+      ? "GUST LOAD · SHROUD PEAK"
+      : isGear2
+        ? "2ND GEAR (CCW) · 46:1 GRIND"
+        : "1ST GEAR (CW) · 13.5:1 FAST TRIM";
+
   return {
-    readout: `${r.gearLabel} · ${r.effWind.toFixed(1)} kn · SHROUD ${r.windwardShroudKn.toFixed(1)} kN · SHEET ${r.sheetLoadKn.toFixed(1)} kN`,
-    phase: `WINCH ${r.ratio.toFixed(1)}:1 · TRIM ${Math.round(r.trim)}%`
+    theta,
+    crankRpm,
+    activeGear,
+    isGear2,
+    gearBlend,
+    gearRatio,
+    powerRatio,
+    effWindKt,
+    windNorm,
+    backstayPct,
+    backstayNorm,
+    handleRad,
+    drumRad,
+    carrierRad,
+    planetSelfRad,
+    compoundRad,
+    sheetTrim,
+    boomAngleRad,
+    camberRatio,
+    camberPct,
+    twistRad,
+    mastPreBend,
+    mastAftBendRad,
+    mastLeewardDropRad,
+    sheetLoadKn,
+    tailLoadN,
+    handleForceN,
+    windwardShroudKn,
+    leewardShroudKn,
+    backstayKn,
+    shiftEnv,
+    gustEnv,
+    modeLabel
+  };
+}
+
+export function formatReadout(state = {}) {
+  const st = getRigState(state.theta ?? SPEC.initialTheta, state.params || state, state.triggers || {});
+  const dirTag = st.isGear2 ? "CCW" : "CW";
+  return {
+    readout: `GEAR ${st.activeGear} (${dirTag} ${st.powerRatio.toFixed(1)}:1) · SHEET ${st.sheetLoadKn.toFixed(1)} kN · V1 ${st.windwardShroudKn.toFixed(1)} kN · CAMBER ${st.camberPct.toFixed(1)}% · ${Math.round(st.effWindKt)} kt`,
+    phase: `46ST SELF-TAILING · ${st.modeLabel}`
   };
 }

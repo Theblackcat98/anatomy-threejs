@@ -1,464 +1,324 @@
 import * as THREE from "three";
-import {
-  buildSlabGeometry,
-  buildCylinderGeometry,
-  makeScrewDetail
-} from "../../kit/primitives.mjs";
-import { SPEC, ANCHORS } from "./model.mjs";
-
-/**
- * Builds an annular cylinder arc extruded along +Y.
- * Under rotateX(-PI/2), shape angle `a` maps to XZ: x = r*cos(a), z = -r*sin(a).
- * Canonical ISO camera looks from (+0.509, +0.500, +0.701) -> a ≈ 306° (-54°).
- */
-function buildArcWallGeometry(rInner, rOuter, height, aStartDeg, aEndDeg, segs = 32) {
-  const shape = new THREE.Shape();
-  const aStart = (aStartDeg * Math.PI) / 180;
-  const aEnd = (aEndDeg * Math.PI) / 180;
-  const span = Math.abs(aEnd - aStart);
-
-  if (span >= Math.PI * 1.99) {
-    shape.absarc(0, 0, rOuter, 0, Math.PI * 2, false);
-    const hole = new THREE.Path();
-    hole.absarc(0, 0, rInner, 0, Math.PI * 2, true);
-    shape.holes.push(hole);
-  } else {
-    for (let i = 0; i <= segs; i++) {
-      const a = aStart + (aEnd - aStart) * (i / segs);
-      const x = Math.cos(a) * rOuter;
-      const y = Math.sin(a) * rOuter;
-      if (i === 0) shape.moveTo(x, y);
-      else shape.lineTo(x, y);
-    }
-    for (let i = segs; i >= 0; i--) {
-      const a = aStart + (aEnd - aStart) * (i / segs);
-      shape.lineTo(Math.cos(a) * rInner, Math.sin(a) * rInner);
-    }
-    shape.closePath();
-  }
-
-  const geo = new THREE.ExtrudeGeometry(shape, {
-    depth: height,
-    bevelEnabled: true,
-    bevelSize: 0.007,
-    bevelThickness: 0.007,
-    bevelSegments: 1
-  });
-  geo.translate(0, 0, -height * 0.5);
-  geo.rotateX(-Math.PI / 2);
-  return geo;
-}
+import { buildCylinderGeometry, makeScrewDetail } from "../../kit/primitives.mjs";
+import { SPEC } from "./model.mjs";
 
 export function buildStructure(reg, kit) {
   const structGroup = reg.group("struct.group", { stage: "structure" });
   const {
-    topSurfaceY,
-    mastX,
-    mastZ,
-    mastHeight,
-    spreaderY,
-    spreaderHalfSpan,
-    winchX,
-    winchZ,
-    winchBaseY,
-    rRing
+    WINCH_CX,
+    WINCH_CZ,
+    WINCH_BASE_Y,
+    SKIRT_H,
+    CARRIER_Y,
+    MAST_X,
+    MAST_Z,
+    GOOSENECK_Y,
+    SPREADER_Y,
+    SPREADER_SPAN,
+    CHAINPLATE_Z_WIND,
+    CHAINPLATE_Z_LEE,
+    STEMHEAD_X
   } = SPEC;
 
-  // 1. Mast Partner Collar, Bolted Flange, Tapered Spar, Spreaders & Masthead Crane
-  reg.part("struct.mastPartner", buildCylinderGeometry(0.16, 0.22, 0.14, { segments: 24, axis: "y" }), {
-    parent: structGroup,
-    pos: [mastX, topSurfaceY + 0.07, mastZ],
-    ramp: "mid",
-    outline: "mid",
-    crease: "lo",
-    clippable: true,
-    mountOn: "base.deckSection"
-  });
-  [0, 1, 2, 3].forEach((i) => {
-    const a = (i * Math.PI) / 2 + Math.PI / 4;
+  // 1. 46ST Winch Stationary Support Structure
+  reg.part(
+    "struct.winchBaseSkirt",
+    buildCylinderGeometry(0.76, 0.80, SKIRT_H, { segments: 32, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [WINCH_CX, WINCH_BASE_Y + SKIRT_H * 0.5, WINCH_CZ],
+      ramp: "lo",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "base.winchPlinth"
+    }
+  );
+
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
     reg.detail(
-      `struct.mastPartner.bolt.${i}`,
-      makeScrewDetail(mastX + Math.cos(a) * 0.18, topSurfaceY + 0.02, mastZ + Math.sin(a) * 0.18, 0.018, "y", kit),
+      `struct.winchBaseBolt.${i}`,
+      makeScrewDetail(
+        WINCH_CX + Math.cos(a) * 0.71,
+        WINCH_BASE_Y + SKIRT_H + 0.004,
+        WINCH_CZ + Math.sin(a) * 0.71,
+        0.028,
+        "y",
+        kit
+      ),
       { parent: structGroup }
     );
-  });
+  }
 
-  const mastGroup = reg.group("struct.mast.group", {
-    parent: structGroup,
-    pos: [mastX, topSurfaceY + 0.14, mastZ],
-    stage: "structure"
-  });
-
-  reg.part("struct.mast.spar", buildCylinderGeometry(0.062, 0.102, mastHeight, { segments: 24, axis: "y" }), {
-    parent: mastGroup,
-    pos: [0, mastHeight * 0.5, 0],
-    ramp: "hi",
-    outline: "hi",
-    crease: "lo",
-    mountOn: "struct.mastPartner"
-  });
-
-  // Sail track groove along aft face of mast
-  const trackPts = [
-    new THREE.Vector3(0.095, 0.20, 0),
-    new THREE.Vector3(0.066, mastHeight - 0.12, 0)
-  ];
-  reg.detail("struct.mast.track", new THREE.Line(new THREE.BufferGeometry().setFromPoints(trackPts), kit.lineMaterials.lo), {
-    parent: mastGroup
-  });
-
-  // Swept-aft Airfoil Spreaders at spreaderY
-  const localSpreaderY = spreaderY - (topSurfaceY + 0.14);
-  reg.part("struct.spreader.collar", buildCylinderGeometry(0.105, 0.105, 0.11, { segments: 18, axis: "y" }), {
-    parent: mastGroup,
-    pos: [0, localSpreaderY, 0],
-    ramp: "mid",
-    outline: "mid",
-    crease: "lo",
-    mountOn: "struct.mast.spar"
-  });
-
-  const sweepAft = 0.05;
-  const sweepYaw = Math.atan2(sweepAft, spreaderHalfSpan);
-  reg.part("struct.spreader.port", buildCylinderGeometry(0.022, 0.036, spreaderHalfSpan, { segments: 14, axis: "z" }), {
-    parent: mastGroup,
-    pos: [sweepAft * 0.5, localSpreaderY, -spreaderHalfSpan * 0.5 - 0.07],
-    rot: [0, sweepYaw, 0],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.spreader.collar"
-  });
-  reg.part("struct.spreader.stbd", buildCylinderGeometry(0.036, 0.022, spreaderHalfSpan, { segments: 14, axis: "z" }), {
-    parent: mastGroup,
-    pos: [sweepAft * 0.5, localSpreaderY, spreaderHalfSpan * 0.5 + 0.07],
-    rot: [0, -sweepYaw, 0],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.spreader.collar"
-  });
-  reg.part("struct.spreader.tipCap.port", buildCylinderGeometry(0.028, 0.028, 0.045, { segments: 12, axis: "y" }), {
-    parent: mastGroup,
-    pos: [sweepAft, localSpreaderY, -spreaderHalfSpan - 0.07],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    detail: true
-  });
-  reg.part("struct.spreader.tipCap.stbd", buildCylinderGeometry(0.028, 0.028, 0.045, { segments: 12, axis: "y" }), {
-    parent: mastGroup,
-    pos: [sweepAft, localSpreaderY, spreaderHalfSpan + 0.07],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    detail: true
-  });
-
-  // Machined Masthead Cap, Aft Crane & Halyard Sheave
-  reg.part("struct.masthead.cap", buildCylinderGeometry(0.095, 0.075, 0.09, { segments: 18, axis: "y" }), {
-    parent: mastGroup,
-    pos: [0, mastHeight - 0.01, 0],
-    ramp: "mid",
-    outline: "mid",
-    crease: "lo",
-    mountOn: "struct.mast.spar"
-  });
+  // Slender stationary stator sleeve (r = 0.095..0.105) so sunGear (r=0.16) and shaftPinion (r=0.13) remain cleanly exposed
   reg.part(
-    "struct.masthead.crane",
-    buildSlabGeometry(0.28, 0.11, 0.055, { radius: 0.025, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
+    "struct.winchCenterPost",
+    buildCylinderGeometry(0.095, 0.105, 1.32, { segments: 24, axis: "y" }),
     {
-      parent: mastGroup,
-      pos: [0.06, mastHeight + 0.025, 0],
-      ramp: "brass",
+      parent: structGroup,
+      pos: [WINCH_CX, -0.34, WINCH_CZ],
+      ramp: "mid",
       outline: "mid",
-      crease: "lo",
-      mountOn: "struct.masthead.cap"
-    }
-  );
-  reg.part("struct.masthead.sheave", buildCylinderGeometry(0.048, 0.048, 0.032, { segments: 16, axis: "z" }), {
-    parent: mastGroup,
-    pos: [0.10, mastHeight - 0.045, 0],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    detail: true
-  });
-
-  // Rotating Masthead Wind Vane / Windex (interactive wind indicator!)
-  const vaneGroup = reg.group("struct.windVane.group", {
-    parent: mastGroup,
-    pos: [0, mastHeight + 0.05, 0],
-    stage: "structure"
-  });
-  reg.part("struct.windVane.post", buildCylinderGeometry(0.015, 0.018, 0.13, { segments: 10, axis: "y" }), {
-    parent: vaneGroup,
-    pos: [0, 0.045, 0],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.masthead.crane"
-  });
-  reg.part(
-    "struct.windVane.arm",
-    buildSlabGeometry(0.32, 0.028, 0.022, { radius: 0.01, bevel: false }),
-    {
-      parent: vaneGroup,
-      pos: [0.04, 0.115, 0],
-      ramp: "lit",
-      outline: "lo",
       crease: "faint",
-      mountOn: "struct.windVane.post"
-    }
-  );
-  reg.part(
-    "struct.windVane.fin",
-    buildSlabGeometry(0.09, 0.016, 0.065, { radius: 0.006, bevel: false }),
-    {
-      parent: vaneGroup,
-      pos: [0.16, 0.135, 0],
-      ramp: "comb",
-      outline: "lo",
-      crease: "faint",
-      detail: true
+      mountOn: "struct.winchBaseSkirt"
     }
   );
 
-  // Anchors on masthead & spreaders for shrouds/stays (outside mast spar radius!)
-  reg.anchor("mast.top.port", 0.02, mastHeight - 0.01, -0.095, mastGroup);
-  reg.anchor("mast.top.stbd", 0.02, mastHeight - 0.01, 0.095, mastGroup);
-  reg.anchor("mast.top.fore", -0.075, mastHeight + 0.005, 0, mastGroup);
-  reg.anchor("mast.top.aft", 0.185, mastHeight + 0.005, 0, mastGroup);
-  reg.anchor("spreader.tip.port", sweepAft, localSpreaderY, -spreaderHalfSpan - 0.07, mastGroup);
-  reg.anchor("spreader.tip.stbd", sweepAft, localSpreaderY, spreaderHalfSpan + 0.07, mastGroup);
-
-  // 2. Deck Chainplates, Cylindrical Turnbuckles & Bow/Stern Stay Fittings
-  const [spX, , spZ] = ANCHORS.shroudPort;
-  const [ssX, , ssZ] = ANCHORS.shroudStbd;
-  [
-    { id: "port", x: spX, z: spZ },
-    { id: "stbd", x: ssX, z: ssZ }
-  ].forEach((cp) => {
-    reg.part(
-      `struct.chainplate.${cp.id}`,
-      buildSlabGeometry(0.14, 0.085, 0.045, { radius: 0.02, bevel: true, bevelSize: 0.007, bevelThickness: 0.007 }),
-      {
-        parent: structGroup,
-        pos: [cp.x, topSurfaceY + 0.045, cp.z],
-        ramp: "brass",
-        outline: "mid",
-        crease: "lo",
-        mountOn: "base.deckSection"
-      }
-    );
-    reg.part(`struct.turnbuckle.${cp.id}`, buildCylinderGeometry(0.032, 0.038, 0.22, { segments: 14, axis: "y" }), {
-      parent: structGroup,
-      pos: [cp.x, topSurfaceY + 0.155, cp.z],
-      ramp: "hi",
-      outline: "lo",
-      crease: "faint",
-      mountOn: `struct.chainplate.${cp.id}`
-    });
-    reg.part(`struct.turnbuckle.nut.${cp.id}`, buildCylinderGeometry(0.046, 0.046, 0.048, { segments: 6, axis: "y" }), {
-      parent: structGroup,
-      pos: [cp.x, topSurfaceY + 0.14, cp.z],
-      ramp: "brass",
-      outline: "lo",
-      crease: "faint",
-      detail: true
-    });
-    reg.anchor(`chainplate.top.${cp.id}`, cp.x, topSurfaceY + 0.265, cp.z, structGroup);
-  });
-
-  // Bow Stemhead Fitting
-  const [fsX, , fsZ] = ANCHORS.forestayDeck;
   reg.part(
-    "struct.bowStem",
-    buildSlabGeometry(0.20, 0.12, 0.055, { radius: 0.025, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
+    "struct.planetCarrierPlate",
+    buildCylinderGeometry(0.56, 0.56, 0.08, { segments: 28, axis: "y" }),
     {
       parent: structGroup,
-      pos: [fsX, topSurfaceY + 0.055, fsZ],
-      ramp: "brass",
-      outline: "mid",
-      crease: "lo",
-      mountOn: "base.deckSection"
-    }
-  );
-  reg.part("struct.bowStem.tang", buildCylinderGeometry(0.032, 0.040, 0.10, { segments: 12, axis: "y" }), {
-    parent: structGroup,
-    pos: [fsX + 0.02, topSurfaceY + 0.11, fsZ],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.bowStem"
-  });
-  reg.anchor("bowStem.top", fsX + 0.02, topSurfaceY + 0.16, fsZ, structGroup);
-
-  // Stern Backstay Tang
-  const [bsX, , bsZ] = ANCHORS.backstayDeck;
-  reg.part(
-    "struct.sternFit",
-    buildSlabGeometry(0.18, 0.10, 0.05, { radius: 0.022, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
-    {
-      parent: structGroup,
-      pos: [bsX, topSurfaceY + 0.05, bsZ],
-      ramp: "brass",
-      outline: "mid",
-      crease: "lo",
-      mountOn: "base.deckSection"
-    }
-  );
-  reg.part("struct.sternFit.tang", buildCylinderGeometry(0.030, 0.038, 0.10, { segments: 12, axis: "y" }), {
-    parent: structGroup,
-    pos: [bsX, topSurfaceY + 0.105, bsZ],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.sternFit"
-  });
-  reg.anchor("sternFit.top", bsX, topSurfaceY + 0.155, bsZ, structGroup);
-
-  // 3. Transverse Cockpit Mainsheet Traveler Track, Sliding Car & Deck Turning Block
-  const [trX, , trZ] = ANCHORS.travelerCenter;
-  reg.part(
-    "struct.traveler.rail",
-    buildSlabGeometry(0.085, 0.86, 0.042, { radius: 0.015, bevel: true, bevelSize: 0.006, bevelThickness: 0.006 }),
-    {
-      parent: structGroup,
-      pos: [trX, topSurfaceY + 0.042, trZ],
+      pos: [WINCH_CX, CARRIER_Y, WINCH_CZ],
       ramp: "mid",
       outline: "mid",
       crease: "lo",
-      mountOn: "base.deckSection"
+      mountOn: "struct.winchCenterPost",
+      allowOverlap: ["struct.winchBaseSkirt"]
     }
   );
-  [-0.41, 0.41].forEach((dz, idx) => {
-    reg.part(
-      `struct.traveler.stop.${idx}`,
-      buildCylinderGeometry(0.036, 0.042, 0.06, { segments: 10, axis: "y" }),
-      {
-        parent: structGroup,
-        pos: [trX, topSurfaceY + 0.05, trZ + dz],
-        ramp: "lo",
-        outline: "lo",
-        crease: "faint",
-        detail: true
-      }
-    );
+
+  reg.part(
+    "struct.stripperCollar",
+    buildCylinderGeometry(0.26, 0.26, 0.11, { segments: 24, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [WINCH_CX, 0.355, WINCH_CZ],
+      ramp: "hi",
+      outline: "hi",
+      crease: "lo",
+      mountOn: "struct.winchCenterPost"
+    }
+  );
+
+  // Stationary chrome self-tailing peeler arm clears drumCap (y<=0.36) and stays below handleArm (y>=0.525)
+  reg.part(
+    "struct.stripperArm",
+    new THREE.BoxGeometry(0.14, 0.07, 0.68),
+    {
+      parent: structGroup,
+      pos: [WINCH_CX, 0.36, WINCH_CZ + 0.31],
+      ramp: "hi",
+      outline: "hi",
+      crease: "lo",
+      mountOn: "struct.stripperCollar",
+      allowOverlap: ["struct.winchCenterPost"]
+    }
+  );
+
+  // Chrome peeler finger dipping into the self-tailing brass jaw groove at z = 0.82
+  reg.part(
+    "struct.stripperTip",
+    new THREE.BoxGeometry(0.12, 0.12, 0.16),
+    {
+      parent: structGroup,
+      pos: [WINCH_CX, 0.29, 0.80],
+      ramp: "hi",
+      outline: "hi",
+      crease: "lo",
+      mountOn: "struct.stripperArm",
+      allowOverlap: ["subject.stJaws", "subject.drumCap"]
+    }
+  );
+  reg.anchor("winch.tail.exit", WINCH_CX + 0.05, 0.28, 0.88, structGroup, {
+    dir: [0.32, -0.58, 0.75]
   });
 
-  const travelerCarGroup = reg.group("struct.traveler.carGroup", {
-    parent: structGroup,
-    pos: [trX, topSurfaceY + 0.055, trZ],
-    stage: "structure"
-  });
+  // Bronze sheet-entry fairlead guide on lower-left winch plinth rim
   reg.part(
-    "struct.traveler.car",
-    buildSlabGeometry(0.13, 0.16, 0.065, { radius: 0.02, bevel: true, bevelSize: 0.007, bevelThickness: 0.007 }),
+    "struct.sheetEntryGuide",
+    buildCylinderGeometry(0.08, 0.08, 0.22, { segments: 18, axis: "y" }),
     {
-      parent: travelerCarGroup,
-      pos: [0, 0.03, 0],
+      parent: structGroup,
+      pos: [0.34, -1.07, 0.56],
       ramp: "brass",
       outline: "mid",
       crease: "lo",
-      mountOn: "struct.traveler.rail"
+      mountOn: "base.winchPlinth",
+      allowOverlap: ["struct.winchBaseSkirt"]
     }
   );
-  reg.part("struct.traveler.sheave", buildCylinderGeometry(0.052, 0.052, 0.034, { segments: 16, axis: "x" }), {
-    parent: travelerCarGroup,
-    pos: [0, 0.085, 0],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.traveler.car"
+  reg.anchor("winch.sheet.in", 0.34, -0.96, 0.56, structGroup, {
+    dir: [-0.58, 0.08, 0.81]
   });
-  reg.anchor("traveler.car.top", 0, 0.135, 0, travelerCarGroup, { dir: [0, 1, 0] });
-  reg.anchor("traveler.car.out", 0.06, 0.065, 0.06, travelerCarGroup, { dir: [0.45, 0.05, 0.89] });
 
-  // Deck Mainsheet Turning Cheek Block (tangential feed to winch drum)
-  const [tbX, , tbZ] = ANCHORS.turningBlock;
+  // 2. Deck Sheet Turning Block & Cockpit Tail Cleat
+  reg.part("struct.turningBlockBase", new THREE.BoxGeometry(0.26, 0.16, 0.26), {
+    parent: structGroup,
+    pos: [-0.58, -1.34, 0.88],
+    ramp: "mid",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.deckSlab"
+  });
+
   reg.part(
-    "struct.turningBlock.base",
-    buildSlabGeometry(0.24, 0.24, 0.042, { radius: 0.05, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
+    "struct.turningSheave",
+    buildCylinderGeometry(0.14, 0.14, 0.08, { segments: 20, axis: "y" }),
     {
       parent: structGroup,
-      pos: [tbX, topSurfaceY + 0.042, tbZ],
-      ramp: "mid",
+      pos: [-0.58, -1.22, 0.88],
+      ramp: "brass",
       outline: "mid",
       crease: "lo",
-      mountOn: "base.deckSection"
+      mountOn: "struct.turningBlockBase"
     }
   );
-  reg.part("struct.turningBlock.sheave", buildCylinderGeometry(0.105, 0.105, 0.052, { segments: 20, axis: "y" }), {
+  reg.anchor("block.sheet.out", -0.44, -1.22, 0.88, structGroup, {
+    dir: [0.78, 0.42, 0.46]
+  });
+
+  reg.part("struct.tailCleat", new THREE.BoxGeometry(0.32, 0.14, 0.22), {
     parent: structGroup,
-    pos: [tbX, topSurfaceY + 0.082, tbZ],
+    pos: [1.92, -1.35, 1.02],
     ramp: "brass",
     outline: "mid",
-    crease: "faint",
-    mountOn: "struct.turningBlock.base"
+    crease: "lo",
+    mountOn: "base.deckSlab"
   });
+  reg.anchor("cleat.tail.in", 1.92, -1.28, 1.02, structGroup, {
+    dir: [-0.22, 0.95, 0.20]
+  });
+
+  // 3. Tapered Aluminum Mast Spar, Gooseneck, Swept Spreaders & Deflecting Masthead
   reg.part(
-    "struct.turningBlock.cap",
-    buildSlabGeometry(0.14, 0.14, 0.022, { radius: 0.04, bevel: true, bevelSize: 0.005, bevelThickness: 0.005 }),
+    "struct.mastLower",
+    buildCylinderGeometry(0.095, 0.11, 1.86, { segments: 24, axis: "y" }),
     {
       parent: structGroup,
-      pos: [tbX, topSurfaceY + 0.132, tbZ],
+      pos: [MAST_X, -0.37, MAST_Z],
       ramp: "hi",
-      outline: "lo",
-      crease: "faint",
-      mountOn: "struct.turningBlock.sheave"
+      outline: "hi",
+      noCrease: true,
+      mountOn: "base.mastStep"
     }
   );
-  reg.anchor("turningBlock.in", tbX - 0.065, topSurfaceY + 0.082, tbZ - 0.085, structGroup, { dir: [-0.45, 0, -0.89] });
-  reg.anchor("turningBlock.out", tbX + 0.10, topSurfaceY + 0.09, tbZ + 0.045, structGroup, { dir: [0.85, 0.34, 0.40] });
 
-  // 4. Cutaway Planetary Winch Base Flange & Outer Cutaway Gearbox Skirt
-  reg.part("struct.winch.baseFlange", buildCylinderGeometry(0.62, 0.66, 0.08, { segments: 36, axis: "y" }), {
+  reg.part("struct.gooseneck", new THREE.BoxGeometry(0.24, 0.18, 0.18), {
     parent: structGroup,
-    pos: [winchX, winchBaseY + 0.04, winchZ],
+    pos: [-1.06, GOOSENECK_Y, MAST_Z],
     ramp: "mid",
-    outline: "hi",
-    crease: "lo",
-    clippable: true,
-    mountOn: "base.winchCoaming"
-  });
-
-  [0, 1, 2, 3, 4, 5].forEach((i) => {
-    const a = (i / 6) * Math.PI * 2;
-    reg.detail(
-      `struct.winch.bolt.${i}`,
-      makeScrewDetail(winchX + Math.cos(a) * 0.59, winchBaseY + 0.082, winchZ + Math.sin(a) * 0.59, 0.024, "y", kit),
-      { parent: structGroup }
-    );
-  });
-
-  // Stationary outer cutaway pedestal housing (144° open window centered at a=306° facing ISO camera!)
-  const skirtH = 0.28;
-  reg.part("struct.winch.housingCut", buildArcWallGeometry(rRing + 0.095, rRing + 0.145, skirtH, 18, 234, 32), {
-    parent: structGroup,
-    pos: [winchX, winchBaseY + 0.08 + skirtH * 0.5, winchZ],
-    ramp: "mid",
-    outline: "hi",
-    crease: "lo",
-    clippable: true,
-    explode: [0, 0, -0.92],
-    mountOn: "struct.winch.baseFlange",
-    allowOverlap: ["winch.ringGear", "winch.drivePost.0", "winch.drivePost.1", "winch.drivePost.2", "winch.planet.0", "winch.planet.1", "winch.planet.2"]
-  });
-
-  // Removable front cutaway cover shell (hidden when Cutaway=ON, seals full 360° skirt when Cutaway=OFF)
-  reg.part("struct.winch.frontShield", buildArcWallGeometry(rRing + 0.095, rRing + 0.145, skirtH, 235, 377, 24), {
-    parent: structGroup,
-    pos: [winchX, winchBaseY + 0.08 + skirtH * 0.5, winchZ],
-    ramp: "lo",
     outline: "mid",
-    crease: "faint",
-    clippable: true,
-    cutawayHide: true,
-    explode: [0, 0, 0.96],
-    mountOn: "struct.winch.baseFlange",
-    allowOverlap: ["struct.winch.housingCut", "winch.ringGear", "winch.drivePost.0", "winch.drivePost.1", "winch.drivePost.2", "winch.planet.0", "winch.planet.1", "winch.planet.2"]
+    crease: "lo",
+    mountOn: "struct.mastLower"
+  });
+  reg.anchor("mast.gooseneck", -1.06, GOOSENECK_Y, MAST_Z, structGroup);
+
+  reg.part("struct.spreaderBracket", new THREE.BoxGeometry(0.22, 0.14, 0.32), {
+    parent: structGroup,
+    pos: [MAST_X, SPREADER_Y, MAST_Z],
+    ramp: "mid",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "struct.mastLower"
   });
 
-  reg.tag("tag-winch", "SELF-TAILER", winchX + 1.02, winchBaseY + 0.92, winchZ - 0.36);
+  reg.part(
+    "struct.spreader.windward",
+    buildCylinderGeometry(0.032, 0.048, SPREADER_SPAN, { segments: 16, axis: "z" }),
+    {
+      parent: structGroup,
+      pos: [MAST_X, SPREADER_Y, 0.38],
+      ramp: "hi",
+      outline: "mid",
+      noCrease: true,
+      mountOn: "struct.spreaderBracket"
+    }
+  );
+  reg.anchor("spreader.tip.windward", MAST_X, SPREADER_Y, 0.86, structGroup);
+  reg.anchor("spreader.root.windward", MAST_X, SPREADER_Y - 0.02, -0.06, structGroup);
+
+  reg.part(
+    "struct.spreader.leeward",
+    buildCylinderGeometry(0.048, 0.032, SPREADER_SPAN, { segments: 16, axis: "z" }),
+    {
+      parent: structGroup,
+      pos: [MAST_X, SPREADER_Y, -0.74],
+      ramp: "hi",
+      outline: "mid",
+      noCrease: true,
+      mountOn: "struct.spreaderBracket"
+    }
+  );
+  reg.anchor("spreader.tip.leeward", MAST_X, SPREADER_Y, -1.22, structGroup);
+  reg.anchor("spreader.root.leeward", MAST_X, SPREADER_Y - 0.02, -0.30, structGroup);
+
+  // Upper Mast Group (pivoted at spreader root for live aft bend & leeward deflection)
+  const mastTopGroup = reg.group("struct.mastTopGroup", {
+    parent: structGroup,
+    pos: [MAST_X, SPREADER_Y, MAST_Z],
+    stage: "structure"
+  });
+
+  reg.part(
+    "struct.mastUpper",
+    buildCylinderGeometry(0.072, 0.095, 1.66, { segments: 24, axis: "y" }),
+    {
+      parent: mastTopGroup,
+      pos: [0, 0.83, 0],
+      ramp: "hi",
+      outline: "hi",
+      noCrease: true,
+      mountOn: "struct.spreaderBracket",
+      allowOverlap: ["struct.mastLower"]
+    }
+  );
+
+  reg.part("struct.mastheadCrane", new THREE.BoxGeometry(0.32, 0.14, 0.24), {
+    parent: mastTopGroup,
+    pos: [0, 1.68, 0],
+    ramp: "brass",
+    outline: "hi",
+    crease: "lo",
+    mountOn: "struct.mastUpper"
+  });
+  reg.anchor("masthead.windward", 0, 1.68, 0.08, mastTopGroup);
+  reg.anchor("masthead.leeward", 0, 1.68, -0.08, mastTopGroup);
+  reg.anchor("masthead.fore", -0.14, 1.68, 0, mastTopGroup);
+  reg.anchor("masthead.aft", 0.14, 1.68, 0, mastTopGroup);
+
+  reg.tag("tag-masthead", "MASTHEAD RIG · V1/D1 SHROUDS", MAST_X, 2.44, MAST_Z);
+
+  // 4. Chainplate Turnbuckle Cylinders (solid mount bases for Stage 5 shrouds & forestay)
+  reg.part(
+    "struct.turnbuckle.windward",
+    buildCylinderGeometry(0.045, 0.045, 0.28, { segments: 14, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [MAST_X, -1.12, CHAINPLATE_Z_WIND],
+      ramp: "brass",
+      outline: "lo",
+      noCrease: true,
+      mountOn: "base.chainplate.windward"
+    }
+  );
+  reg.anchor("turnbuckle.windward.top", MAST_X, -0.98, CHAINPLATE_Z_WIND, structGroup);
+
+  reg.part(
+    "struct.turnbuckle.leeward",
+    buildCylinderGeometry(0.045, 0.045, 0.28, { segments: 14, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [MAST_X, -1.12, CHAINPLATE_Z_LEE],
+      ramp: "brass",
+      outline: "lo",
+      noCrease: true,
+      mountOn: "base.chainplate.leeward"
+    }
+  );
+  reg.anchor("turnbuckle.leeward.top", MAST_X, -0.98, CHAINPLATE_Z_LEE, structGroup);
+
+  reg.part(
+    "struct.forestayTurnbuckle",
+    buildCylinderGeometry(0.045, 0.045, 0.28, { segments: 14, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [STEMHEAD_X, -1.12, MAST_Z],
+      ramp: "brass",
+      outline: "lo",
+      noCrease: true,
+      mountOn: "base.stemhead"
+    }
+  );
+  reg.anchor("forestay.turnbuckle.top", STEMHEAD_X, -0.98, MAST_Z, structGroup);
 }

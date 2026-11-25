@@ -1,146 +1,30 @@
 import * as THREE from "three";
-import { SPEC } from "./model.mjs";
+import { SPEC, getRigState } from "./model.mjs";
 
 export function buildShader(reg, kit) {
+  const boomGroup = reg.groups.get("subject.boomGroup")?.group || reg.root;
+  const shaderGroup = reg.group("shader.group", { parent: boomGroup, stage: "shader" });
   const theme = kit.currentTheme;
-  const boomGroup = reg.groups.get("boom.group")?.group || reg.root;
-  const shaderGroup = reg.group("shader.group", { stage: "shader" });
+  const initSt = getRigState(SPEC.initialTheta, {}, {});
 
-  // 1. Dynamic Wind-Pressure Cambered Mainsail with Curved Roach & Batten Pockets
-  const sailMat = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: true,
-    side: THREE.DoubleSide,
-    uniforms: {
-      uTime: { value: 0 },
-      uCamber: { value: 0.22 },
-      uWind: { value: 18.0 },
-      uEnvelope: { value: 1.0 },
-      uColSail: { value: new THREE.Color(theme.ramps.hi[2]) },
-      uColSailShade: { value: new THREE.Color(theme.ramps.mid[1]) },
-      uColHi: { value: new THREE.Color(theme.channels.comb) },
-      uColLo: { value: new THREE.Color(theme.channels.intake) },
-      uInk: { value: new THREE.Color(theme.ink) }
-    },
-    vertexShader: `
-      uniform float uTime;
-      uniform float uCamber;
-      uniform float uWind;
-      varying vec2 vSailUv;
-      varying float vBillow;
+  const sharedUniforms = {
+    uTime: { value: Math.abs(SPEC.initialTheta) * 0.45 },
+    uWindSpeed: { value: 0.6 + initSt.windNorm * 1.6 },
+    uCamber: { value: initSt.camberRatio },
+    uGust: { value: initSt.gustEnv },
+    uEnvelope: { value: 1.0 },
+    uIsDark: { value: theme.isDark ? 1.0 : 0.0 },
+    uColIntake: { value: new THREE.Color(theme.channels.intake) },
+    uColComb: { value: new THREE.Color(theme.channels.comb) },
+    uColLit: { value: new THREE.Color(theme.channels.lit) }
+  };
 
-      void main() {
-        vSailUv = uv;
-        float u = uv.x; // 0 = luff (mast), 1 = leech
-        float v = uv.y; // 0 = foot (boom), 1 = head (masthead)
-
-        // Authentic airfoil camber peaking at ~35% chord, tapering smoothly toward luff, foot & head
-        float chordEnv = sin(3.14159265 * pow(clamp(u, 0.0, 1.0), 0.76));
-        float spanEnv = sin(3.14159265 * clamp(v, 0.06, 0.96));
-        float flutter = sin(uTime * (3.2 + uWind * 0.15) - u * 6.5) * 0.010 * u * smoothstep(0.3, 1.0, u);
-        float billow = chordEnv * (0.42 + 0.58 * spanEnv) * uCamber + flutter;
-
-        vec3 displaced = position;
-        displaced.z += billow;
-        vBillow = billow / max(0.05, uCamber);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float uEnvelope;
-      uniform float uTime;
-      uniform float uWind;
-      uniform vec3 uColSail;
-      uniform vec3 uColSailShade;
-      uniform vec3 uColHi;
-      uniform vec3 uColLo;
-      uniform vec3 uInk;
-      varying vec2 vSailUv;
-      varying float vBillow;
-
-      void main() {
-        float u = vSailUv.x;
-        float v = vSailUv.y;
-
-        // Crisp batten pockets & horizontal draft stripe
-        float batten = step(0.95, fract(v * 4.0)) * step(0.35, u);
-        float draftStripe = exp(-pow((v - 0.40) / 0.014, 2.0));
-
-        // Quantized 3-band cel shading on sailcloth + aerodynamic pressure field
-        float cp = clamp(vBillow, 0.0, 1.0);
-        float band = floor(cp * 3.0 + 0.5) / 3.0;
-        vec3 clothCol = mix(uColSailShade, uColSail, 0.35 + 0.65 * band);
-
-        // Animated flow ripple across pressure contours when shader is ON
-        float flowWave = 0.06 * sin(u * 18.0 - uTime * (1.8 + uWind * 0.12));
-        vec3 pressCol = mix(uColLo, uColHi, smoothstep(0.22, 0.88, cp + flowWave));
-        vec3 baseCol = mix(clothCol, pressCol, 0.68 * uEnvelope);
-        baseCol = mix(baseCol, uInk, 0.22 * batten + 0.26 * draftStripe);
-
-        // Crisp technical ink border along luff, foot, and roach leech
-        float edge = min(min(u, 1.0 - u), min(v, 1.0 - v));
-        if (edge < 0.016) {
-          baseCol = mix(baseCol, uInk, 0.65);
-        }
-
-        float alpha = mix(0.96, 0.88, uEnvelope);
-        gl_FragColor = vec4(baseCol, alpha);
-      }
-    `
-  });
-
-  // Build roach-curved mainsail mesh in boom local space
-  const segU = 24;
-  const segV = 24;
-  const sailH = SPEC.topSurfaceY + 0.14 + SPEC.mastHeight - 0.08 - SPEC.boomY;
-  const sailLen = SPEC.boomLength - 0.12;
-  const posArr = [];
-  const uvArr = [];
-  const idxArr = [];
-
-  for (let iv = 0; iv <= segV; iv++) {
-    const v = iv / segV;
-    // Convex parabolic roach gives realistic sailboat mainsail profile
-    const roach = 0.14 * Math.sin(Math.PI * v);
-    const maxLenAtV = sailLen * (1.0 - v * 0.90) + roach;
-    const y = v * sailH + 0.06;
-    for (let iu = 0; iu <= segU; iu++) {
-      const u = iu / segU;
-      const x = 0.02 + u * maxLenAtV;
-      posArr.push(x, y, 0);
-      uvArr.push(u, v);
-    }
-  }
-  for (let iv = 0; iv < segV; iv++) {
-    for (let iu = 0; iu < segU; iu++) {
-      const a = iv * (segU + 1) + iu;
-      const b = a + 1;
-      const c = a + (segU + 1);
-      const d = c + 1;
-      idxArr.push(a, b, d, a, d, c);
-    }
-  }
-
-  const sailGeo = new THREE.BufferGeometry();
-  sailGeo.setAttribute("position", new THREE.Float32BufferAttribute(posArr, 3));
-  sailGeo.setAttribute("uv", new THREE.Float32BufferAttribute(uvArr, 2));
-  sailGeo.setIndex(idxArr);
-  sailGeo.computeVertexNormals();
-
-  const sailMesh = new THREE.Mesh(sailGeo, sailMat);
-  reg.detail("shader.mainsail", sailMesh, { parent: boomGroup, stage: "shader" });
-
-  // 2. Non-Intersecting Leeward/Windward Aerodynamic Flow Streamlines (parented to boomGroup so they wrap cleanly around the sail!)
-  const windMat = new THREE.ShaderMaterial({
+  // 1. Vertical Sail-Span Apparent Wind & Leeward Suction Streamline Sheet
+  const spanMat = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    uniforms: {
-      uTime: { value: 0 },
-      uWind: { value: 18.0 },
-      uEnvelope: { value: 1.0 },
-      uColWind: { value: new THREE.Color(theme.channels.intake) }
-    },
+    uniforms: sharedUniforms,
     vertexShader: `
       varying vec2 vUv;
       void main() {
@@ -150,47 +34,124 @@ export function buildShader(reg, kit) {
     `,
     fragmentShader: `
       uniform float uTime;
-      uniform float uWind;
+      uniform float uWindSpeed;
+      uniform float uCamber;
+      uniform float uGust;
       uniform float uEnvelope;
-      uniform vec3 uColWind;
+      uniform float uIsDark;
+      uniform vec3 uColIntake;
+      uniform vec3 uColComb;
       varying vec2 vUv;
+
       void main() {
-        float streak = smoothstep(0.25, 0.92, sin(vUv.x * 16.0 - uTime * (2.6 + uWind * 0.22)));
-        float ends = smoothstep(0.0, 0.16, vUv.x) * smoothstep(1.0, 0.84, vUv.x);
-        float edge = 1.0 - abs(vUv.y - 0.5) * 2.0;
-        float alpha = ends * smoothstep(0.0, 0.45, edge) * (0.20 + 0.58 * streak) * uEnvelope;
-        if (alpha < 0.01) discard;
-        gl_FragColor = vec4(uColWind, clamp(alpha, 0.0, 0.72));
+        if (uEnvelope < 0.004) discard;
+
+        // Taper chord envelope with sail planform from foot (v=0) toward masthead (v=1)
+        float maxChordU = mix(0.95, 0.24, pow(vUv.y, 1.08));
+        float uChord = vUv.x / max(0.08, maxChordU);
+
+        // Soft boundary fade inside quad (no visible rectangular card edge)
+        float maskX = smoothstep(0.02, 0.14, vUv.x) * (1.0 - smoothstep(maxChordU - 0.14, maxChordU + 0.06, vUv.x));
+        float maskY = smoothstep(0.04, 0.18, vUv.y) * (1.0 - smoothstep(0.84, 0.98, vUv.y));
+        float env = maskX * maskY * uEnvelope;
+        if (env < 0.004) discard;
+
+        // Flowing chordwise wind streamlines curved slightly by NACA camber draft peak at 38% chord
+        float draftCurve = sin(clamp(uChord, 0.0, 1.0) * 3.14159) * (uCamber * 2.1);
+        float laneCoord = (vUv.y - draftCurve * 0.12) * 14.0;
+        float flowWave = 0.5 + 0.5 * sin(uChord * 12.0 - uTime * (2.6 * uWindSpeed) + laneCoord * 0.6);
+        float streak = smoothstep(0.62, 0.98, abs(sin(laneCoord * 3.14159))) * (0.45 + 0.55 * flowWave);
+
+        // Stagnation pressure peak near 32% chord (comb) transitioning into fast trailing wash (intake)
+        float stagZone = exp(-pow((uChord - 0.30) / 0.24, 2.0));
+        vec3 flowCol = mix(uColIntake, uColComb, clamp(stagZone * (0.68 + uGust * 0.32), 0.0, 1.0));
+
+        float alpha = clamp((0.06 + 0.30 * streak + 0.14 * stagZone * uGust) * env * (uIsDark > 0.5 ? 0.92 : 0.72), 0.0, 0.44);
+        if (alpha < 0.004) discard;
+        gl_FragColor = vec4(flowCol, alpha);
       }
     `
   });
 
-  // Streamlines sweep cleanly on the leeward (+Z) side of the cambered sail without piercing the cloth
-  [0.24, 0.48, 0.72].forEach((vFrac, idx) => {
-    const wy = vFrac * sailH + 0.08;
-    const maxX = sailLen * (1.0 - vFrac * 0.90) + 0.14 * Math.sin(Math.PI * vFrac);
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.75, wy, -0.35),
-      new THREE.Vector3(-0.08, wy + 0.03, 0.18),
-      new THREE.Vector3(maxX * 0.45, wy + 0.02, 0.42),
-      new THREE.Vector3(maxX + 0.45, wy - 0.03, 0.16)
-    ]);
-    const ribbonGeo = new THREE.TubeGeometry(curve, 36, 0.015, 6, false);
-    const ribbonMesh = new THREE.Mesh(ribbonGeo, windMat);
-    reg.detail(`shader.windRibbon.${idx}`, ribbonMesh, { parent: boomGroup, stage: "shader" });
+  const spanGeo = new THREE.PlaneGeometry(1.56, 2.40, 1, 1);
+  const spanMesh = new THREE.Mesh(spanGeo, spanMat);
+  spanMesh.position.set(0.68, 1.28, 0.05);
+  reg.detail("rig.windShaderPlane", spanMesh, { parent: shaderGroup, stage: "shader" });
+
+  // 2. Horizontal Mid-Span Aerodynamic Pressure & Leeward Slot Slice (visible in TOP & ISO)
+  const sliceMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    uniforms: sharedUniforms,
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uWindSpeed;
+      uniform float uCamber;
+      uniform float uGust;
+      uniform float uEnvelope;
+      uniform float uIsDark;
+      uniform vec3 uColIntake;
+      uniform vec3 uColComb;
+      varying vec2 vUv;
+
+      void main() {
+        if (uEnvelope < 0.004) discard;
+
+        // Smooth elliptical aperture fade so horizontal slice never shows a box border
+        vec2 c = (vUv - 0.5) * 2.0;
+        float rad = length(c);
+        float mask = 1.0 - smoothstep(0.62, 0.98, rad);
+        float env = mask * uEnvelope;
+        if (env < 0.004) discard;
+
+        // vUv.x runs 0..1 along chord (luff -> leech); vUv.y runs 0..1 across leeward (-Z) -> windward (+Z)
+        float p = 0.38;
+        float xi = clamp((vUv.x - 0.14) / 0.72, 0.0, 1.0);
+        float camberProf = xi < p
+          ? (2.0 * p * xi - xi * xi) / (p * p)
+          : (1.0 - 2.0 * p + 2.0 * p * xi - xi * xi) / ((1.0 - p) * (1.0 - p));
+        // Sail cross-section sits shifted toward -Z (lower vUv.y in PlaneGeometry after rotateX(-PI/2))
+        float foilZ = 0.48 - camberProf * clamp(uCamber * 1.45, 0.06, 0.32);
+
+        float distFoil = vUv.y - foilZ;
+        // Windward (+Z, distFoil > 0) = stagnation pressure; Leeward (-Z, distFoil < 0) = accelerated suction slot
+        float leeSide = smoothstep(0.02, -0.14, distFoil);
+        float windSide = smoothstep(-0.02, 0.16, distFoil);
+
+        // Deflected airflow streamlines curving smoothly past the cambered section
+        float psi = vUv.y - (foilZ - 0.48) * exp(-pow(abs(distFoil) / 0.18, 2.0));
+        float lines = smoothstep(0.68, 0.99, abs(sin(psi * 26.0)));
+        float pulse = 0.55 + 0.45 * sin(vUv.x * 16.0 - uTime * (3.2 * uWindSpeed));
+
+        vec3 col = mix(uColComb, uColIntake, leeSide);
+        float intensity = lines * pulse * (0.55 * windSide + 0.85 * leeSide) + exp(-abs(distFoil) * 14.0) * 0.25;
+        float alpha = clamp(intensity * env * (uIsDark > 0.5 ? 0.88 : 0.65), 0.0, 0.46);
+        if (alpha < 0.004) discard;
+        gl_FragColor = vec4(col, alpha);
+      }
+    `
   });
 
-  const sData = reg.group("shader.sailData", { parent: shaderGroup, stage: "shader" });
-  sData.userData.material = sailMat;
-  const wData = reg.group("shader.windData", { parent: shaderGroup, stage: "shader" });
-  wData.userData.material = windMat;
+  const sliceGeo = new THREE.PlaneGeometry(1.76, 1.12, 1, 1);
+  sliceGeo.rotateX(-Math.PI / 2);
+  const sliceMesh = new THREE.Mesh(sliceGeo, sliceMat);
+  sliceMesh.position.set(0.64, 0.92, -0.10);
+  reg.detail("rig.windSliceShader", sliceMesh, { parent: shaderGroup, stage: "shader" });
+
+  reg.root.userData.windShaderMat = { uniforms: sharedUniforms };
 
   kit.onThemeChange((nextTheme) => {
-    sailMat.uniforms.uColSail.value.set(nextTheme.ramps.hi[2]);
-    sailMat.uniforms.uColSailShade.value.set(nextTheme.ramps.mid[1]);
-    sailMat.uniforms.uColHi.value.set(nextTheme.channels.comb);
-    sailMat.uniforms.uColLo.value.set(nextTheme.channels.intake);
-    sailMat.uniforms.uInk.value.set(nextTheme.ink);
-    windMat.uniforms.uColWind.value.set(nextTheme.channels.intake);
+    sharedUniforms.uIsDark.value = nextTheme.isDark ? 1.0 : 0.0;
+    sharedUniforms.uColIntake.value.set(nextTheme.channels.intake);
+    sharedUniforms.uColComb.value.set(nextTheme.channels.comb);
+    sharedUniforms.uColLit.value.set(nextTheme.channels.lit);
   });
 }

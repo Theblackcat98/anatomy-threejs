@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Anatomy · Sailing Yacht Winch & Masthead Rigging (Three.js Isometric)</title>
+  <title>Anatomy · Sailing Yacht 2-Speed Winch & Masthead Rigging (Three.js Isometric)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     :root {
@@ -516,7 +516,7 @@
 </head>
 <body>
   <div class="wrapper iso-plate">
-    <div class="figure-card" id="figure-card" tabindex="0" aria-label="Interactive 2-speed self-tailing planetary yacht winch and masthead rigging figure">
+    <div class="figure-card" id="figure-card" tabindex="0" aria-label="Interactive 2-speed self-tailing planetary yacht winch and masthead rigging cutaway figure">
       <div id="canvas-host"></div>
 
       <button type="button" class="hud-quick-btn active" id="hud-quick-btn" title="Toggle Floating Details (H)" aria-label="Toggle Floating Details">
@@ -527,16 +527,16 @@
       </button>
 
       <div class="engraved-layer hud-detail" id="engraved-layer">
-        <div class="engraved-tag" id="tag-plate">2-SPD · 3.5:1</div>
-        <div class="engraved-tag" id="tag-winch">SELF-TAILER</div>
+        <div class="engraved-tag" id="tag-plate">46ST 2-SPEED · 13.5:1 / 46:1 · MASTHEAD RIG</div>
+        <div class="engraved-tag" id="tag-masthead">MASTHEAD RIG · V1/D1 SHROUDS</div>
       </div>
 
       <div class="corner top-left hud-detail">
         <span class="accent-dot"></span>
-        <span>Fig 08 · Yacht Winch</span>
+        <span>Fig 10 · Yacht 2-Speed Winch & Masthead Rigging</span>
       </div>
       <div class="views-group hud-detail" id="camera-views-group" aria-label="Camera views"></div>
-      <div class="corner top-right hud-detail" id="phase-corner">WINCH 3.5:1 · TRIM 58%</div>
+      <div class="corner top-right hud-detail" id="phase-corner">46ST SELF-TAILING · 1ST GEAR (CW) · 13.5:1 FAST TRIM</div>
 
       <div class="corner bottom-left hud-detail">
         <span class="desktop-hint">
@@ -548,7 +548,7 @@
       </div>
 
       <div class="corner bottom-right hud-detail" id="readout" data-readout aria-live="polite">
-        3.5:1 PLANETARY · 18.0 kn · SHROUD 6.2 kN · SHEET 2.5 kN
+        GEAR 1 (CW 13.5:1) · SHEET 7.0 kN · V1 SHROUD 11.5 kN · CAMBER 8.7% · WIND 18 kt
       </div>
     </div>
 
@@ -573,12 +573,12 @@
     </div>
 
     <div class="caption-bar hud-detail">
-      <div><strong>Two-speed mechanical advantage.</strong> Crank clockwise for <strong>1:1 direct speed</strong>, or reverse counter-clockwise to drive a <strong>12:15:42 planetary reduction (3.5:1)</strong> while ratchet pawls keep the drum winding clockwise under mainsheet &amp; shroud loads.</div>
+      <div><strong>The object is the explanation.</strong> Crank the lock-in handle clockwise for 1st-gear fast trim (2.6:1) or reverse counter-clockwise to engage the 2nd-gear compound reduction (9.2:1 / 46:1 mechanical advantage)—opposing ratchets ensure the drum always hauls clockwise through its self-tailing brass jaws, trimming the boom against wind-loaded shrouds and hydraulic backstay mast bend to control sail draft camber.</div>
       <div class="legend-strip">
-        <span class="legend-item"><span class="legend-swatch" id="leg-lit"></span>Winch Drum &amp; Sun</span>
-        <span class="legend-item"><span class="legend-swatch" id="leg-brass"></span>3× Planets &amp; Pawls</span>
-        <span class="legend-item"><span class="legend-swatch" id="leg-comb"></span>High Wind Pressure</span>
-        <span class="legend-item"><span class="legend-swatch" id="leg-intake"></span>Leeward Flow</span>
+        <span class="legend-item"><span class="legend-swatch" id="leg-lit"></span>Loaded Sheet &amp; Sail Foil</span>
+        <span class="legend-item"><span class="legend-swatch" id="leg-comb"></span>Windward V1 Shroud &amp; High Load</span>
+        <span class="legend-item"><span class="legend-swatch" id="leg-intake"></span>Leeward Shroud &amp; Suction Slot</span>
+        <span class="legend-item"><span class="legend-swatch" id="leg-comp"></span>2nd-Gear Compound &amp; Backstay</span>
       </div>
     </div>
   </div>
@@ -2955,8 +2955,7 @@ function mountAnatomyFigure(config) {
       let tourExplodeTarget = null;
       let tourCutawayTarget = null;
       let tourShaderTarget = null;
-      const idleThresholdMs = hasUserInteracted ? 3600 : 1600;
-      if (typeof tourFn === "function" && (now - lastInteractionMs) > idleThresholdMs && activePointers.size === 0) {
+      if (!hasUserInteracted && typeof tourFn === "function" && (now - lastInteractionMs) > 1600 && activePointers.size === 0) {
         tourClock += dt;
         const patch = tourFn(tourClock, {
           theta: state.theta,
@@ -3270,279 +3269,391 @@ function mountAnatomyFigure(config) {
 
 
 /* --- figure/model.mjs --- */
+const TAU = Math.PI * 2;
+
+function clamp(x, lo, hi) {
+  return Math.max(lo, Math.min(hi, x));
+}
+
+function clampUnit(x) {
+  return Math.max(0, Math.min(1, x));
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
 const SPEC = {
   archetype: "section",
   simulationMode: "continuous",
   toneMode: "multi-channel",
 
-  // Sculpted yacht foredeck & cockpit section dimensions
-  deckW: 5.0,
-  deckD: 2.65,
-  deckH: 0.22,
-  deckY: -1.62,
-  topSurfaceY: -1.62 + 0.22 + 0.025, // -1.375
+  // Yacht Deck Section Envelope
+  DECK_W: 4.60,
+  DECK_D: 3.30,
+  DECK_H: 0.28,
+  FLOOR_Y: -1.75,
+  DECK_SLAB_Y: -1.445,    // With bevelThickness 0.025 -> bottom = -1.75, top = -1.42
+  topSurfaceY: -1.42,
 
-  // Mast, spreaders & boom coordinates
-  mastX: -1.32,
-  mastZ: -0.16,
-  mastHeight: 2.84,
-  spreaderY: 0.24,
-  spreaderHalfSpan: 0.58,
-  boomY: -0.68,
-  boomLength: 1.82,
+  // Starboard 46ST 2-Speed Self-Tailing Winch Coordinates
+  WINCH_CX: 1.12,
+  WINCH_CZ: 0.18,
+  WINCH_PLINTH_H: 0.24,
+  WINCH_BASE_Y: -1.18,    // Top of base.winchPlinth (-1.42 + 0.24)
+  SKIRT_H: 0.18,          // struct.winchBaseSkirt: -1.18 .. -1.00
+  CARRIER_Y: -0.58,       // Planetary carrier plate center Y
+  PLANET_Y: -0.42,        // Planetary gear & internal ring gear plane Y
+  COMPOUND_Y: -0.82,      // 2nd-speed compound reduction gear plane Y
+  DRUM_R_TOP: 0.58,
+  DRUM_R_BOT: 0.64,
+  DRUM_H: 0.96,           // Drum shell spans y in [-0.80, +0.16]
+  JAWS_Y: 0.23,           // Self-tailing ribbed brass jaw crown center Y
+  STRIPPER_Y: 0.32,       // Stationary chrome stripper arm center Y
+  HANDLE_Y: 0.54,         // Lock-in winch handle socket plane (clears stripper arm!)
+  HANDLE_LEN: 0.68,
 
-  // Hero 2-speed self-tailing planetary winch (coaming top at topSurfaceY + 0.24 = -1.135)
-  // Exact involute pitch math (module m = 0.025): rSun + 2*rPlanet = 0.150 + 0.375 = 0.525 = rRing
-  winchX: 1.40,
-  winchZ: 0.40,
-  winchBaseY: -1.135,
-  sunTeeth: 12,
-  planetTeeth: 15,
-  ringTeeth: 42,
-  rSun: 0.150,
-  rPlanet: 0.1875,
-  rRing: 0.525,
-  gearToothDepth: 0.036,
-  gearRatioLow: 3.5, // 42 / 12 exact planetary reduction
+  // 46ST Gear Ratios & Capstan Constants
+  GEAR1_RATIO: 2.60,      // CW Handle -> Fast Trim (13.5:1 power ratio)
+  GEAR2_RATIO: 9.20,      // CCW Handle -> Low-Speed Grind (46.0:1 power ratio)
+  POWER_RATIO_1: 13.5,
+  POWER_RATIO_2: 46.0,
+  CAPSTAN_MU: 0.33,
+  CAPSTAN_TURNS: 3.25,
+
+  // Masthead Rig, Spreaders, Boom & Sail Foil Coordinates
+  MAST_X: -1.18,
+  MAST_Z: -0.18,
+  MAST_STEP_Y: -1.30,
+  GOOSENECK_Y: -0.82,
+  SPREADER_Y: 0.60,
+  SPREADER_SPAN: 0.96,    // Each spreader extends 0.96 u in +Z and -Z
+  MASTHEAD_Y: 2.28,
+  BOOM_LEN: 1.48,
+  SAIL_LUFF_H: 2.92,
+  SAIL_FOOT_W: 1.40,
+  CHAINPLATE_Z_WIND: 1.12,
+  CHAINPLATE_Z_LEE: -1.42,
+  STEMHEAD_X: -2.08,
+  STERN_BACKSTAY_X: -0.22,
 
   features: {
-    explode: true,
-    cutaway: true,
-    shader: true,
-    crank: true,
-    slow: true,
-    section: true
+    explode: false,   // Open rigging + cutaway winch drum -> explode disabled to keep shrouds & tubes intact
+    cutaway: true,    // Hides front half of winch drum barrel & upper gear housing cover to expose planetary + compound gears
+    shader: true,     // GLSL aerodynamic windward pressure + leeward suction slot streamlines across sail camber
+    crank: true,      // Manual handle cranking in viewport
+    slow: true,       // 1x, 1/5x, 1/20x, PAUSED
+    section: false    // Cutaway already opens the +Z front winch drum cleanly
   },
 
-  interactionHint: "Drag winch handle to crank (CW 1:1 / CCW 3.5:1), or drag boom/wind vane",
+  interactionHint: "Drag handle to crank or sail/boom to trim",
 
   controls: [
     {
       id: "rpm",
       label: "CRANK",
-      min: -60,
-      max: 60,
-      step: 4,
-      initial: -32,
-      title: "Winch handle speed (CW + = 1:1 High Speed, CCW - = 3.5:1 Planetary Power, 0 = Hold)"
+      min: 15,
+      max: 120,
+      step: 5,
+      initial: 55,
+      title: "Winch handle cranking cadence (RPM)"
     },
     {
-      id: "wind",
-      label: "WIND",
-      min: 4,
-      max: 36,
+      id: "gearMode",
+      label: "GEAR (1/2)",
+      min: 1,
+      max: 2,
+      step: 1,
+      initial: 1,
+      title: "1 = CW Handle (Fast 2.6:1 Trim) · 2 = CCW Handle (High-Torque 9.2:1 Grind)"
+    },
+    {
+      id: "windKt",
+      label: "WIND KT",
+      min: 6,
+      max: 32,
       step: 1,
       initial: 18,
-      title: "Apparent wind speed (knots) — drives sail camber & shroud load"
+      title: "Apparent wind speed (knots) — drives sail camber, shroud kN load & mast bend"
     },
     {
-      id: "trim",
-      label: "SHEET",
-      min: 0,
+      id: "backstay",
+      label: "BACKSTAY",
+      min: 10,
       max: 100,
-      step: 2,
-      initial: 58,
-      title: "Mainsheet trim (0% eased off -> 100% close-hauled)"
+      step: 5,
+      initial: 45,
+      title: "Hydraulic backstay tension (%) — bends mast & flattens mid-sail draft camber"
     }
   ],
 
   triggers: [
     {
-      id: "fastCw",
-      label: "1:1 CW",
-      rise: 0.05,
-      fall: 0.55,
-      title: "Switch winch handle clockwise to 1:1 direct high-speed gear",
-      onTrigger: ({ setParam }) => setParam("rpm", 44)
-    },
-    {
-      id: "powerCcw",
-      label: "3.5:1 CCW",
-      rise: 0.05,
-      fall: 0.55,
-      title: "Reverse winch handle counter-clockwise to engage 3.5:1 planetary reduction",
-      onTrigger: ({ setParam }) => setParam("rpm", -36)
+      id: "reverseGear",
+      label: "SHIFT 2ND GEAR",
+      rise: 0.14,
+      fall: 1.60,
+      title: "Reverse handle rotation into 2nd-speed compound reduction (46:1 high-load grind)"
     },
     {
       id: "gust",
-      label: "GUST +14kn",
-      rise: 0.08,
+      label: "WIND GUST",
+      rise: 0.12,
       fall: 1.25,
-      title: "Simulate sudden wind gust — spikes sail camber and windward shroud tension"
+      title: "Hit rig with a 10-knot wind gust — deepens sail draft, spikes windward shroud load & deflects masthead"
     }
   ],
 
-  section: {
-    axis: "z",
-    min: -0.95,
-    max: 1.15,
-    initial: 1.15,
-    label: "SECT",
-    title: "Slice planetary winch housing, deck coaming, and mast partner along Z"
-  },
-
   cameraViews: [
-    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 1.00, pan: [0, 0.04] },
-    { id: "winch", label: "WINCH", elev: 28, azim: -26, zoom: 1.62, pan: [-1.10, 0.58] },
-    { id: "rig", label: "RIG", elev: 18, azim: -48, zoom: 1.08, pan: [0.60, -0.20] },
-    { id: "top", label: "DECK", elev: 86, azim: 0, zoom: 0.98, pan: [0, 0] }
+    { id: "iso", label: "ISO", elev: 30, azim: -36, zoom: 0.88, pan: [0.02, 0.14] },
+    { id: "winch", label: "PLANETARY", elev: 24, azim: -28, zoom: 1.58, pan: [-0.82, 0.36] },
+    { id: "jaws", label: "SELF-TAILER", elev: 42, azim: -16, zoom: 1.72, pan: [-0.88, 0.08] },
+    { id: "rig", label: "MAST & SAIL", elev: 22, azim: -48, zoom: 1.08, pan: [0.68, -0.14] },
+    { id: "top", label: "DECK PLAN", elev: 88, azim: 0, zoom: 0.94, pan: [0.0, 0.0] }
   ],
 
-  initialTheta: 0.45,
-  initialRpm: -32,
+  initialTheta: 1.85,
+  initialRpm: 55,
   isoElevDeg: 30,
   isoAzimDeg: -36,
-  initialZoom: 1.00,
-  initialPanY: 0.04,
-  minVertSpan: 5.5,
-  minHorizSpan: 7.2,
+  initialZoom: 0.88,
+  initialPanY: 0.14,
+  minVertSpan: 5.8,
+  minHorizSpan: 7.4,
 
   auditPoses: [
-    { name: "3.5:1 CCW power (θ=0°)", theta: 0, explode: 0, params: { rpm: -32, wind: 18, trim: 58 } },
-    { name: "1:1 CW fast (θ=90°)", theta: Math.PI * 0.5, explode: 0, params: { rpm: 44, wind: 12, trim: 85 } },
-    { name: "eased light air (θ=180°)", theta: Math.PI, explode: 0, params: { rpm: 0, wind: 6, trim: 15 } },
-    { name: "heavy gust close-hauled (θ=270°)", theta: Math.PI * 1.5, explode: 0, params: { rpm: -48, wind: 36, trim: 95 } },
-    { name: "exploded (E=1)", theta: 0.45, explode: 1, params: { rpm: -32, wind: 18, trim: 58 } }
+    {
+      name: "gear 1 fast trim (18 kt wind)",
+      theta: 1.85,
+      explode: 0,
+      params: { rpm: 55, gearMode: 1, windKt: 18, backstay: 45 }
+    },
+    {
+      name: "gear 2 high-torque grind (26 kt wind)",
+      theta: Math.PI * 0.75,
+      explode: 0,
+      params: { rpm: 70, gearMode: 2, windKt: 26, backstay: 75 }
+    },
+    {
+      name: "light air full camber (8 kt, low backstay)",
+      theta: Math.PI * 1.35,
+      explode: 0,
+      params: { rpm: 40, gearMode: 1, windKt: 8, backstay: 15 }
+    },
+    {
+      name: "storm flattened trim (32 kt, max backstay)",
+      theta: Math.PI * 1.90,
+      explode: 0,
+      params: { rpm: 95, gearMode: 2, windKt: 32, backstay: 100 }
+    },
+    {
+      name: "gust & shift trigger active",
+      theta: 2.40,
+      explode: 0,
+      params: { rpm: 65, gearMode: 1, windKt: 22, backstay: 60 },
+      triggers: { reverseGear: 1.0, gust: 1.0 }
+    }
   ],
 
   drivePoses: [
     {
-      label: "1. 3.5:1 CCW PLANETARY",
-      pose: { theta: 0.45, explode: 0, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: -32, wind: 18, trim: 58 } }
+      label: "1. GEAR 1 (CW) · FAST SHEET TRIM (13.5:1)",
+      pose: { theta: 1.85, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 55, gearMode: 1, windKt: 16, backstay: 35 } }
     },
     {
-      label: "2. 1:1 CW DIRECT SPEED",
-      pose: { theta: 1.2, explode: 0, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 44, wind: 14, trim: 78 } }
+      label: "2. GEAR 2 (CCW) · COMPOUND GRIND (46:1)",
+      pose: { theta: 3.40, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 65, gearMode: 2, windKt: 26, backstay: 70 } }
     },
     {
-      label: "3. HEAVY WIND · 34 KN",
-      pose: { theta: 2.0, explode: 0, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: -40, wind: 34, trim: 92 } }
+      label: "3. LIGHT AIR (8 KT) · DEEP 16% SAIL CAMBER",
+      pose: { theta: 0.65, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 40, gearMode: 1, windKt: 8, backstay: 15 } }
     },
     {
-      label: "4. EASED REACH · 10% TRIM",
-      pose: { theta: 2.8, explode: 0, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 20, wind: 16, trim: 10 } }
+      label: "4. HEAVY AIR (32 KT) + MAX BACKSTAY BEND",
+      pose: { theta: 4.80, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: 90, gearMode: 2, windKt: 32, backstay: 100 } }
     },
     {
-      label: "5. EXPLODED PLANETARY",
-      pose: { theta: 0.45, explode: 1, cutaway: true, shader: true, hud: true, theme: "light", params: { rpm: -32, wind: 18, trim: 58 } }
+      label: "5. WIND GUST PULSE · SHROUD PEAK LOAD",
+      pose: { theta: 2.60, cutaway: true, shader: true, trigger: "gust", hud: true, theme: "light", params: { rpm: 70, gearMode: 2, windKt: 24, backstay: 55 } }
     },
     {
-      label: "6. CUTAWAY OFF (CLOSED DRUM)",
-      pose: { theta: 0.45, explode: 0, cutaway: false, shader: true, hud: true, theme: "light", params: { rpm: -32, wind: 18, trim: 58 } }
+      label: "6. CUTAWAY OFF · ENCLOSED 46ST DRUM",
+      pose: { theta: 2.10, cutaway: false, shader: true, hud: true, theme: "light", params: { rpm: 55, gearMode: 1, windKt: 18, backstay: 45 } }
     },
     {
-      label: "7. DARK THEME · Z-SLICE",
-      pose: { theta: 1.0, explode: 0, cutaway: true, shader: true, section: 0.46, hud: true, theme: "dark", params: { rpm: -36, wind: 26, trim: 72 } }
+      label: "7. DARK THEME · AERODYNAMIC SLOT FLOW",
+      pose: { theta: 3.90, cutaway: true, shader: true, hud: true, theme: "dark", params: { rpm: 65, gearMode: 2, windKt: 24, backstay: 65 } }
     },
     {
-      label: "8. BLUEPRINT THEME",
-      pose: { theta: 2.2, explode: 0, cutaway: true, shader: true, hud: true, theme: "blueprint", params: { rpm: 32, wind: 20, trim: 60 } }
+      label: "8. BLUEPRINT THEME · RIG & PLANETARY PLAN",
+      pose: { theta: 1.20, cutaway: true, shader: true, hud: true, theme: "blueprint", params: { rpm: 55, gearMode: 1, windKt: 20, backstay: 50 } }
     }
   ]
 };
-
-const TOP_Y = SPEC.topSurfaceY;
 const ANCHORS = {
-  baseTop: [0, TOP_Y, 0],
-  mastStep: [SPEC.mastX, TOP_Y, SPEC.mastZ],
-  shroudPort: [SPEC.mastX, TOP_Y, -1.10],
-  shroudStbd: [SPEC.mastX, TOP_Y, 0.78],
-  forestayDeck: [-2.30, TOP_Y, SPEC.mastZ],
-  backstayDeck: [0.54, TOP_Y, -1.10],
-  travelerCenter: [0.22, TOP_Y, -0.02],
-  turningBlock: [0.42, TOP_Y, 0.52],
-  winchBase: [SPEC.winchX, SPEC.winchBaseY, SPEC.winchZ],
-  screenMount: [-1.86, TOP_Y, 0.84],
-  plaqueCenter: [-0.04, TOP_Y, 1.03]
+  winchCenter: [SPEC.WINCH_CX, SPEC.WINCH_BASE_Y, SPEC.WINCH_CZ],
+  mastStepCenter: [SPEC.MAST_X, SPEC.MAST_STEP_Y, SPEC.MAST_Z],
+  gooseneckPivot: [-1.06, SPEC.GOOSENECK_Y, SPEC.MAST_Z],
+  spreaderRoot: [SPEC.MAST_X, SPEC.SPREADER_Y, SPEC.MAST_Z],
+  mastheadTop: [SPEC.MAST_X, SPEC.MASTHEAD_Y, SPEC.MAST_Z],
+  windwardChainplate: [SPEC.MAST_X, -1.26, SPEC.CHAINPLATE_Z_WIND],
+  leewardChainplate: [SPEC.MAST_X, -1.26, SPEC.CHAINPLATE_Z_LEE],
+  stemheadFitting: [SPEC.STEMHEAD_X, -1.26, SPEC.MAST_Z],
+  sternBackstayPad: [SPEC.STERN_BACKSTAY_X, -1.26, SPEC.MAST_Z],
+  turningBlockOut: [-0.44, -1.22, 0.88],
+  winchSheetIn: [0.34, -0.96, 0.56],
+  stripperTailOut: [1.12, 0.26, 0.82],
+  cockpitCleatIn: [1.92, -1.28, 1.02],
+  screenMount: [-0.04, -1.15, 1.34],
+  plaqueCenter: [1.16, -1.38, 1.42]
 };
 
 /**
- * Computes exact planetary winch kinematics & aerodynamic rigging loads.
- * Right-handed +Y rotation sign convention (runtime.mjs steps theta -= omega * dt):
- * - rpm > 0 (CW crank): d(theta)/dt < 0 -> handleRotY = theta turns CW; 1:1 ratchet locks carrier & drum together (CW).
- * - rpm < 0 (CCW crank): d(theta)/dt > 0 -> handleRotY = theta turns CCW; base ratchet holds carrier fixed,
- *   sun turns CCW (+theta), 3x planets spin CW (-theta * 12/15), and ring/drum turns CW (-theta / 3.5)!
+ * Computes exact NACA-style sail camber offset (+Z leeward/windward billow)
+ * for normalized chord xi in [0..1] (0 = mast luff, 1 = leech)
+ * and normalized span eta in [0..1] (0 = boom foot, 1 = masthead peak).
  */
-function getRigState(state = {}) {
-  const rpm = state.params?.rpm ?? state.rpm ?? SPEC.initialRpm;
-  const wind = Math.max(4, Math.min(36, state.wind ?? state.params?.wind ?? 18));
-  const trim = Math.max(0, Math.min(100, state.trim ?? state.params?.trim ?? 58));
-  const gust = state.triggers?.gust ?? 0;
-  const theta = state.theta ?? SPEC.initialTheta;
+function computeSailSurfaceOffset(xi, eta, camberRatio, twistRad, mastPreBend) {
+  // Peak draft positioned at 38% chord (xi = 0.38)
+  const p = 0.38;
+  const camberProfile =
+    xi < p
+      ? (2 * p * xi - xi * xi) / (p * p)
+      : (1 - 2 * p + 2 * p * xi - xi * xi) / ((1 - p) * (1 - p));
 
-  const effWind = wind + gust * 14;
-  const isLowGear = rpm < -0.5;
-  const isHold = Math.abs(rpm) <= 0.5;
-  const ratio = isLowGear ? SPEC.gearRatioLow : 1.0;
+  // Camber builds from foot/head toward mid-span and scales with camberRatio
+  const spanEnvelope = 0.35 + 0.65 * Math.sin(Math.PI * clampUnit(eta * 0.92 + 0.04));
+  // Sail billows toward -Z (leeward) under wind coming from +Z (windward)
+  const billowZ = -camberRatio * 1.65 * camberProfile * spanEnvelope;
 
-  const handleRotY = theta;
-  let carrierRotY = 0;
-  let planetSelfRot = 0;
-  let drumRotY = 0;
+  // Spanwise leech twist opens upper leech toward -Z
+  const twistZ = -Math.sin(twistRad * Math.pow(eta, 1.25)) * xi * 0.62;
 
-  if (isLowGear) {
-    // Sun turns CCW (+theta), carrier held stationary by base ratchet,
-    // planets spin CW (-theta * Zs/Zp), ring & drum turn CW (-theta * Zs/Zr).
-    carrierRotY = 0;
-    planetSelfRot = -theta * (SPEC.sunTeeth / SPEC.planetTeeth);
-    drumRotY = -theta / SPEC.gearRatioLow;
-  } else {
-    // 1:1 Direct CW lock: carrier, planets, ring & drum turn rigidly with handle/sun.
-    carrierRotY = theta;
-    planetSelfRot = 0;
-    drumRotY = theta;
-  }
-
-  // Boom ease angle (rad around Y): trim=100% -> -0.05 rad (close-hauled), trim=0% -> -0.68 rad (eased toward +Z)
-  const trimNorm = trim / 100;
-  const windPush = Math.min(1, effWind / 36) * 0.14 * (1 - 0.65 * trimNorm);
-  const boomAngleY = -(0.05 + (1 - trimNorm) * 0.52 + windPush);
-
-  // Traveler car z-offset responds gently to sheet trim
-  const travelerCarZ = 0.24 - trimNorm * 0.34;
-
-  // Sail dynamic camber depth (0.10 .. 0.36)
-  const camber = (0.09 + 0.22 * Math.pow(effWind / 36, 0.85)) * (1.12 - 0.38 * trimNorm);
-
-  // Shroud tension (kN): windward shroud carries primary load, leeward goes slack
-  const totalLoadKn = 1.4 + 0.022 * effWind * effWind * (0.45 + 0.55 * trimNorm);
-  const windwardShroudKn = totalLoadKn * 0.84;
-  const leewardShroudKn = Math.max(0.4, totalLoadKn * 0.16);
-  const sheetLoadKn = totalLoadKn * 0.34;
-
-  // Apparent wind vane angle (steers toward aft-port with wind speed)
-  const windVaneYaw = 0.42 + (effWind / 36) * 0.35;
-
-  const gearLabel = isHold ? "RATCHET HOLD" : isLowGear ? "3.5:1 PLANETARY" : "1:1 DIRECT";
+  // Luff tracks mast pre-bend along X
+  const luffBendX = mastPreBend * Math.sin(Math.PI * eta) * (1 - xi);
 
   return {
-    rpm,
-    effWind,
-    trim,
-    trimNorm,
-    gust,
-    isLowGear,
-    isHold,
-    ratio,
-    gearLabel,
-    handleRotY,
-    carrierRotY,
-    planetSelfRot,
-    drumRotY,
-    boomAngleY,
-    travelerCarZ,
-    camber,
-    windwardShroudKn,
-    leewardShroudKn,
-    sheetLoadKn,
-    windVaneYaw
+    dx: luffBendX,
+    dz: billowZ + twistZ
   };
 }
-function formatReadout(state) {
-  const r = getRigState(state);
+function getRigState(theta = SPEC.initialTheta, params = {}, triggers = {}) {
+  const crankRpm = clamp(params.rpm ?? 55, 15, 120);
+  const rawGear = params.gearMode ?? 1;
+  const shiftEnv = clampUnit(triggers.reverseGear ?? 0);
+  const gustEnv = clampUnit(triggers.gust ?? 0);
+
+  // Active gear: Gear 2 engages either via slider (gearMode >= 1.5) or SHIFT 2ND GEAR trigger
+  const gearBlend = clampUnit(Math.max(rawGear - 1, shiftEnv));
+  const isGear2 = gearBlend >= 0.5;
+  const activeGear = isGear2 ? 2 : 1;
+  const gearRatio = lerp(SPEC.GEAR1_RATIO, SPEC.GEAR2_RATIO, gearBlend);
+  const powerRatio = lerp(SPEC.POWER_RATIO_1, SPEC.POWER_RATIO_2, gearBlend);
+
+  // Effective wind speed including gust impulse (+10 kt peak)
+  const baseWindKt = clamp(params.windKt ?? 18, 6, 32);
+  const effWindKt = clamp(baseWindKt + gustEnv * 10.0, 6, 38);
+  const windNorm = clampUnit((effWindKt - 6) / 28);
+
+  // Hydraulic backstay tension (%)
+  const backstayPct = clamp(params.backstay ?? 45, 10, 100);
+  const backstayNorm = (backstayPct - 10) / 90;
+
+  // Winch kinematics (kit/runtime.mjs decrements state.theta as time advances, so d(theta)/dt < 0):
+  // In right-handed +Y coords, decreasing rotation.y = clockwise (CW) viewed from above.
+  // - Gear 1 (handleDir = +1): handleRad = +theta turns CW; drumRad = +theta/2.6 turns CW.
+  // - Gear 2 (handleDir = -1): handleRad = -theta turns CCW; drumRad = +theta/9.2 STILL turns CW!
+  const handleDir = isGear2 ? -1 : 1;
+  const handleRad = theta * handleDir;
+  const drumRad = theta / gearRatio;
+  const carrierRad = isGear2 ? drumRad * 1.45 : handleRad * 0.52;
+  const planetSelfRad = (handleRad - carrierRad) * 2.2;
+  const compoundRad = isGear2 ? -handleRad * (10 / 18) : -handleRad * 0.25;
+
+  // Periodic sheet trim cycle coupled to drum rotation + wind/backstay
+  // Smoothly cycles sheet trim between 0.15 (eased) and 0.95 (sheeted hard in)
+  const trimWave = 0.52 + 0.43 * Math.sin(theta * 0.45);
+  const sheetTrim = clampUnit(trimWave + backstayNorm * 0.08 - gustEnv * 0.10);
+
+  // Boom trim angle (close-hauled ~9 deg = 0.16 rad when sheetTrim=1; eased ~36 deg = 0.63 rad when sheetTrim=0)
+  const boomAngleRad = lerp(0.62, 0.15, sheetTrim) + gustEnv * 0.05;
+
+  // Dynamic Sail Camber (f/c ratio: 6.2% flattened up to 17.5% deep draft)
+  // Wind pressure deepens draft; sheet tension and hydraulic backstay mast-bend flatten draft!
+  const camberRatio = clamp(
+    0.115 + windNorm * 0.055 + gustEnv * 0.028 - sheetTrim * 0.042 - backstayNorm * 0.038,
+    0.062,
+    0.178
+  );
+  const camberPct = camberRatio * 100;
+
+  // Spanwise leech twist (radians)
+  const twistRad = clamp(0.18 + windNorm * 0.16 - sheetTrim * 0.14 + gustEnv * 0.08, 0.08, 0.42);
+
+  // Masthead deflection & pre-bend
+  const mastPreBend = 0.035 + backstayNorm * 0.065 + sheetTrim * 0.02;
+  const mastAftBendRad = 0.015 + backstayNorm * 0.042;
+  const mastLeewardDropRad = 0.012 + windNorm * 0.045 + gustEnv * 0.022;
+
+  // Forces: Sheet Load (kN), Tail Load (N), Windward Cap Shroud V1 Load (kN), Backstay Load (kN)
+  const dynamicPressure = (effWindKt / 18) * (effWindKt / 18);
+  const sheetLoadKn = clamp(1.4 + dynamicPressure * (3.2 + sheetTrim * 2.8), 0.8, 9.8);
+  const capstanFactor = Math.exp(SPEC.CAPSTAN_MU * SPEC.CAPSTAN_TURNS * TAU); // ~843
+  const tailLoadN = (sheetLoadKn * 1000) / capstanFactor;
+  const handleForceN = Math.round((sheetLoadKn * 1000) / powerRatio);
+
+  const windwardShroudKn = clamp(3.5 + dynamicPressure * 6.8 + backstayNorm * 3.2, 2.5, 18.5);
+  const leewardShroudKn = clamp(2.2 - windNorm * 1.6 + backstayNorm * 1.1, 0.3, 4.0);
+  const backstayKn = clamp(1.8 + backstayNorm * 10.4 + windNorm * 2.2, 1.5, 14.2);
+
+  const modeLabel =
+    gustEnv > 0.25
+      ? "GUST LOAD · SHROUD PEAK"
+      : isGear2
+        ? "2ND GEAR (CCW) · 46:1 GRIND"
+        : "1ST GEAR (CW) · 13.5:1 FAST TRIM";
+
   return {
-    readout: `${r.gearLabel} · ${r.effWind.toFixed(1)} kn · SHROUD ${r.windwardShroudKn.toFixed(1)} kN · SHEET ${r.sheetLoadKn.toFixed(1)} kN`,
-    phase: `WINCH ${r.ratio.toFixed(1)}:1 · TRIM ${Math.round(r.trim)}%`
+    theta,
+    crankRpm,
+    activeGear,
+    isGear2,
+    gearBlend,
+    gearRatio,
+    powerRatio,
+    effWindKt,
+    windNorm,
+    backstayPct,
+    backstayNorm,
+    handleRad,
+    drumRad,
+    carrierRad,
+    planetSelfRad,
+    compoundRad,
+    sheetTrim,
+    boomAngleRad,
+    camberRatio,
+    camberPct,
+    twistRad,
+    mastPreBend,
+    mastAftBendRad,
+    mastLeewardDropRad,
+    sheetLoadKn,
+    tailLoadN,
+    handleForceN,
+    windwardShroudKn,
+    leewardShroudKn,
+    backstayKn,
+    shiftEnv,
+    gustEnv,
+    modeLabel
+  };
+}
+function formatReadout(state = {}) {
+  const st = getRigState(state.theta ?? SPEC.initialTheta, state.params || state, state.triggers || {});
+  const dirTag = st.isGear2 ? "CCW" : "CW";
+  return {
+    readout: `GEAR ${st.activeGear} (${dirTag} ${st.powerRatio.toFixed(1)}:1) · SHEET ${st.sheetLoadKn.toFixed(1)} kN · V1 ${st.windwardShroudKn.toFixed(1)} kN · CAMBER ${st.camberPct.toFixed(1)}% · ${Math.round(st.effWindKt)} kt`,
+    phase: `46ST SELF-TAILING · ${st.modeLabel}`
   };
 }
 
@@ -3550,644 +3661,515 @@ function formatReadout(state) {
 /* --- figure/base.mjs --- */
 function buildBase(reg, kit) {
   const baseGroup = reg.group("base.group", { stage: "base" });
-  const { deckW, deckD, deckH, deckY, topSurfaceY } = SPEC;
+  const {
+    DECK_W,
+    DECK_D,
+    DECK_H,
+    FLOOR_Y,
+    DECK_SLAB_Y,
+    topSurfaceY,
+    WINCH_CX,
+    WINCH_CZ,
+    WINCH_PLINTH_H,
+    WINCH_BASE_Y,
+    MAST_X,
+    MAST_Z,
+    MAST_STEP_Y,
+    CHAINPLATE_Z_WIND,
+    CHAINPLATE_Z_LEE,
+    STEMHEAD_X,
+    STERN_BACKSTAY_X
+  } = SPEC;
 
-  // Ground shadow halo + blueprint datum grid beneath sliced yacht hull section
-  reg.detail("base.halo", makeHaloMesh(deckW + 0.40, deckD + 0.40, 0.38, [0.04, deckY - 0.14, 0.04], kit), {
-    parent: baseGroup,
-    stage: "base"
-  });
-  reg.detail("base.datumGrid", makeDatumGrid(deckW + 0.85, deckD + 0.80, 14, 9, deckY - 0.08, kit, "faint"), {
-    parent: baseGroup,
-    stage: "base"
-  });
-
-  // Lower hull chine plinth (gives authentic sliced boat-section depth under the deck)
-  const hullChineH = 0.10;
-  reg.part(
-    "base.hullChine",
-    buildSlabGeometry(deckW - 0.24, deckD - 0.24, hullChineH, {
-      radius: 0.28,
-      bevel: true,
-      bevelSize: 0.015,
-      bevelThickness: 0.015,
-      bevelSegments: 1
-    }),
-    {
-      parent: baseGroup,
-      pos: [0, deckY + 0.04, 0],
-      ramp: "lo",
-      outline: "lo",
-      crease: "faint",
-      clippable: true,
-      mountOn: "ground"
-    }
+  // 1. Ground Shadow Halo & Orthographic Blueprint Datum Grid
+  reg.detail(
+    "base.halo",
+    makeHaloMesh(5.10, 3.80, 0.36, [0, FLOOR_Y + 0.002, 0], kit),
+    { parent: baseGroup, stage: "base" }
+  );
+  reg.detail(
+    "base.datumGrid",
+    makeDatumGrid(5.40, 4.10, 10, 8, FLOOR_Y + 0.004, kit, "faint"),
+    { parent: baseGroup, stage: "base" }
   );
 
-  // Main Sliced Yacht Foredeck & Cockpit Deck Slab
-  const deckGeo = buildSlabGeometry(deckW, deckD, deckH, {
-    radius: 0.34,
+  // 2. Sliced Yacht Deck Section Structural Plinth (y in [-1.75, -1.42])
+  const deckGeo = buildSlabGeometry(DECK_W, DECK_D, DECK_H, {
+    radius: 0.24,
     bevel: true,
     bevelSize: 0.025,
-    bevelThickness: 0.025,
-    bevelSegments: 2
+    bevelThickness: 0.025
   });
-  reg.part("base.deckSection", deckGeo, {
+  reg.part("base.deckSlab", deckGeo, {
     parent: baseGroup,
-    pos: [0, deckY + deckH, 0],
-    ramp: "mid",
+    pos: [0, DECK_SLAB_Y, 0],
+    ramp: "lo",
     outline: "mid",
     crease: "faint",
-    outlineWidth: 0.018,
-    clippable: true,
-    mountOn: "base.hullChine"
+    mountOn: "ground"
   });
 
-  // Port & Starboard Raised Bulwark Toe-Rails along deck edges
-  const railW = deckW - 0.88;
-  const railH = 0.065;
-  const railD = 0.07;
-  const railGeo = buildSlabGeometry(railW, railD, railH, {
-    radius: 0.03,
-    bevel: true,
-    bevelSize: 0.01,
-    bevelThickness: 0.01,
-    bevelSegments: 1
-  });
-  reg.part("base.toeRail.port", railGeo, {
-    parent: baseGroup,
-    pos: [0, topSurfaceY + railH - 0.01, -1.22],
-    ramp: "lo",
-    outline: "lo",
-    crease: "faint",
-    clippable: true,
-    mountOn: "base.deckSection"
-  });
-  reg.part("base.toeRail.stbd", railGeo, {
-    parent: baseGroup,
-    pos: [0, topSurfaceY + railH - 0.01, 1.23],
-    ramp: "lo",
-    outline: "lo",
-    crease: "faint",
-    clippable: true,
-    mountOn: "base.deckSection"
-  });
-
-  // Teak deck planking seam lines along X (stop cleanly inside toe-rails)
-  const plankPts = [];
+  // Inset deck plank perimeter outline & teak plank seam lines
+  reg.detail(
+    "base.deckOutline",
+    makePlanOutline(DECK_W - 0.32, DECK_D - 0.32, 0.16, topSurfaceY + 0.003, kit, "lo"),
+    { parent: baseGroup }
+  );
+  const seamPts = [];
   for (let i = -3; i <= 3; i++) {
-    const pz = i * 0.28;
-    plankPts.push(
-      new THREE.Vector3(-deckW * 0.42, topSurfaceY + 0.003, pz),
-      new THREE.Vector3(deckW * 0.42, topSurfaceY + 0.003, pz)
+    const z = i * 0.36;
+    seamPts.push(
+      new THREE.Vector3(-DECK_W * 0.43, topSurfaceY + 0.0025, z),
+      new THREE.Vector3(DECK_W * 0.43, topSurfaceY + 0.0025, z)
     );
   }
-  reg.detail("base.teakSeams", new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(plankPts), kit.lineMaterials.faint), {
-    parent: baseGroup
-  });
-
-  reg.detail("base.groove.outer", makePlanOutline(deckW - 0.30, deckD - 0.30, 0.24, topSurfaceY + 0.003, kit, "faint"), {
-    parent: baseGroup
-  });
-
-  // Two-tier Sculpted Cockpit Winch Coaming Pedestal (right-front, top exact at SPEC.winchBaseY)
-  const lowerH = 0.12;
-  reg.part(
-    "base.winchCoamingLower",
-    buildSlabGeometry(1.64, 1.54, lowerH, {
-      radius: 0.24,
-      bevel: true,
-      bevelSize: 0.016,
-      bevelThickness: 0.016
-    }),
-    {
-      parent: baseGroup,
-      pos: [SPEC.winchX, topSurfaceY + lowerH - 0.016, SPEC.winchZ],
-      ramp: "lo",
-      outline: "mid",
-      crease: "lo",
-      clippable: true,
-      mountOn: "base.deckSection"
-    }
+  reg.detail(
+    "base.teakSeams",
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(seamPts), kit.lineMaterials.faint),
+    { parent: baseGroup }
   );
 
-  const upperH = 0.12;
+  // 4 corner deck fastener details
+  [
+    [-2.05, 1.40],
+    [2.05, 1.40],
+    [-2.05, -1.40],
+    [2.05, -1.40]
+  ].forEach(([sx, sz], idx) => {
+    reg.detail(
+      `base.cornerBolt.${idx}`,
+      makeScrewDetail(sx, topSurfaceY + 0.004, sz, 0.055, "y", kit),
+      { parent: baseGroup }
+    );
+  });
+
+  // 3. Starboard Cockpit Winch Coaming Pedestal (y in [-1.42, -1.18])
   reg.part(
-    "base.winchCoaming",
-    buildSlabGeometry(1.46, 1.38, upperH, {
-      radius: 0.22,
-      bevel: true,
-      bevelSize: 0.016,
-      bevelThickness: 0.016
-    }),
+    "base.winchPlinth",
+    buildCylinderGeometry(0.84, 0.92, WINCH_PLINTH_H, { segments: 32, axis: "y" }),
     {
       parent: baseGroup,
-      pos: [SPEC.winchX, topSurfaceY + lowerH + upperH - 0.016, SPEC.winchZ],
+      pos: [WINCH_CX, topSurfaceY + WINCH_PLINTH_H * 0.5, WINCH_CZ],
       ramp: "mid",
       outline: "mid",
       crease: "lo",
-      clippable: true,
-      mountOn: "base.winchCoamingLower"
+      mountOn: "base.deckSlab"
     }
   );
 
-  // Register section anchors
-  reg.anchor("base.top", ...ANCHORS.baseTop, baseGroup);
-  reg.anchor("mast.step", ...ANCHORS.mastStep, baseGroup);
-  reg.anchor("shroud.port", ...ANCHORS.shroudPort, baseGroup);
-  reg.anchor("shroud.stbd", ...ANCHORS.shroudStbd, baseGroup);
-  reg.anchor("forestay.deck", ...ANCHORS.forestayDeck, baseGroup);
-  reg.anchor("backstay.deck", ...ANCHORS.backstayDeck, baseGroup);
-  reg.anchor("traveler.center", ...ANCHORS.travelerCenter, baseGroup);
-  reg.anchor("turningBlock", ...ANCHORS.turningBlock, baseGroup);
-  reg.anchor("winch.base", ...ANCHORS.winchBase, baseGroup);
-  reg.anchor("screen.mount", ...ANCHORS.screenMount, baseGroup);
+  // 4. Fore/Port Mast Step & Rigging Chainplate Foundations
+  reg.part(
+    "base.mastStep",
+    buildCylinderGeometry(0.28, 0.32, 0.12, { segments: 24, axis: "y" }),
+    {
+      parent: baseGroup,
+      pos: [MAST_X, -1.36, MAST_Z],
+      ramp: "mid",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "base.deckSlab"
+    }
+  );
 
-  // Brass Spec Plaque on front apron between cockpit console and winch coaming
-  const [pqX, , pqZ] = ANCHORS.plaqueCenter;
-  const plaqueGeo = buildSlabGeometry(1.12, 0.28, 0.036, {
-    radius: 0.04,
-    bevel: true,
-    bevelSize: 0.008,
-    bevelThickness: 0.008,
-    bevelSegments: 1
-  });
-  reg.part("base.plaque", plaqueGeo, {
+  reg.part("base.chainplate.windward", new THREE.BoxGeometry(0.20, 0.16, 0.16), {
     parent: baseGroup,
-    pos: [pqX, topSurfaceY + 0.036, pqZ],
+    pos: [MAST_X, -1.34, CHAINPLATE_Z_WIND],
     ramp: "brass",
     outline: "mid",
     crease: "lo",
-    mountOn: "base.deckSection"
-  });
-  [[-0.46, -0.08], [0.46, -0.08], [-0.46, 0.08], [0.46, 0.08]].forEach(([dx, dz], idx) => {
-    reg.detail(`base.plaque.screw.${idx}`, makeScrewDetail(pqX + dx, topSurfaceY + 0.045, pqZ + dz, 0.020, "y", kit), {
-      parent: baseGroup
-    });
+    mountOn: "base.deckSlab"
   });
 
-  reg.tag("tag-plate", "2-SPD · 3.5:1", pqX, topSurfaceY + 0.048, pqZ + 0.01);
+  reg.part("base.chainplate.leeward", new THREE.BoxGeometry(0.20, 0.16, 0.16), {
+    parent: baseGroup,
+    pos: [MAST_X, -1.34, CHAINPLATE_Z_LEE],
+    ramp: "brass",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.deckSlab"
+  });
+
+  reg.part("base.stemhead", new THREE.BoxGeometry(0.24, 0.16, 0.16), {
+    parent: baseGroup,
+    pos: [STEMHEAD_X, -1.34, MAST_Z],
+    ramp: "brass",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.deckSlab"
+  });
+
+  reg.part("base.sternPad", new THREE.BoxGeometry(0.24, 0.16, 0.18), {
+    parent: baseGroup,
+    pos: [STERN_BACKSTAY_X, -1.34, MAST_Z],
+    ramp: "mid",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.deckSlab"
+  });
+
+  // 5. Front Apron Trim Scale & Engraved Brass Spec Plaque
+  reg.part(
+    "base.ruler",
+    buildSlabGeometry(1.34, 0.18, 0.025, { radius: 0.03, bevel: false }),
+    {
+      parent: baseGroup,
+      pos: [-1.28, -1.395, 1.42],
+      ramp: "hi",
+      outline: "lo",
+      crease: "lo",
+      mountOn: "base.deckSlab"
+    }
+  );
+  reg.detail(
+    "base.rulerTicks",
+    makeRulerTicks(-1.28, 1.24, 1.42, 0.14, -1.392, 24, 4, kit),
+    { parent: baseGroup }
+  );
+
+  reg.part(
+    "base.plaque",
+    buildSlabGeometry(1.24, 0.24, 0.03, { radius: 0.04, bevel: false }),
+    {
+      parent: baseGroup,
+      pos: [1.16, -1.39, 1.42],
+      ramp: "brass",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "base.deckSlab"
+    }
+  );
+  reg.tag("tag-plate", "46ST 2-SPEED · 13.5:1 / 46:1 · MASTHEAD RIG", 1.16, -1.38, 1.44);
+
+  // Stage 2 mounting anchors for downstream stages
+  reg.anchor("winch.center", WINCH_CX, WINCH_BASE_Y, WINCH_CZ, baseGroup);
+  reg.anchor("mast.step", MAST_X, MAST_STEP_Y, MAST_Z, baseGroup);
+  reg.anchor("chainplate.windward", MAST_X, -1.26, CHAINPLATE_Z_WIND, baseGroup);
+  reg.anchor("chainplate.leeward", MAST_X, -1.26, CHAINPLATE_Z_LEE, baseGroup);
+  reg.anchor("stemhead.anchor", STEMHEAD_X, -1.26, MAST_Z, baseGroup);
+  reg.anchor("stern.pad", STERN_BACKSTAY_X, -1.26, MAST_Z, baseGroup);
 }
 
 
 /* --- figure/structure.mjs --- */
-
-
-
-/**
- * Builds an annular cylinder arc extruded along +Y.
- * Under rotateX(-PI/2), shape angle `a` maps to XZ: x = r*cos(a), z = -r*sin(a).
- * Canonical ISO camera looks from (+0.509, +0.500, +0.701) -> a ≈ 306° (-54°).
- */
-function buildArcWallGeometry(rInner, rOuter, height, aStartDeg, aEndDeg, segs = 32) {
-  const shape = new THREE.Shape();
-  const aStart = (aStartDeg * Math.PI) / 180;
-  const aEnd = (aEndDeg * Math.PI) / 180;
-  const span = Math.abs(aEnd - aStart);
-
-  if (span >= Math.PI * 1.99) {
-    shape.absarc(0, 0, rOuter, 0, Math.PI * 2, false);
-    const hole = new THREE.Path();
-    hole.absarc(0, 0, rInner, 0, Math.PI * 2, true);
-    shape.holes.push(hole);
-  } else {
-    for (let i = 0; i <= segs; i++) {
-      const a = aStart + (aEnd - aStart) * (i / segs);
-      const x = Math.cos(a) * rOuter;
-      const y = Math.sin(a) * rOuter;
-      if (i === 0) shape.moveTo(x, y);
-      else shape.lineTo(x, y);
-    }
-    for (let i = segs; i >= 0; i--) {
-      const a = aStart + (aEnd - aStart) * (i / segs);
-      shape.lineTo(Math.cos(a) * rInner, Math.sin(a) * rInner);
-    }
-    shape.closePath();
-  }
-
-  const geo = new THREE.ExtrudeGeometry(shape, {
-    depth: height,
-    bevelEnabled: true,
-    bevelSize: 0.007,
-    bevelThickness: 0.007,
-    bevelSegments: 1
-  });
-  geo.translate(0, 0, -height * 0.5);
-  geo.rotateX(-Math.PI / 2);
-  return geo;
-}
 function buildStructure(reg, kit) {
   const structGroup = reg.group("struct.group", { stage: "structure" });
   const {
-    topSurfaceY,
-    mastX,
-    mastZ,
-    mastHeight,
-    spreaderY,
-    spreaderHalfSpan,
-    winchX,
-    winchZ,
-    winchBaseY,
-    rRing
+    WINCH_CX,
+    WINCH_CZ,
+    WINCH_BASE_Y,
+    SKIRT_H,
+    CARRIER_Y,
+    MAST_X,
+    MAST_Z,
+    GOOSENECK_Y,
+    SPREADER_Y,
+    SPREADER_SPAN,
+    CHAINPLATE_Z_WIND,
+    CHAINPLATE_Z_LEE,
+    STEMHEAD_X
   } = SPEC;
 
-  // 1. Mast Partner Collar, Bolted Flange, Tapered Spar, Spreaders & Masthead Crane
-  reg.part("struct.mastPartner", buildCylinderGeometry(0.16, 0.22, 0.14, { segments: 24, axis: "y" }), {
-    parent: structGroup,
-    pos: [mastX, topSurfaceY + 0.07, mastZ],
-    ramp: "mid",
-    outline: "mid",
-    crease: "lo",
-    clippable: true,
-    mountOn: "base.deckSection"
-  });
-  [0, 1, 2, 3].forEach((i) => {
-    const a = (i * Math.PI) / 2 + Math.PI / 4;
+  // 1. 46ST Winch Stationary Support Structure
+  reg.part(
+    "struct.winchBaseSkirt",
+    buildCylinderGeometry(0.76, 0.80, SKIRT_H, { segments: 32, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [WINCH_CX, WINCH_BASE_Y + SKIRT_H * 0.5, WINCH_CZ],
+      ramp: "lo",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "base.winchPlinth"
+    }
+  );
+
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
     reg.detail(
-      `struct.mastPartner.bolt.${i}`,
-      makeScrewDetail(mastX + Math.cos(a) * 0.18, topSurfaceY + 0.02, mastZ + Math.sin(a) * 0.18, 0.018, "y", kit),
+      `struct.winchBaseBolt.${i}`,
+      makeScrewDetail(
+        WINCH_CX + Math.cos(a) * 0.71,
+        WINCH_BASE_Y + SKIRT_H + 0.004,
+        WINCH_CZ + Math.sin(a) * 0.71,
+        0.028,
+        "y",
+        kit
+      ),
       { parent: structGroup }
     );
-  });
+  }
 
-  const mastGroup = reg.group("struct.mast.group", {
-    parent: structGroup,
-    pos: [mastX, topSurfaceY + 0.14, mastZ],
-    stage: "structure"
-  });
-
-  reg.part("struct.mast.spar", buildCylinderGeometry(0.062, 0.102, mastHeight, { segments: 24, axis: "y" }), {
-    parent: mastGroup,
-    pos: [0, mastHeight * 0.5, 0],
-    ramp: "hi",
-    outline: "hi",
-    crease: "lo",
-    mountOn: "struct.mastPartner"
-  });
-
-  // Sail track groove along aft face of mast
-  const trackPts = [
-    new THREE.Vector3(0.095, 0.20, 0),
-    new THREE.Vector3(0.066, mastHeight - 0.12, 0)
-  ];
-  reg.detail("struct.mast.track", new THREE.Line(new THREE.BufferGeometry().setFromPoints(trackPts), kit.lineMaterials.lo), {
-    parent: mastGroup
-  });
-
-  // Swept-aft Airfoil Spreaders at spreaderY
-  const localSpreaderY = spreaderY - (topSurfaceY + 0.14);
-  reg.part("struct.spreader.collar", buildCylinderGeometry(0.105, 0.105, 0.11, { segments: 18, axis: "y" }), {
-    parent: mastGroup,
-    pos: [0, localSpreaderY, 0],
-    ramp: "mid",
-    outline: "mid",
-    crease: "lo",
-    mountOn: "struct.mast.spar"
-  });
-
-  const sweepAft = 0.05;
-  const sweepYaw = Math.atan2(sweepAft, spreaderHalfSpan);
-  reg.part("struct.spreader.port", buildCylinderGeometry(0.022, 0.036, spreaderHalfSpan, { segments: 14, axis: "z" }), {
-    parent: mastGroup,
-    pos: [sweepAft * 0.5, localSpreaderY, -spreaderHalfSpan * 0.5 - 0.07],
-    rot: [0, sweepYaw, 0],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.spreader.collar"
-  });
-  reg.part("struct.spreader.stbd", buildCylinderGeometry(0.036, 0.022, spreaderHalfSpan, { segments: 14, axis: "z" }), {
-    parent: mastGroup,
-    pos: [sweepAft * 0.5, localSpreaderY, spreaderHalfSpan * 0.5 + 0.07],
-    rot: [0, -sweepYaw, 0],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.spreader.collar"
-  });
-  reg.part("struct.spreader.tipCap.port", buildCylinderGeometry(0.028, 0.028, 0.045, { segments: 12, axis: "y" }), {
-    parent: mastGroup,
-    pos: [sweepAft, localSpreaderY, -spreaderHalfSpan - 0.07],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    detail: true
-  });
-  reg.part("struct.spreader.tipCap.stbd", buildCylinderGeometry(0.028, 0.028, 0.045, { segments: 12, axis: "y" }), {
-    parent: mastGroup,
-    pos: [sweepAft, localSpreaderY, spreaderHalfSpan + 0.07],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    detail: true
-  });
-
-  // Machined Masthead Cap, Aft Crane & Halyard Sheave
-  reg.part("struct.masthead.cap", buildCylinderGeometry(0.095, 0.075, 0.09, { segments: 18, axis: "y" }), {
-    parent: mastGroup,
-    pos: [0, mastHeight - 0.01, 0],
-    ramp: "mid",
-    outline: "mid",
-    crease: "lo",
-    mountOn: "struct.mast.spar"
-  });
+  // Slender stationary stator sleeve (r = 0.095..0.105) so sunGear (r=0.16) and shaftPinion (r=0.13) remain cleanly exposed
   reg.part(
-    "struct.masthead.crane",
-    buildSlabGeometry(0.28, 0.11, 0.055, { radius: 0.025, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
+    "struct.winchCenterPost",
+    buildCylinderGeometry(0.095, 0.105, 1.32, { segments: 24, axis: "y" }),
     {
-      parent: mastGroup,
-      pos: [0.06, mastHeight + 0.025, 0],
-      ramp: "brass",
+      parent: structGroup,
+      pos: [WINCH_CX, -0.34, WINCH_CZ],
+      ramp: "mid",
       outline: "mid",
-      crease: "lo",
-      mountOn: "struct.masthead.cap"
-    }
-  );
-  reg.part("struct.masthead.sheave", buildCylinderGeometry(0.048, 0.048, 0.032, { segments: 16, axis: "z" }), {
-    parent: mastGroup,
-    pos: [0.10, mastHeight - 0.045, 0],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    detail: true
-  });
-
-  // Rotating Masthead Wind Vane / Windex (interactive wind indicator!)
-  const vaneGroup = reg.group("struct.windVane.group", {
-    parent: mastGroup,
-    pos: [0, mastHeight + 0.05, 0],
-    stage: "structure"
-  });
-  reg.part("struct.windVane.post", buildCylinderGeometry(0.015, 0.018, 0.13, { segments: 10, axis: "y" }), {
-    parent: vaneGroup,
-    pos: [0, 0.045, 0],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.masthead.crane"
-  });
-  reg.part(
-    "struct.windVane.arm",
-    buildSlabGeometry(0.32, 0.028, 0.022, { radius: 0.01, bevel: false }),
-    {
-      parent: vaneGroup,
-      pos: [0.04, 0.115, 0],
-      ramp: "lit",
-      outline: "lo",
       crease: "faint",
-      mountOn: "struct.windVane.post"
-    }
-  );
-  reg.part(
-    "struct.windVane.fin",
-    buildSlabGeometry(0.09, 0.016, 0.065, { radius: 0.006, bevel: false }),
-    {
-      parent: vaneGroup,
-      pos: [0.16, 0.135, 0],
-      ramp: "comb",
-      outline: "lo",
-      crease: "faint",
-      detail: true
+      mountOn: "struct.winchBaseSkirt"
     }
   );
 
-  // Anchors on masthead & spreaders for shrouds/stays (outside mast spar radius!)
-  reg.anchor("mast.top.port", 0.02, mastHeight - 0.01, -0.095, mastGroup);
-  reg.anchor("mast.top.stbd", 0.02, mastHeight - 0.01, 0.095, mastGroup);
-  reg.anchor("mast.top.fore", -0.075, mastHeight + 0.005, 0, mastGroup);
-  reg.anchor("mast.top.aft", 0.185, mastHeight + 0.005, 0, mastGroup);
-  reg.anchor("spreader.tip.port", sweepAft, localSpreaderY, -spreaderHalfSpan - 0.07, mastGroup);
-  reg.anchor("spreader.tip.stbd", sweepAft, localSpreaderY, spreaderHalfSpan + 0.07, mastGroup);
-
-  // 2. Deck Chainplates, Cylindrical Turnbuckles & Bow/Stern Stay Fittings
-  const [spX, , spZ] = ANCHORS.shroudPort;
-  const [ssX, , ssZ] = ANCHORS.shroudStbd;
-  [
-    { id: "port", x: spX, z: spZ },
-    { id: "stbd", x: ssX, z: ssZ }
-  ].forEach((cp) => {
-    reg.part(
-      `struct.chainplate.${cp.id}`,
-      buildSlabGeometry(0.14, 0.085, 0.045, { radius: 0.02, bevel: true, bevelSize: 0.007, bevelThickness: 0.007 }),
-      {
-        parent: structGroup,
-        pos: [cp.x, topSurfaceY + 0.045, cp.z],
-        ramp: "brass",
-        outline: "mid",
-        crease: "lo",
-        mountOn: "base.deckSection"
-      }
-    );
-    reg.part(`struct.turnbuckle.${cp.id}`, buildCylinderGeometry(0.032, 0.038, 0.22, { segments: 14, axis: "y" }), {
-      parent: structGroup,
-      pos: [cp.x, topSurfaceY + 0.155, cp.z],
-      ramp: "hi",
-      outline: "lo",
-      crease: "faint",
-      mountOn: `struct.chainplate.${cp.id}`
-    });
-    reg.part(`struct.turnbuckle.nut.${cp.id}`, buildCylinderGeometry(0.046, 0.046, 0.048, { segments: 6, axis: "y" }), {
-      parent: structGroup,
-      pos: [cp.x, topSurfaceY + 0.14, cp.z],
-      ramp: "brass",
-      outline: "lo",
-      crease: "faint",
-      detail: true
-    });
-    reg.anchor(`chainplate.top.${cp.id}`, cp.x, topSurfaceY + 0.265, cp.z, structGroup);
-  });
-
-  // Bow Stemhead Fitting
-  const [fsX, , fsZ] = ANCHORS.forestayDeck;
   reg.part(
-    "struct.bowStem",
-    buildSlabGeometry(0.20, 0.12, 0.055, { radius: 0.025, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
+    "struct.planetCarrierPlate",
+    buildCylinderGeometry(0.56, 0.56, 0.08, { segments: 28, axis: "y" }),
     {
       parent: structGroup,
-      pos: [fsX, topSurfaceY + 0.055, fsZ],
-      ramp: "brass",
-      outline: "mid",
-      crease: "lo",
-      mountOn: "base.deckSection"
-    }
-  );
-  reg.part("struct.bowStem.tang", buildCylinderGeometry(0.032, 0.040, 0.10, { segments: 12, axis: "y" }), {
-    parent: structGroup,
-    pos: [fsX + 0.02, topSurfaceY + 0.11, fsZ],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.bowStem"
-  });
-  reg.anchor("bowStem.top", fsX + 0.02, topSurfaceY + 0.16, fsZ, structGroup);
-
-  // Stern Backstay Tang
-  const [bsX, , bsZ] = ANCHORS.backstayDeck;
-  reg.part(
-    "struct.sternFit",
-    buildSlabGeometry(0.18, 0.10, 0.05, { radius: 0.022, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
-    {
-      parent: structGroup,
-      pos: [bsX, topSurfaceY + 0.05, bsZ],
-      ramp: "brass",
-      outline: "mid",
-      crease: "lo",
-      mountOn: "base.deckSection"
-    }
-  );
-  reg.part("struct.sternFit.tang", buildCylinderGeometry(0.030, 0.038, 0.10, { segments: 12, axis: "y" }), {
-    parent: structGroup,
-    pos: [bsX, topSurfaceY + 0.105, bsZ],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.sternFit"
-  });
-  reg.anchor("sternFit.top", bsX, topSurfaceY + 0.155, bsZ, structGroup);
-
-  // 3. Transverse Cockpit Mainsheet Traveler Track, Sliding Car & Deck Turning Block
-  const [trX, , trZ] = ANCHORS.travelerCenter;
-  reg.part(
-    "struct.traveler.rail",
-    buildSlabGeometry(0.085, 0.86, 0.042, { radius: 0.015, bevel: true, bevelSize: 0.006, bevelThickness: 0.006 }),
-    {
-      parent: structGroup,
-      pos: [trX, topSurfaceY + 0.042, trZ],
+      pos: [WINCH_CX, CARRIER_Y, WINCH_CZ],
       ramp: "mid",
       outline: "mid",
       crease: "lo",
-      mountOn: "base.deckSection"
+      mountOn: "struct.winchCenterPost",
+      allowOverlap: ["struct.winchBaseSkirt"]
     }
   );
-  [-0.41, 0.41].forEach((dz, idx) => {
-    reg.part(
-      `struct.traveler.stop.${idx}`,
-      buildCylinderGeometry(0.036, 0.042, 0.06, { segments: 10, axis: "y" }),
-      {
-        parent: structGroup,
-        pos: [trX, topSurfaceY + 0.05, trZ + dz],
-        ramp: "lo",
-        outline: "lo",
-        crease: "faint",
-        detail: true
-      }
-    );
+
+  reg.part(
+    "struct.stripperCollar",
+    buildCylinderGeometry(0.26, 0.26, 0.11, { segments: 24, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [WINCH_CX, 0.355, WINCH_CZ],
+      ramp: "hi",
+      outline: "hi",
+      crease: "lo",
+      mountOn: "struct.winchCenterPost"
+    }
+  );
+
+  // Stationary chrome self-tailing peeler arm clears drumCap (y<=0.36) and stays below handleArm (y>=0.525)
+  reg.part(
+    "struct.stripperArm",
+    new THREE.BoxGeometry(0.14, 0.07, 0.68),
+    {
+      parent: structGroup,
+      pos: [WINCH_CX, 0.36, WINCH_CZ + 0.31],
+      ramp: "hi",
+      outline: "hi",
+      crease: "lo",
+      mountOn: "struct.stripperCollar",
+      allowOverlap: ["struct.winchCenterPost"]
+    }
+  );
+
+  // Chrome peeler finger dipping into the self-tailing brass jaw groove at z = 0.82
+  reg.part(
+    "struct.stripperTip",
+    new THREE.BoxGeometry(0.12, 0.12, 0.16),
+    {
+      parent: structGroup,
+      pos: [WINCH_CX, 0.29, 0.80],
+      ramp: "hi",
+      outline: "hi",
+      crease: "lo",
+      mountOn: "struct.stripperArm",
+      allowOverlap: ["subject.stJaws", "subject.drumCap"]
+    }
+  );
+  reg.anchor("winch.tail.exit", WINCH_CX + 0.05, 0.28, 0.88, structGroup, {
+    dir: [0.32, -0.58, 0.75]
   });
 
-  const travelerCarGroup = reg.group("struct.traveler.carGroup", {
-    parent: structGroup,
-    pos: [trX, topSurfaceY + 0.055, trZ],
-    stage: "structure"
-  });
+  // Bronze sheet-entry fairlead guide on lower-left winch plinth rim
   reg.part(
-    "struct.traveler.car",
-    buildSlabGeometry(0.13, 0.16, 0.065, { radius: 0.02, bevel: true, bevelSize: 0.007, bevelThickness: 0.007 }),
+    "struct.sheetEntryGuide",
+    buildCylinderGeometry(0.08, 0.08, 0.22, { segments: 18, axis: "y" }),
     {
-      parent: travelerCarGroup,
-      pos: [0, 0.03, 0],
+      parent: structGroup,
+      pos: [0.34, -1.07, 0.56],
       ramp: "brass",
       outline: "mid",
       crease: "lo",
-      mountOn: "struct.traveler.rail"
+      mountOn: "base.winchPlinth",
+      allowOverlap: ["struct.winchBaseSkirt"]
     }
   );
-  reg.part("struct.traveler.sheave", buildCylinderGeometry(0.052, 0.052, 0.034, { segments: 16, axis: "x" }), {
-    parent: travelerCarGroup,
-    pos: [0, 0.085, 0],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.traveler.car"
+  reg.anchor("winch.sheet.in", 0.34, -0.96, 0.56, structGroup, {
+    dir: [-0.58, 0.08, 0.81]
   });
-  reg.anchor("traveler.car.top", 0, 0.135, 0, travelerCarGroup, { dir: [0, 1, 0] });
-  reg.anchor("traveler.car.out", 0.06, 0.065, 0.06, travelerCarGroup, { dir: [0.45, 0.05, 0.89] });
 
-  // Deck Mainsheet Turning Cheek Block (tangential feed to winch drum)
-  const [tbX, , tbZ] = ANCHORS.turningBlock;
+  // 2. Deck Sheet Turning Block & Cockpit Tail Cleat
+  reg.part("struct.turningBlockBase", new THREE.BoxGeometry(0.26, 0.16, 0.26), {
+    parent: structGroup,
+    pos: [-0.58, -1.34, 0.88],
+    ramp: "mid",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.deckSlab"
+  });
+
   reg.part(
-    "struct.turningBlock.base",
-    buildSlabGeometry(0.24, 0.24, 0.042, { radius: 0.05, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
+    "struct.turningSheave",
+    buildCylinderGeometry(0.14, 0.14, 0.08, { segments: 20, axis: "y" }),
     {
       parent: structGroup,
-      pos: [tbX, topSurfaceY + 0.042, tbZ],
-      ramp: "mid",
+      pos: [-0.58, -1.22, 0.88],
+      ramp: "brass",
       outline: "mid",
       crease: "lo",
-      mountOn: "base.deckSection"
+      mountOn: "struct.turningBlockBase"
     }
   );
-  reg.part("struct.turningBlock.sheave", buildCylinderGeometry(0.105, 0.105, 0.052, { segments: 20, axis: "y" }), {
+  reg.anchor("block.sheet.out", -0.44, -1.22, 0.88, structGroup, {
+    dir: [0.78, 0.42, 0.46]
+  });
+
+  reg.part("struct.tailCleat", new THREE.BoxGeometry(0.32, 0.14, 0.22), {
     parent: structGroup,
-    pos: [tbX, topSurfaceY + 0.082, tbZ],
+    pos: [1.92, -1.35, 1.02],
     ramp: "brass",
     outline: "mid",
-    crease: "faint",
-    mountOn: "struct.turningBlock.base"
+    crease: "lo",
+    mountOn: "base.deckSlab"
   });
+  reg.anchor("cleat.tail.in", 1.92, -1.28, 1.02, structGroup, {
+    dir: [-0.22, 0.95, 0.20]
+  });
+
+  // 3. Tapered Aluminum Mast Spar, Gooseneck, Swept Spreaders & Deflecting Masthead
   reg.part(
-    "struct.turningBlock.cap",
-    buildSlabGeometry(0.14, 0.14, 0.022, { radius: 0.04, bevel: true, bevelSize: 0.005, bevelThickness: 0.005 }),
+    "struct.mastLower",
+    buildCylinderGeometry(0.095, 0.11, 1.86, { segments: 24, axis: "y" }),
     {
       parent: structGroup,
-      pos: [tbX, topSurfaceY + 0.132, tbZ],
+      pos: [MAST_X, -0.37, MAST_Z],
       ramp: "hi",
-      outline: "lo",
-      crease: "faint",
-      mountOn: "struct.turningBlock.sheave"
+      outline: "hi",
+      noCrease: true,
+      mountOn: "base.mastStep"
     }
   );
-  reg.anchor("turningBlock.in", tbX - 0.065, topSurfaceY + 0.082, tbZ - 0.085, structGroup, { dir: [-0.45, 0, -0.89] });
-  reg.anchor("turningBlock.out", tbX + 0.10, topSurfaceY + 0.09, tbZ + 0.045, structGroup, { dir: [0.85, 0.34, 0.40] });
 
-  // 4. Cutaway Planetary Winch Base Flange & Outer Cutaway Gearbox Skirt
-  reg.part("struct.winch.baseFlange", buildCylinderGeometry(0.62, 0.66, 0.08, { segments: 36, axis: "y" }), {
+  reg.part("struct.gooseneck", new THREE.BoxGeometry(0.24, 0.18, 0.18), {
     parent: structGroup,
-    pos: [winchX, winchBaseY + 0.04, winchZ],
+    pos: [-1.06, GOOSENECK_Y, MAST_Z],
     ramp: "mid",
-    outline: "hi",
-    crease: "lo",
-    clippable: true,
-    mountOn: "base.winchCoaming"
-  });
-
-  [0, 1, 2, 3, 4, 5].forEach((i) => {
-    const a = (i / 6) * Math.PI * 2;
-    reg.detail(
-      `struct.winch.bolt.${i}`,
-      makeScrewDetail(winchX + Math.cos(a) * 0.59, winchBaseY + 0.082, winchZ + Math.sin(a) * 0.59, 0.024, "y", kit),
-      { parent: structGroup }
-    );
-  });
-
-  // Stationary outer cutaway pedestal housing (144° open window centered at a=306° facing ISO camera!)
-  const skirtH = 0.28;
-  reg.part("struct.winch.housingCut", buildArcWallGeometry(rRing + 0.095, rRing + 0.145, skirtH, 18, 234, 32), {
-    parent: structGroup,
-    pos: [winchX, winchBaseY + 0.08 + skirtH * 0.5, winchZ],
-    ramp: "mid",
-    outline: "hi",
-    crease: "lo",
-    clippable: true,
-    explode: [0, 0, -0.92],
-    mountOn: "struct.winch.baseFlange",
-    allowOverlap: ["winch.ringGear", "winch.drivePost.0", "winch.drivePost.1", "winch.drivePost.2", "winch.planet.0", "winch.planet.1", "winch.planet.2"]
-  });
-
-  // Removable front cutaway cover shell (hidden when Cutaway=ON, seals full 360° skirt when Cutaway=OFF)
-  reg.part("struct.winch.frontShield", buildArcWallGeometry(rRing + 0.095, rRing + 0.145, skirtH, 235, 377, 24), {
-    parent: structGroup,
-    pos: [winchX, winchBaseY + 0.08 + skirtH * 0.5, winchZ],
-    ramp: "lo",
     outline: "mid",
-    crease: "faint",
-    clippable: true,
-    cutawayHide: true,
-    explode: [0, 0, 0.96],
-    mountOn: "struct.winch.baseFlange",
-    allowOverlap: ["struct.winch.housingCut", "winch.ringGear", "winch.drivePost.0", "winch.drivePost.1", "winch.drivePost.2", "winch.planet.0", "winch.planet.1", "winch.planet.2"]
+    crease: "lo",
+    mountOn: "struct.mastLower"
+  });
+  reg.anchor("mast.gooseneck", -1.06, GOOSENECK_Y, MAST_Z, structGroup);
+
+  reg.part("struct.spreaderBracket", new THREE.BoxGeometry(0.22, 0.14, 0.32), {
+    parent: structGroup,
+    pos: [MAST_X, SPREADER_Y, MAST_Z],
+    ramp: "mid",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "struct.mastLower"
   });
 
-  reg.tag("tag-winch", "SELF-TAILER", winchX + 1.02, winchBaseY + 0.92, winchZ - 0.36);
+  reg.part(
+    "struct.spreader.windward",
+    buildCylinderGeometry(0.032, 0.048, SPREADER_SPAN, { segments: 16, axis: "z" }),
+    {
+      parent: structGroup,
+      pos: [MAST_X, SPREADER_Y, 0.38],
+      ramp: "hi",
+      outline: "mid",
+      noCrease: true,
+      mountOn: "struct.spreaderBracket"
+    }
+  );
+  reg.anchor("spreader.tip.windward", MAST_X, SPREADER_Y, 0.86, structGroup);
+  reg.anchor("spreader.root.windward", MAST_X, SPREADER_Y - 0.02, -0.06, structGroup);
+
+  reg.part(
+    "struct.spreader.leeward",
+    buildCylinderGeometry(0.048, 0.032, SPREADER_SPAN, { segments: 16, axis: "z" }),
+    {
+      parent: structGroup,
+      pos: [MAST_X, SPREADER_Y, -0.74],
+      ramp: "hi",
+      outline: "mid",
+      noCrease: true,
+      mountOn: "struct.spreaderBracket"
+    }
+  );
+  reg.anchor("spreader.tip.leeward", MAST_X, SPREADER_Y, -1.22, structGroup);
+  reg.anchor("spreader.root.leeward", MAST_X, SPREADER_Y - 0.02, -0.30, structGroup);
+
+  // Upper Mast Group (pivoted at spreader root for live aft bend & leeward deflection)
+  const mastTopGroup = reg.group("struct.mastTopGroup", {
+    parent: structGroup,
+    pos: [MAST_X, SPREADER_Y, MAST_Z],
+    stage: "structure"
+  });
+
+  reg.part(
+    "struct.mastUpper",
+    buildCylinderGeometry(0.072, 0.095, 1.66, { segments: 24, axis: "y" }),
+    {
+      parent: mastTopGroup,
+      pos: [0, 0.83, 0],
+      ramp: "hi",
+      outline: "hi",
+      noCrease: true,
+      mountOn: "struct.spreaderBracket",
+      allowOverlap: ["struct.mastLower"]
+    }
+  );
+
+  reg.part("struct.mastheadCrane", new THREE.BoxGeometry(0.32, 0.14, 0.24), {
+    parent: mastTopGroup,
+    pos: [0, 1.68, 0],
+    ramp: "brass",
+    outline: "hi",
+    crease: "lo",
+    mountOn: "struct.mastUpper"
+  });
+  reg.anchor("masthead.windward", 0, 1.68, 0.08, mastTopGroup);
+  reg.anchor("masthead.leeward", 0, 1.68, -0.08, mastTopGroup);
+  reg.anchor("masthead.fore", -0.14, 1.68, 0, mastTopGroup);
+  reg.anchor("masthead.aft", 0.14, 1.68, 0, mastTopGroup);
+
+  reg.tag("tag-masthead", "MASTHEAD RIG · V1/D1 SHROUDS", MAST_X, 2.44, MAST_Z);
+
+  // 4. Chainplate Turnbuckle Cylinders (solid mount bases for Stage 5 shrouds & forestay)
+  reg.part(
+    "struct.turnbuckle.windward",
+    buildCylinderGeometry(0.045, 0.045, 0.28, { segments: 14, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [MAST_X, -1.12, CHAINPLATE_Z_WIND],
+      ramp: "brass",
+      outline: "lo",
+      noCrease: true,
+      mountOn: "base.chainplate.windward"
+    }
+  );
+  reg.anchor("turnbuckle.windward.top", MAST_X, -0.98, CHAINPLATE_Z_WIND, structGroup);
+
+  reg.part(
+    "struct.turnbuckle.leeward",
+    buildCylinderGeometry(0.045, 0.045, 0.28, { segments: 14, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [MAST_X, -1.12, CHAINPLATE_Z_LEE],
+      ramp: "brass",
+      outline: "lo",
+      noCrease: true,
+      mountOn: "base.chainplate.leeward"
+    }
+  );
+  reg.anchor("turnbuckle.leeward.top", MAST_X, -0.98, CHAINPLATE_Z_LEE, structGroup);
+
+  reg.part(
+    "struct.forestayTurnbuckle",
+    buildCylinderGeometry(0.045, 0.045, 0.28, { segments: 14, axis: "y" }),
+    {
+      parent: structGroup,
+      pos: [STEMHEAD_X, -1.12, MAST_Z],
+      ramp: "brass",
+      outline: "lo",
+      noCrease: true,
+      mountOn: "base.stemhead"
+    }
+  );
+  reg.anchor("forestay.turnbuckle.top", STEMHEAD_X, -0.98, MAST_Z, structGroup);
 }
 
 
@@ -4195,899 +4177,1170 @@ function buildStructure(reg, kit) {
 
 
 
-function buildHorizontalGear(pitchR, teeth, toothDepth, width, boreFraction) {
-  const geo = buildExternalGearGeometry(pitchR, teeth, toothDepth, width, boreFraction);
-  geo.rotateX(-Math.PI / 2);
+const N_XI = 18;
+const N_ETA = 24;
+const SAIL_HALF_THICK = 0.007;
+const BATTEN_ETAS = [0.22, 0.42, 0.62, 0.80];
+const BATTEN_SEGS = 10;
+
+/**
+ * Builds a watertight thick-walled tapered cylindrical cutaway arc shell around Y.
+ * Matches Three.js CylinderGeometry angle convention: x = r * sin(a), z = r * cos(a).
+ */
+function buildDrumArcShell(rOutTop, rOutBot, rInTop, rInBot, height, thetaStart, thetaLength, segs = 28) {
+  const halfH = height * 0.5;
+  const positions = [];
+  const pushTri = (a, b, c) => {
+    positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+  };
+  const pushQuad = (p0, p1, p2, p3) => {
+    pushTri(p0, p1, p2);
+    pushTri(p0, p2, p3);
+  };
+
+  const pt = (r, y, a) => [Math.sin(a) * r, y, Math.cos(a) * r];
+
+  for (let i = 0; i < segs; i++) {
+    const a0 = thetaStart + (thetaLength * i) / segs;
+    const a1 = thetaStart + (thetaLength * (i + 1)) / segs;
+
+    const ob0 = pt(rOutBot, -halfH, a0);
+    const ob1 = pt(rOutBot, -halfH, a1);
+    const ot0 = pt(rOutTop, halfH, a0);
+    const ot1 = pt(rOutTop, halfH, a1);
+
+    const ib0 = pt(rInBot, -halfH, a0);
+    const ib1 = pt(rInBot, -halfH, a1);
+    const it0 = pt(rInTop, halfH, a0);
+    const it1 = pt(rInTop, halfH, a1);
+
+    // Outer face (+r)
+    pushQuad(ob0, ob1, ot1, ot0);
+    // Inner face (-r)
+    pushQuad(ib1, ib0, it0, it1);
+    // Top annular cap (+Y)
+    pushQuad(it0, ot0, ot1, it1);
+    // Bottom annular cap (-Y)
+    pushQuad(ob0, ib0, ib1, ob1);
+  }
+
+  // Vertical cutaway end caps at thetaStart and thetaStart + thetaLength
+  const aS = thetaStart;
+  const aE = thetaStart + thetaLength;
+  pushQuad(
+    pt(rInBot, -halfH, aS),
+    pt(rOutBot, -halfH, aS),
+    pt(rOutTop, halfH, aS),
+    pt(rInTop, halfH, aS)
+  );
+  pushQuad(
+    pt(rOutBot, -halfH, aE),
+    pt(rInBot, -halfH, aE),
+    pt(rInTop, halfH, aE),
+    pt(rOutTop, halfH, aE)
+  );
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
   return geo;
 }
 
-function buildHorizontalInternalGear(outerR, pitchR, teeth, toothDepth, width) {
-  const geo = buildInternalGearRingGeometry(outerR, pitchR, teeth, toothDepth, width);
-  geo.rotateX(-Math.PI / 2);
+/**
+ * Watertight thin double-sheet cambered sail BufferGeometry with separate front (+Z) and back (-Z) vertices
+ * plus perimeter edge skirt so cel shading and inverted-hull silhouettes never z-fight or bleed.
+ */
+function createSailGeometry(st) {
+  const geo = new THREE.BufferGeometry();
+  const gridVerts = (N_XI + 1) * (N_ETA + 1);
+  const positions = new Float32Array(gridVerts * 2 * 3);
+  const indices = [];
+
+  const idxF = (i, j) => j * (N_XI + 1) + i;
+  const idxB = (i, j) => gridVerts + j * (N_XI + 1) + i;
+
+  for (let j = 0; j < N_ETA; j++) {
+    for (let i = 0; i < N_XI; i++) {
+      const aF = idxF(i, j);
+      const bF = idxF(i + 1, j);
+      const cF = idxF(i, j + 1);
+      const dF = idxF(i + 1, j + 1);
+      indices.push(aF, bF, dF, aF, dF, cF);
+
+      const aB = idxB(i, j);
+      const bB = idxB(i + 1, j);
+      const cB = idxB(i, j + 1);
+      const dB = idxB(i + 1, j + 1);
+      indices.push(aB, dB, bB, aB, cB, dB);
+    }
+  }
+
+  // Stitch perimeter edges (foot j=0, headboard j=N_ETA, luff i=0, leech i=N_XI)
+  for (let i = 0; i < N_XI; i++) {
+    indices.push(idxF(i, 0), idxB(i, 0), idxB(i + 1, 0), idxF(i, 0), idxB(i + 1, 0), idxF(i + 1, 0));
+    indices.push(
+      idxF(i, N_ETA), idxF(i + 1, N_ETA), idxB(i + 1, N_ETA),
+      idxF(i, N_ETA), idxB(i + 1, N_ETA), idxB(i, N_ETA)
+    );
+  }
+  for (let j = 0; j < N_ETA; j++) {
+    indices.push(idxF(0, j), idxF(0, j + 1), idxB(0, j + 1), idxF(0, j), idxB(0, j + 1), idxB(0, j));
+    indices.push(
+      idxF(N_XI, j), idxB(N_XI, j), idxB(N_XI, j + 1),
+      idxF(N_XI, j), idxB(N_XI, j + 1), idxF(N_XI, j + 1)
+    );
+  }
+
+  geo.setIndex(indices);
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  fillSailVertices(geo, st);
   return geo;
+}
+function fillSailVertices(geo, st) {
+  const posAttr = geo.getAttribute("position");
+  const arr = posAttr.array;
+  const gridVerts = (N_XI + 1) * (N_ETA + 1);
+
+  for (let j = 0; j <= N_ETA; j++) {
+    const eta = j / N_ETA;
+    const chordLen = SPEC.SAIL_FOOT_W * (1.0 - 0.86 * Math.pow(eta, 1.35));
+    const y = 0.08 + eta * SPEC.SAIL_LUFF_H;
+
+    for (let i = 0; i <= N_XI; i++) {
+      const xi = i / N_XI;
+      const off = computeSailSurfaceOffset(xi, eta, st.camberRatio, st.twistRad, st.mastPreBend);
+      const x = 0.02 + xi * chordLen + off.dx;
+      const z = off.dz;
+
+      const fOff = (j * (N_XI + 1) + i) * 3;
+      const bOff = (gridVerts + j * (N_XI + 1) + i) * 3;
+      arr[fOff] = x;
+      arr[fOff + 1] = y;
+      arr[fOff + 2] = z + SAIL_HALF_THICK;
+
+      arr[bOff] = x;
+      arr[bOff + 1] = y;
+      arr[bOff + 2] = z - SAIL_HALF_THICK;
+    }
+  }
+  posAttr.needsUpdate = true;
+  geo.computeVertexNormals();
+}
+
+function createBattenGeometry(eta, st) {
+  const geo = new THREE.BufferGeometry();
+  const cols = BATTEN_SEGS + 1;
+  // 4 vertices per cross-section (+Y/+Z, +Y/-Z, -Y/-Z, -Y/+Z)
+  const positions = new Float32Array(cols * 4 * 3);
+  const indices = [];
+
+  for (let i = 0; i < BATTEN_SEGS; i++) {
+    const b0 = i * 4;
+    const b1 = (i + 1) * 4;
+    for (let k = 0; k < 4; k++) {
+      const kn = (k + 1) % 4;
+      indices.push(b0 + k, b1 + k, b1 + kn, b0 + k, b1 + kn, b0 + kn);
+    }
+  }
+  // End caps
+  indices.push(0, 3, 2, 0, 2, 1);
+  const last = BATTEN_SEGS * 4;
+  indices.push(last, last + 1, last + 2, last, last + 2, last + 3);
+
+  geo.setIndex(indices);
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  fillBattenVertices(geo, eta, st);
+  return geo;
+}
+
+function fillBattenVertices(geo, eta, st) {
+  const posAttr = geo.getAttribute("position");
+  const arr = posAttr.array;
+  const chordLen = SPEC.SAIL_FOOT_W * (1.0 - 0.86 * Math.pow(eta, 1.35));
+  const y = 0.08 + eta * SPEC.SAIL_LUFF_H;
+  const hy = 0.016;
+  const hz = 0.015;
+  const xiStart = 0.14;
+
+  for (let i = 0; i <= BATTEN_SEGS; i++) {
+    const xi = xiStart + ((1.0 - xiStart) * i) / BATTEN_SEGS;
+    const off = computeSailSurfaceOffset(xi, eta, st.camberRatio, st.twistRad, st.mastPreBend);
+    const x = 0.02 + xi * chordLen + off.dx;
+    const z = off.dz;
+    const base = i * 12;
+
+    arr[base] = x; arr[base + 1] = y + hy; arr[base + 2] = z + hz;
+    arr[base + 3] = x; arr[base + 4] = y + hy; arr[base + 5] = z - hz;
+    arr[base + 6] = x; arr[base + 7] = y - hy; arr[base + 8] = z - hz;
+    arr[base + 9] = x; arr[base + 10] = y - hy; arr[base + 11] = z + hz;
+  }
+  posAttr.needsUpdate = true;
+  geo.computeVertexNormals();
 }
 function buildSubject(reg, kit) {
-  const subjectGroup = reg.group("subject.group", { stage: "subject" });
+  const initSt = getRigState(SPEC.initialTheta);
   const {
-    winchX,
-    winchZ,
-    winchBaseY,
-    sunTeeth,
-    planetTeeth,
-    ringTeeth,
-    rSun,
-    rPlanet,
-    rRing,
-    gearToothDepth,
-    mastX,
-    mastZ,
-    boomY,
-    boomLength
+    WINCH_CX,
+    WINCH_CZ,
+    PLANET_Y,
+    DRUM_R_TOP,
+    DRUM_R_BOT,
+    DRUM_H,
+    JAWS_Y,
+    HANDLE_Y,
+    HANDLE_LEN,
+    MAST_Z,
+    GOOSENECK_Y,
+    BOOM_LEN
   } = SPEC;
 
-  // 1. Hero 2-Speed Self-Tailing Planetary Winch Assembly
-  const winchRoot = reg.group("winch.root", {
-    parent: subjectGroup,
-    pos: [winchX, winchBaseY, winchZ],
+  // 1. Central Winch Input Spindle, Sun Gear & Lock-In Handle
+  const shaftGroup = reg.group("subject.shaftGroup", {
+    pos: [WINCH_CX, 0, WINCH_CZ],
+    rot: [0, initSt.handleRad, 0],
     stage: "subject"
   });
 
-  // Central Drive Spindle (rotates with handle)
-  const spindleGroup = reg.group("winch.spindle.group", {
-    parent: winchRoot,
-    stage: "subject"
-  });
-  reg.part("winch.spindle", buildCylinderGeometry(0.058, 0.058, 0.96, { segments: 20, axis: "y" }), {
-    parent: spindleGroup,
-    pos: [0, 0.56, 0],
-    ramp: "hi",
-    outline: "hi",
-    crease: "faint",
-    mountOn: "struct.winch.baseFlange",
-    allowOverlap: ["winch.drum", "winch.crownBot", "winch.crownTop", "winch.carrier", "winch.ratchetRing", "winch.sunGear"]
-  });
-
-  // 12T Sun Gear on Spindle inside Cutaway Planetary Bay (y = 0.24)
-  reg.part("winch.sunGear", buildHorizontalGear(rSun, sunTeeth, gearToothDepth, 0.17, 0.40), {
-    parent: spindleGroup,
-    pos: [0, 0.24, 0],
-    ramp: "lit",
-    outline: "mid",
-    crease: "faint",
-    explode: [0, 0.20, 0],
-    mountOn: "winch.spindle",
-    allowOverlap: ["winch.planet.0", "winch.planet.1", "winch.planet.2", "winch.spindle"]
-  });
-
-  // Base 1-Way Ratchet Ring (holds carrier stationary during 3.5:1 CCW reduction)
-  reg.part("winch.ratchetRing", buildHorizontalGear(0.24, 16, 0.024, 0.055, 0.45), {
-    parent: winchRoot,
-    pos: [0, 0.108, 0],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.winch.baseFlange",
-    allowOverlap: ["winch.spindle", "winch.carrier"]
-  });
-
-  // 3-Arm Planet Carrier Plate + 3 Ratchet Pawls + 3 Meshing 15T Brass Planet Gears
-  const carrierGroup = reg.group("winch.carrier.group", {
-    parent: winchRoot,
-    pos: [0, 0.235, 0],
-    stage: "subject"
-  });
-  reg.part("winch.carrier", buildCylinderGeometry(0.41, 0.41, 0.055, { segments: 28, axis: "y" }), {
-    parent: carrierGroup,
-    pos: [0, -0.105, 0],
-    ramp: "lo",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.winch.baseFlange",
-    allowOverlap: ["winch.spindle", "winch.ratchetRing"]
-  });
-
-  const orbitR = rSun + rPlanet; // 0.3375
-  const planetGeo = buildHorizontalGear(rPlanet, planetTeeth, gearToothDepth, 0.16, 0.28);
-  const planetPinGeo = buildCylinderGeometry(0.048, 0.048, 0.20, { segments: 14, axis: "y" });
-  const pawlGeo = buildSlabGeometry(0.095, 0.036, 0.038, { radius: 0.01, bevel: false });
-
-  [0, 1, 2].forEach((idx) => {
-    // a_0 = 60° places planet 0 dead-center in the open ISO cutaway window AND gives exact 12T/42T integer tooth alignment
-    const a = Math.PI / 3 + (idx * 2 * Math.PI) / 3;
-    const px = Math.cos(a) * orbitR;
-    const pz = Math.sin(a) * orbitR;
-
-    // Visible spring-loaded brass ratchet pawl on carrier edge
-    reg.part(`winch.pawl.${idx}`, pawlGeo, {
-      parent: carrierGroup,
-      pos: [Math.cos(a + 0.52) * 0.28, -0.055, Math.sin(a + 0.52) * 0.28],
-      rot: [0, -(a + 0.52) + 0.45, 0],
-      ramp: "brass",
-      outline: "lo",
-      crease: "faint",
-      detail: true
-    });
-
-    const pOrbitGroup = reg.group(`winch.planet.orbit.${idx}`, {
-      parent: carrierGroup,
-      pos: [px, 0, pz],
-      rot: [0, -a, 0], // Align local +X radially outward so tooth gap faces sun cleanly
-      stage: "subject"
-    });
-    const pSpinGroup = reg.group(`winch.planet.spin.${idx}`, {
-      parent: pOrbitGroup,
-      stage: "subject"
-    });
-
-    reg.part(`winch.planet.pin.${idx}`, planetPinGeo, {
-      parent: pSpinGroup,
-      pos: [0, -0.015, 0],
-      ramp: "hi",
-      outline: "lo",
-      crease: "faint",
-      detail: true
-    });
-
-    reg.part(`winch.planet.${idx}`, planetGeo, {
-      parent: pSpinGroup,
-      ramp: "brass",
-      outline: "mid",
-      crease: "faint",
-      explode: [0.18, 0.20, 0], // Explodes radially outward along local +X!
-      mountOn: "winch.carrier",
-      allowOverlap: ["winch.sunGear", "winch.ringGear", "winch.carrier", "struct.winch.housingCut", "struct.winch.frontShield"]
-    });
-  });
-
-  // Rotating Winch Drum + 42T Internal Ring Gear + Self-Tailing Jaws Crown
-  const drumGroup = reg.group("winch.drum.group", {
-    parent: winchRoot,
-    stage: "subject"
-  });
-
-  // 42T Internal Ring Gear around lower half of planets (y = 0.185, height = 0.068 so sun & planets rise cleanly above!)
-  reg.part("winch.ringGear", buildHorizontalInternalGear(rRing + 0.068, rRing, ringTeeth, gearToothDepth, 0.068), {
-    parent: drumGroup,
-    pos: [0, 0.185, 0],
-    ramp: "hi",
-    outline: "mid",
-    crease: "faint",
-    explode: [0, 0.34, 0],
-    mountOn: "struct.winch.housingCut",
-    allowOverlap: ["winch.planet.0", "winch.planet.1", "winch.planet.2", "struct.winch.housingCut", "struct.winch.frontShield"]
-  });
-
-  // 3 Drive Pillars connecting the rotating Ring Gear up to the Winch Drum Waist (leaves front cutaway wide open!)
-  [0, 1, 2].forEach((idx) => {
-    const a = Math.PI * 0.72 + (idx * 2 * Math.PI) / 3;
-    reg.part(`winch.drivePost.${idx}`, buildCylinderGeometry(0.036, 0.036, 0.18, { segments: 12, axis: "y" }), {
-      parent: drumGroup,
-      pos: [Math.cos(a) * (rRing + 0.032), 0.31, Math.sin(a) * (rRing + 0.032)],
-      ramp: "hi",
-      outline: "lo",
-      crease: "faint",
-      explode: [0, 0.44, 0],
-      mountOn: "winch.ringGear",
-      allowOverlap: ["struct.winch.housingCut", "struct.winch.frontShield", "winch.drumFlangeLow"]
-    });
-  });
-
-  // Lower Drum Skirt Collar (y = 0.39..0.44)
-  reg.part("winch.drumFlangeLow", buildCylinderGeometry(0.49, 0.59, 0.055, { segments: 32, axis: "y" }), {
-    parent: drumGroup,
-    pos: [0, 0.415, 0],
-    ramp: "hi",
-    outline: "mid",
-    crease: "lo",
-    explode: [0, 0.54, 0],
-    mountOn: "winch.drivePost.0",
-    allowOverlap: ["winch.spindle", "winch.drivePost.0", "winch.drivePost.1", "winch.drivePost.2"]
-  });
-
-  // Main Knurled Winch Drum Waist (y = 0.44..0.80)
-  reg.part("winch.drum", buildCylinderGeometry(0.42, 0.49, 0.37, { segments: 32, axis: "y" }), {
-    parent: drumGroup,
-    pos: [0, 0.625, 0],
-    ramp: "lit",
-    outline: "hi",
-    crease: "lo",
-    explode: [0, 0.62, 0],
-    mountOn: "winch.drumFlangeLow",
-    allowOverlap: ["winch.spindle"]
-  });
-  reg.detail("winch.drum.knurl", makeKnurlLines(0.445, 0.47, 0.77, 26, kit, { tone: "lo" }), {
-    parent: drumGroup
-  });
-
-  // Self-Tailing V-Groove Top Crown (lower flared jaw + upper jaw cap)
-  reg.part("winch.crownBot", buildCylinderGeometry(0.55, 0.42, 0.065, { segments: 32, axis: "y" }), {
-    parent: drumGroup,
-    pos: [0, 0.84, 0],
-    ramp: "brass",
-    outline: "hi",
-    crease: "lo",
-    explode: [0, 0.80, 0],
-    mountOn: "winch.drum",
-    allowOverlap: ["winch.spindle"]
-  });
-  reg.part("winch.crownTop", buildCylinderGeometry(0.55, 0.49, 0.065, { segments: 32, axis: "y" }), {
-    parent: drumGroup,
-    pos: [0, 0.905, 0],
-    ramp: "hi",
-    outline: "hi",
-    crease: "lo",
-    explode: [0, 0.90, 0],
-    mountOn: "winch.crownBot",
-    allowOverlap: ["winch.spindle"]
-  });
-  const crownRing = makeRingLine(0.54, 32, kit, "hi");
-  crownRing.rotation.x = Math.PI / 2;
-  crownRing.position.y = 0.942;
-  reg.detail("winch.crown.ring", crownRing, { parent: drumGroup });
-
-  // Fixed Self-Tailing Stripper Horn peeling sheet cleanly out of the V-groove crown
   reg.part(
-    "winch.stripperArm",
-    buildSlabGeometry(0.11, 0.28, 0.055, { radius: 0.03, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
+    "subject.mainShaft",
+    buildCylinderGeometry(0.068, 0.068, 1.44, { segments: 20, axis: "y" }),
     {
-      parent: winchRoot,
-      pos: [0.50, 0.915, 0.16],
-      rot: [0, -0.32, 0],
-      ramp: "brass",
-      outline: "mid",
-      crease: "lo",
-      explode: [0.24, 0.92, 0.12],
-      mountOn: "winch.crownTop",
-      allowOverlap: ["winch.crownBot", "winch.crownTop"]
+      parent: shaftGroup,
+      pos: [0, -0.20, 0],
+      ramp: "hi",
+      outline: "hi",
+      noCrease: true,
+      mountOn: "struct.winchCenterPost",
+      allowOverlap: [
+        "struct.winchBaseSkirt",
+        "struct.planetCarrierPlate",
+        "struct.stripperCollar",
+        "struct.stripperArm",
+        "subject.sunGear",
+        "subject.drumCap",
+        "subject.stJaws",
+        "subject.handleHub"
+      ]
     }
   );
-  reg.part("winch.stripperHorn", buildCylinderGeometry(0.030, 0.038, 0.18, { segments: 12, axis: "y" }), {
-    parent: winchRoot,
-    pos: [0.61, 0.80, 0.11],
-    rot: [0.12, 0, -0.22],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    explode: [0.24, 0.92, 0.12],
-    mountOn: "winch.stripperArm"
-  });
 
-  // Removable Locking Winch Handle (top of spindle y = 1.01, rotated by handleRotY)
-  const handleGroup = reg.group("winch.handle.group", {
-    parent: winchRoot,
-    pos: [0, 1.00, 0],
+  // 12-tooth copper sun gear (pitchR=0.153, boreR=0.068 -> boreFraction=0.444, width=0.16)
+  reg.part(
+    "subject.sunGear",
+    buildExternalGearGeometry(0.153, 12, 0.024, 0.16, 0.068 / 0.153),
+    {
+      parent: shaftGroup,
+      pos: [0, PLANET_Y, 0],
+      rot: [Math.PI / 2, 0, 0],
+      ramp: "copper",
+      outline: "mid",
+      crease: "faint",
+      mountOn: "subject.mainShaft",
+      allowOverlap: [
+        "struct.winchCenterPost",
+        "struct.planetCarrierPlate",
+        "subject.planetGear.0",
+        "subject.planetGear.1",
+        "subject.planetGear.2"
+      ]
+    }
+  );
+
+  const handleGroup = reg.group("subject.handleGroup", {
+    parent: shaftGroup,
+    pos: [0, HANDLE_Y, 0],
     stage: "subject"
   });
-  reg.part("winch.handle.hub", buildCylinderGeometry(0.11, 0.12, 0.08, { segments: 20, axis: "y" }), {
-    parent: handleGroup,
-    ramp: "brass",
-    outline: "mid",
-    crease: "lo",
-    explode: [0, 1.06, 0],
-    mountOn: "winch.spindle"
-  });
-  reg.part("winch.handle.latch", buildCylinderGeometry(0.048, 0.048, 0.03, { segments: 14, axis: "y" }), {
-    parent: handleGroup,
-    pos: [0, 0.052, 0],
-    ramp: "comb",
-    outline: "lo",
-    crease: "faint",
-    explode: [0, 1.06, 0],
-    detail: true
-  });
+
   reg.part(
-    "winch.handle.arm",
-    buildSlabGeometry(0.84, 0.11, 0.055, { radius: 0.045, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
+    "subject.handleHub",
+    buildCylinderGeometry(0.11, 0.11, 0.10, { segments: 20, axis: "y" }),
     {
       parent: handleGroup,
-      pos: [0.40, 0.03, 0],
-      ramp: "lit",
-      outline: "hi",
+      pos: [0, 0, 0],
+      ramp: "brass",
+      outline: "mid",
       crease: "lo",
-      explode: [0, 1.06, 0],
-      mountOn: "winch.handle.hub"
+      mountOn: "subject.mainShaft",
+      allowOverlap: ["struct.stripperCollar", "subject.drumCap"]
     }
   );
-  reg.part("winch.handle.grip", buildCylinderGeometry(0.062, 0.050, 0.23, { segments: 18, axis: "y" }), {
-    parent: handleGroup,
-    pos: [0.76, 0.145, 0],
-    ramp: "brass",
-    outline: "mid",
-    crease: "lo",
-    explode: [0, 1.06, 0],
-    mountOn: "winch.handle.arm"
+
+  reg.part(
+    "subject.handleArm",
+    new THREE.BoxGeometry(HANDLE_LEN, 0.07, 0.11),
+    {
+      parent: handleGroup,
+      pos: [HANDLE_LEN * 0.5, 0.02, 0],
+      ramp: "hi",
+      outline: "hi",
+      crease: "lo",
+      mountOn: "subject.handleHub"
+    }
+  );
+
+  reg.part(
+    "subject.handleGrip",
+    buildCylinderGeometry(0.065, 0.055, 0.34, { segments: 18, axis: "y" }),
+    {
+      parent: handleGroup,
+      pos: [HANDLE_LEN - 0.04, 0.20, 0],
+      ramp: "lit",
+      outline: "lit",
+      noCrease: true,
+      mountOn: "subject.handleArm"
+    }
+  );
+
+  // 2. Planetary Gear Stage (3 orbiting 12T brass planet gears meshing between 12T sun and 36T ring)
+  const carrierGroup = reg.group("subject.carrierGroup", {
+    pos: [WINCH_CX, 0, WINCH_CZ],
+    rot: [0, initSt.carrierRad, 0],
+    stage: "subject"
   });
 
-  // 2. Articulated Boom, Rigid Telescopic Vang & Mainsail Clew Fiddle Block
-  const restRig = getRigState({ theta: SPEC.initialTheta, rpm: SPEC.initialRpm, wind: 18, trim: 58 });
-  const boomGroup = reg.group("boom.group", {
-    parent: subjectGroup,
-    pos: [mastX + 0.09, boomY, mastZ],
-    rot: [0, restRig.boomAngleY, 0],
+  const R_ORB = 0.307;
+  const planetGeo = buildExternalGearGeometry(0.153, 12, 0.022, 0.14, 0.04 / 0.153);
+  const planetPinGeo = buildCylinderGeometry(0.038, 0.038, 0.24, { segments: 14, axis: "y" });
+
+  for (let i = 0; i < 3; i++) {
+    const a = (i * TAU) / 3;
+    const px = Math.cos(a) * R_ORB;
+    const pz = Math.sin(a) * R_ORB;
+
+    reg.part(`subject.planetPin.${i}`, planetPinGeo, {
+      parent: carrierGroup,
+      pos: [px, -0.46, pz],
+      ramp: "hi",
+      outline: "lo",
+      noCrease: true,
+      mountOn: "struct.planetCarrierPlate",
+      allowOverlap: [
+        "struct.winchCenterPost",
+        "subject.planetGear.0",
+        "subject.planetGear.1",
+        "subject.planetGear.2"
+      ]
+    });
+
+    const pSpin = reg.group(`subject.planetSpin.${i}`, {
+      parent: carrierGroup,
+      pos: [px, PLANET_Y, pz],
+      stage: "subject"
+    });
+
+    reg.part(`subject.planetGear.${i}`, planetGeo, {
+      parent: pSpin,
+      pos: [0, 0, 0],
+      rot: [Math.PI / 2, 0, 0],
+      ramp: "brass",
+      outline: "mid",
+      crease: "faint",
+      mountOn: `subject.planetPin.${i}`,
+      allowOverlap: [
+        "struct.planetCarrierPlate",
+        "subject.sunGear",
+        "subject.drumRingGear",
+        "subject.drumRear",
+        "subject.drumFront",
+        "struct.winchCenterPost"
+      ]
+    });
+  }
+
+  // 3. Cutaway Winch Drum, 36T Internal Ring Gear, Self-Tailing Jaws & Loaded Sheet Wraps
+  const drumGroup = reg.group("subject.drumGroup", {
+    pos: [WINCH_CX, 0, WINCH_CZ],
+    rot: [0, initSt.drumRad, 0],
+    stage: "subject"
+  });
+
+  // 36-tooth internal brass ring gear (outerR=0.56, pitchR=0.46, teeth=36, toothDepth=0.022, width=0.16)
+  reg.part(
+    "subject.drumRingGear",
+    buildInternalGearRingGeometry(0.56, 0.46, 36, 0.022, 0.16),
+    {
+      parent: drumGroup,
+      pos: [0, PLANET_Y, 0],
+      rot: [Math.PI / 2, 0, 0],
+      ramp: "brass",
+      outline: "mid",
+      crease: "faint",
+      mountOn: "subject.drumRear",
+      allowOverlap: [
+        "struct.planetCarrierPlate",
+        "subject.planetGear.0",
+        "subject.planetGear.1",
+        "subject.planetGear.2",
+        "subject.drumFront",
+        "struct.winchCenterPost"
+      ]
+    }
+  );
+
+  // Watertight thick-walled cutaway rear & removable front drum shells (window stays open toward +X/+Z viewer)
+  const drumShellGroup = reg.group("subject.drumShellGroup", {
+    pos: [WINCH_CX, -0.32, WINCH_CZ],
     stage: "subject"
   });
 
   reg.part(
-    "boom.gooseneck",
-    buildSlabGeometry(0.15, 0.11, 0.11, { radius: 0.03, bevel: true, bevelSize: 0.008, bevelThickness: 0.008 }),
+    "subject.drumRear",
+    buildDrumArcShell(DRUM_R_TOP, DRUM_R_BOT, 0.525, 0.575, DRUM_H, Math.PI * 0.72, Math.PI * 1.12, 28),
     {
-      parent: boomGroup,
-      pos: [0, 0.04, 0],
-      ramp: "brass",
-      outline: "mid",
+      parent: drumShellGroup,
+      pos: [0, 0, 0],
+      ramp: "mid",
+      outline: "hi",
       crease: "lo",
-      mountOn: "struct.mast.spar"
+      mountOn: "struct.planetCarrierPlate",
+      allowOverlap: [
+        "struct.winchBaseSkirt",
+        "struct.winchCenterPost",
+        "subject.planetGear.0",
+        "subject.planetGear.1",
+        "subject.planetGear.2",
+        "subject.stJaws",
+        "subject.drumFront",
+        "subject.drumRingGear",
+        "mech.compoundShaft",
+        "mech.compoundGear"
+      ]
     }
   );
-  reg.part("boom.spar", buildCylinderGeometry(0.052, 0.068, boomLength, { segments: 20, axis: "x" }), {
-    parent: boomGroup,
-    pos: [boomLength * 0.5 + 0.04, 0, 0],
-    ramp: "hi",
-    outline: "hi",
-    crease: "lo",
-    mountOn: "boom.gooseneck"
-  });
-  reg.part("boom.endCap", buildCylinderGeometry(0.056, 0.056, 0.05, { segments: 16, axis: "x" }), {
-    parent: boomGroup,
-    pos: [boomLength + 0.05, 0, 0],
-    ramp: "mid",
-    outline: "lo",
-    crease: "faint",
-    detail: true
-  });
 
-  // Rigid Telescopic Boom Vang Strut (mast base swivel -> boom underside)
-  const vangAngle = Math.atan2(0.32, 0.54);
-  reg.part("boom.vangBracket", buildCylinderGeometry(0.036, 0.042, 0.08, { segments: 12, axis: "y" }), {
-    parent: boomGroup,
-    pos: [0.02, -0.34, 0],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "struct.mast.spar"
-  });
-  reg.part("boom.vangOuter", buildCylinderGeometry(0.032, 0.036, 0.36, { segments: 12, axis: "x" }), {
-    parent: boomGroup,
-    pos: [0.18, -0.26, 0],
-    rot: [0, 0, vangAngle],
-    ramp: "mid",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "boom.vangBracket"
-  });
-  reg.part("boom.vangRod", buildCylinderGeometry(0.020, 0.020, 0.30, { segments: 10, axis: "x" }), {
-    parent: boomGroup,
-    pos: [0.40, -0.13, 0],
-    rot: [0, 0, vangAngle],
-    ramp: "brass",
-    outline: "lo",
-    crease: "faint",
-    mountOn: "boom.vangOuter"
-  });
-
-  // Boom Clew Mainsheet Block + Sheave
   reg.part(
-    "boom.clewBlock",
-    buildSlabGeometry(0.13, 0.07, 0.12, { radius: 0.025, bevel: true, bevelSize: 0.007, bevelThickness: 0.007 }),
+    "subject.drumFront",
+    buildDrumArcShell(DRUM_R_TOP, DRUM_R_BOT, 0.525, 0.575, DRUM_H, -Math.PI * 0.16, Math.PI * 0.88, 28),
     {
-      parent: boomGroup,
-      pos: [boomLength - 0.12, -0.04, 0],
-      ramp: "brass",
-      outline: "mid",
+      parent: drumShellGroup,
+      pos: [0, 0, 0],
+      ramp: "mid",
+      outline: "hi",
       crease: "lo",
-      mountOn: "boom.spar"
+      cutawayHide: true,
+      mountOn: "subject.drumRingGear",
+      allowOverlap: [
+        "subject.drumRear",
+        "struct.winchBaseSkirt",
+        "struct.planetCarrierPlate",
+        "struct.winchCenterPost",
+        "subject.planetGear.0",
+        "subject.planetGear.1",
+        "subject.planetGear.2",
+        "subject.stJaws",
+        "mech.compoundShaft",
+        "mech.compoundGear"
+      ]
     }
   );
-  reg.part("boom.clewSheave", buildCylinderGeometry(0.045, 0.045, 0.032, { segments: 14, axis: "z" }), {
-    parent: boomGroup,
-    pos: [boomLength - 0.12, -0.11, 0],
-    ramp: "hi",
-    outline: "lo",
-    crease: "faint",
-    detail: true
+
+  reg.part(
+    "subject.stJaws",
+    buildCylinderGeometry(0.65, 0.56, 0.14, { segments: 28, axis: "y" }),
+    {
+      parent: drumGroup,
+      pos: [0, JAWS_Y, 0],
+      ramp: "brass",
+      outline: "hi",
+      crease: "lo",
+      mountOn: "subject.drumRear",
+      allowOverlap: [
+        "subject.drumFront",
+        "struct.winchCenterPost",
+        "struct.stripperCollar",
+        "struct.stripperArm",
+        "struct.stripperTip",
+        "subject.drumCap",
+        "subject.mainShaft"
+      ]
+    }
+  );
+  reg.detail(
+    "subject.stJaws.knurl",
+    makeKnurlLines(0.61, 0.165, 0.295, 24, kit, { tone: "mid" }),
+    { parent: drumGroup }
+  );
+
+  reg.part(
+    "subject.drumCap",
+    buildCylinderGeometry(0.46, 0.52, 0.06, { segments: 24, axis: "y" }),
+    {
+      parent: drumGroup,
+      pos: [0, 0.33, 0],
+      ramp: "lo",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "subject.stJaws",
+      allowOverlap: [
+        "struct.stripperCollar",
+        "struct.stripperArm",
+        "struct.stripperTip",
+        "subject.mainShaft",
+        "subject.handleHub"
+      ]
+    }
+  );
+
+  // 3 helical capstan barrel wraps + 1 self-tailing jaw crown wrap (ramp: "lit")
+  [
+    { y: -0.22, r: 0.635 },
+    { y: -0.10, r: 0.625 },
+    { y: 0.02, r: 0.615 },
+    { y: 0.23, r: 0.605 }
+  ].forEach((wrap, idx) => {
+    reg.part(
+      `subject.sheetWrap.${idx}`,
+      new THREE.TorusGeometry(wrap.r, 0.036, 12, 36),
+      {
+        parent: drumGroup,
+        pos: [0, wrap.y, 0],
+        rot: [Math.PI / 2, 0.05, 0],
+        ramp: "lit",
+        outline: "lit",
+        noCrease: true,
+        detail: true,
+        mountOn: "subject.drumRear"
+      }
+    );
   });
-  reg.anchor("boom.clew", boomLength - 0.12, -0.145, 0, boomGroup);
+
+  // 4. Pivoting Boom, Rigid Vang, Mainsheet Bail & Dynamic Camber Sail Foil
+  const boomGroup = reg.group("subject.boomGroup", {
+    pos: [-1.06, GOOSENECK_Y, MAST_Z],
+    rot: [0, -initSt.boomAngleRad, 0],
+    stage: "subject"
+  });
+
+  reg.part(
+    "subject.boomSpar",
+    buildCylinderGeometry(0.052, 0.062, BOOM_LEN, { segments: 20, axis: "x" }),
+    {
+      parent: boomGroup,
+      pos: [BOOM_LEN * 0.5, 0, 0],
+      ramp: "hi",
+      outline: "hi",
+      noCrease: true,
+      mountOn: "struct.gooseneck",
+      allowOverlap: ["struct.mastLower"]
+    }
+  );
+
+  reg.part(
+    "subject.vangStrut",
+    buildCylinderGeometry(0.034, 0.042, 0.72, { segments: 16, axis: "x" }),
+    {
+      parent: boomGroup,
+      pos: [0.32, -0.20, 0],
+      rot: [0, 0, 0.52],
+      ramp: "comp",
+      outline: "mid",
+      noCrease: true,
+      mountOn: "subject.boomSpar",
+      allowOverlap: ["struct.mastLower", "struct.gooseneck"]
+    }
+  );
+
+  reg.part("subject.mainsheetBail", new THREE.BoxGeometry(0.14, 0.12, 0.12), {
+    parent: boomGroup,
+    pos: [0.98, -0.08, 0],
+    ramp: "brass",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "subject.boomSpar"
+  });
+  reg.anchor("boom.mainsheet.bail", 0.98, -0.14, 0, boomGroup);
+
+  // Dynamic 3D Wind-Pressure Sail Foil + 4 Live-Deforming Camber Battens
+  const sailGeo = createSailGeometry(initSt);
+  const sailPart = reg.part("subject.sailFoil", sailGeo, {
+    parent: boomGroup,
+    ramp: "lit",
+    outline: "mid",
+    noCrease: true,
+    detail: true,
+    mountOn: "subject.boomSpar"
+  });
+
+  const battenGeos = BATTEN_ETAS.map((eta, idx) => {
+    const bGeo = createBattenGeometry(eta, initSt);
+    reg.part(`subject.batten.${idx}`, bGeo, {
+      parent: boomGroup,
+      ramp: idx % 2 === 0 ? "comb" : "hi",
+      outline: "lo",
+      noCrease: true,
+      detail: true,
+      mountOn: "subject.sailFoil"
+    });
+    return { eta, geo: bGeo };
+  });
+
+  reg.root.userData.updateSail = (st) => {
+    fillSailVertices(sailGeo, st);
+    for (const b of battenGeos) {
+      fillBattenVertices(b.geo, b.eta, st);
+    }
+  };
+  reg.root.userData.sailMesh = sailPart;
 }
 
 
 /* --- figure/mechanism.mjs --- */
-function buildMechanism(reg, kit) {
-  const mechGroup = reg.group("mech.group", { stage: "mechanism" });
-  const { topSurfaceY, winchX, winchZ, winchBaseY } = SPEC;
 
-  // 1. Loaded Standing Rigging: Port/Stbd Shrouds, Forestay & Backstay
-  reg.tube("rig.shroud.port.lower", "chainplate.top.port", [], "spreader.tip.port", {
-    parent: mechGroup,
-    radius: 0.017,
-    segments: 12,
-    radialSegments: 8,
-    rigid: true,
-    ramp: "brass",
-    outline: "lo",
-    fromPart: "struct.turnbuckle.port",
-    toPart: "struct.spreader.port"
-  });
-  reg.tube("rig.shroud.port.upper", "spreader.tip.port", [], "mast.top.port", {
-    parent: mechGroup,
-    radius: 0.017,
-    segments: 12,
-    radialSegments: 8,
-    rigid: true,
-    ramp: "brass",
-    outline: "lo",
-    fromPart: "struct.spreader.port",
-    toPart: "struct.masthead.cap"
-  });
-  reg.tube("rig.shroud.stbd.lower", "chainplate.top.stbd", [], "spreader.tip.stbd", {
-    parent: mechGroup,
-    radius: 0.017,
-    segments: 12,
-    radialSegments: 8,
-    rigid: true,
-    ramp: "comb",
-    outline: "lo",
-    fromPart: "struct.turnbuckle.stbd",
-    toPart: "struct.spreader.stbd"
-  });
-  reg.tube("rig.shroud.stbd.upper", "spreader.tip.stbd", [], "mast.top.stbd", {
-    parent: mechGroup,
-    radius: 0.017,
-    segments: 12,
-    radialSegments: 8,
-    rigid: true,
-    ramp: "comb",
-    outline: "lo",
-    fromPart: "struct.spreader.stbd",
-    toPart: "struct.masthead.cap"
-  });
-  reg.tube("rig.forestay", "bowStem.top", [], "mast.top.fore", {
-    parent: mechGroup,
-    radius: 0.019,
-    segments: 16,
-    radialSegments: 8,
-    rigid: true,
-    ramp: "hi",
-    outline: "lo",
-    fromPart: "struct.bowStem.tang",
-    toPart: "struct.masthead.cap"
-  });
-  reg.tube("rig.backstay", "sternFit.top", [], "mast.top.aft", {
-    parent: mechGroup,
-    radius: 0.017,
-    segments: 16,
-    radialSegments: 8,
-    rigid: true,
-    ramp: "hi",
-    outline: "lo",
-    fromPart: "struct.sternFit.tang",
-    toPart: "struct.masthead.crane"
-  });
 
-  // 2. Mainsheet Line: Turning Block -> Smooth Clearance Ramp -> Helical Winch Drum Wraps -> Self-Tailer -> Free Tail
-  const wrapWaypoints = [
-    [winchX - 0.72, winchBaseY + 0.04, winchZ + 0.32],
-    [winchX - 0.46, winchBaseY + 0.30, winchZ + 0.52],
-    [winchX - 0.16, winchBaseY + 0.44, winchZ + 0.50]
-  ];
-  // 2.25 smooth helical turns hugging the tapered drum waist (8 samples/turn, zero polygon facets)
-  const totalSteps = 18;
-  const startAngle = Math.PI * 0.52; // +Z side facing turning block
-  const endAngle = startAngle - Math.PI * 4.25; // wraps CW around drum
-  for (let i = 0; i <= totalSteps; i++) {
-    const t = i / totalSteps;
-    const ang = startAngle + (endAngle - startAngle) * t;
-    const y = 0.48 + t * 0.34; // climbs from 0.48 up to 0.82 near crown
-    const rDrum = 0.49 - 0.07 * ((y - 0.44) / 0.37);
-    const r = rDrum + 0.018;
-    wrapWaypoints.push([winchX + Math.cos(ang) * r, winchBaseY + y, winchZ + Math.sin(ang) * r]);
+
+const _rodOrigin = new THREE.Vector3(0, 1, 0);
+const _rodDelta = new THREE.Vector3();
+const _rodMid = new THREE.Vector3();
+const _rodDir = new THREE.Vector3();
+const _rodPosA = new THREE.Vector3();
+const _rodPosB = new THREE.Vector3();
+const _bailPos = new THREE.Vector3();
+const _blockPos = new THREE.Vector3();
+const _offA = new THREE.Vector3(0, 0, -0.045);
+const _offB = new THREE.Vector3(0, 0, +0.045);
+const _invRig = new THREE.Matrix4();
+
+/**
+ * Orients a unit-length Y cylinder mesh to span cleanly between world points A and B.
+ */
+function orientRodBetween(mesh, posA, posB, radiusScale = 1) {
+  if (!mesh) return;
+  _rodDelta.subVectors(posB, posA);
+  const dist = _rodDelta.length();
+  if (dist < 1e-4) {
+    mesh.visible = false;
+    return;
   }
-  // Gentle large-radius waterfall curve out of self-tailer crown groove past stripper horn (no Z reversal!)
-  wrapWaypoints.push([winchX + 0.43, winchBaseY + 0.85, winchZ + 0.23]);
-  wrapWaypoints.push([winchX + 0.56, winchBaseY + 0.83, winchZ + 0.14]);
-  wrapWaypoints.push([winchX + 0.65, winchBaseY + 0.72, winchZ + 0.08]);
-  wrapWaypoints.push([winchX + 0.68, winchBaseY + 0.52, winchZ + 0.04]);
+  mesh.visible = true;
+  _rodMid.addVectors(posA, posB).multiplyScalar(0.5);
+  _rodDir.copy(_rodDelta).multiplyScalar(1 / dist);
+  mesh.position.copy(_rodMid);
+  mesh.quaternion.setFromUnitVectors(_rodOrigin, _rodDir);
+  mesh.scale.set(radiusScale, dist, radiusScale);
+}
 
-  reg.anchor("winch.sheet.tail", winchX + 0.68, winchBaseY + 0.24, winchZ + 0.02, mechGroup, {
-    dir: [0.0, 0.99, 0.08]
+/**
+ * Draws the diegetic 2D telemetry canvas mounted on the yacht cockpit coaming.
+ */
+function drawRigScreen(ctx, width, height, state) {
+  const st = getRigState(state.theta ?? SPEC.initialTheta, state.params || state, state.triggers || {});
+
+  // Deep instrument panel background
+  ctx.fillStyle = "#0e131a";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = "#2b394a";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(3, 3, width - 6, height - 6);
+
+  // Header strip with active gear badge
+  ctx.fillStyle = "#18222f";
+  ctx.fillRect(6, 6, width - 12, 24);
+
+  ctx.fillStyle = st.isGear2 ? "#f97316" : "#38bdf8";
+  ctx.font = "bold 11px ui-monospace, Menlo, monospace";
+  ctx.fillText(
+    `GEAR ${st.activeGear} · ${st.isGear2 ? "CCW 46:1 GRIND" : "CW 13.5:1 TRIM"}`,
+    12,
+    22
+  );
+
+  // Top-right wind readout
+  ctx.fillStyle = st.gustEnv > 0.25 ? "#ef4444" : "#cbd5e1";
+  ctx.textAlign = "right";
+  ctx.fillText(`WIND ${Math.round(st.effWindKt)} KT`, width - 12, 22);
+  ctx.textAlign = "left";
+
+  // Left half: Force & ratio telemetry bars
+  const barX = 12;
+  const barW = 124;
+  const rows = [
+    {
+      label: `SHEET ${st.sheetLoadKn.toFixed(1)} kN`,
+      frac: Math.min(1, st.sheetLoadKn / 10),
+      color: "#f59e0b"
+    },
+    {
+      label: `V1 SHROUD ${st.windwardShroudKn.toFixed(1)} kN`,
+      frac: Math.min(1, st.windwardShroudKn / 18.5),
+      color: "#ef4444"
+    },
+    {
+      label: `BACKSTAY ${st.backstayKn.toFixed(1)} kN`,
+      frac: Math.min(1, st.backstayKn / 14.5),
+      color: "#a855f7"
+    },
+    {
+      label: `CAMBER f/c ${st.camberPct.toFixed(1)}%`,
+      frac: Math.min(1, st.camberPct / 18),
+      color: "#38bdf8"
+    }
+  ];
+
+  rows.forEach((row, idx) => {
+    const y = 40 + idx * 22;
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "9px ui-monospace, Menlo, monospace";
+    ctx.fillText(row.label, barX, y + 7);
+    ctx.fillStyle = "#1e293b";
+    ctx.fillRect(barX, y + 10, barW, 5);
+    ctx.fillStyle = row.color;
+    ctx.fillRect(barX, y + 10, Math.max(2, barW * row.frac), 5);
   });
 
-  reg.tube("rig.mainsheet.winchWrap", "turningBlock.out", wrapWaypoints, "winch.sheet.tail", {
-    parent: mechGroup,
-    radius: 0.022,
-    segments: 96,
-    radialSegments: 10,
-    leadOut: 0.10,
-    leadIn: 0.10,
-    ramp: "copper",
-    outline: "lo",
-    fromPart: "struct.turningBlock.sheave",
-    toPart: "winch.stripperHorn",
-    allowOverlap: [
-      "winch.drum",
-      "winch.drumFlangeLow",
-      "winch.crownBot",
-      "winch.crownTop",
-      "winch.stripperArm",
-      "winch.stripperHorn",
-      "winch.ringGear",
-      "winch.planet.0",
-      "winch.planet.1",
-      "winch.planet.2",
-      "struct.winch.housingCut",
-      "struct.winch.frontShield",
-      "base.winchCoaming",
-      "base.winchCoamingLower"
-    ]
+  // Right half: Live NACA airfoil camber profile & load readout
+  const plotX = 154;
+  const plotY = 38;
+  const plotW = width - plotX - 12;
+  const plotH = 66;
+
+  ctx.fillStyle = "#121a24";
+  ctx.fillRect(plotX, plotY, plotW, plotH);
+  ctx.strokeStyle = "#263344";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(plotX, plotY, plotW, plotH);
+
+  // Dashed chord line
+  const chordY = plotY + plotH * 0.72;
+  ctx.strokeStyle = "#475569";
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(plotX + 8, chordY);
+  ctx.lineTo(plotX + plotW - 8, chordY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Camber curve (draft peaks at 38% chord)
+  ctx.strokeStyle = "#f59e0b";
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  const p = 0.38;
+  const amp = plotH * (st.camberRatio * 2.85);
+  for (let i = 0; i <= 24; i++) {
+    const xi = i / 24;
+    const prof =
+      xi < p
+        ? (2 * p * xi - xi * xi) / (p * p)
+        : (1 - 2 * p + 2 * p * xi - xi * xi) / ((1 - p) * (1 - p));
+    const px = plotX + 8 + xi * (plotW - 16);
+    const py = chordY - amp * prof;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // Bottom footer line on screen
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "9px ui-monospace, Menlo, monospace";
+  ctx.fillText(`CAPSTAN ${SPEC.CAPSTAN_TURNS.toFixed(1)}T -> TAIL ${st.tailLoadN.toFixed(0)} N`, plotX, plotY + plotH + 16);
+}
+function buildMechanism(reg, kit) {
+  const {
+    WINCH_CX,
+    WINCH_CZ,
+    COMPOUND_Y,
+    MAST_Z,
+    STERN_BACKSTAY_X
+  } = SPEC;
+
+  const initSt = getRigState(SPEC.initialTheta, {}, {});
+
+  // 1. 2nd-Speed Compound Reduction Pinion (mounted on rotating shaftGroup)
+  const shaftGroup = reg.groups.get("subject.shaftGroup")?.group;
+  reg.part(
+    "mech.shaftPinion",
+    buildExternalGearGeometry(0.145, 12, 0.020, 0.12, 0.068 / 0.145),
+    {
+      parent: shaftGroup,
+      pos: [0, COMPOUND_Y, 0],
+      rot: [Math.PI / 2, 0, 0],
+      ramp: "copper",
+      outline: "mid",
+      crease: "faint",
+      stage: "mechanism",
+      mountOn: "subject.mainShaft",
+      allowOverlap: ["struct.winchCenterPost", "mech.compoundGear"]
+    }
+  );
+
+  // Compound Reduction Shaft & 18T Idler / 10T Pawl Gear (center dist = 0.336 vs 0.145 + 0.19)
+  const compoundGroup = reg.group("mech.compoundGroup", {
+    pos: [WINCH_CX - 0.31, COMPOUND_Y, WINCH_CZ + 0.13],
+    rot: [0, initSt.compoundRad, 0],
+    stage: "mechanism"
   });
 
-  // Dynamic Cel-Shaded Mainsheet Tackle (Boom Clew Block -> Sliding Traveler Car)
-  const sheetDynGeo = buildCylinderGeometry(0.020, 0.020, 1.0, { segments: 12, axis: "y" });
-  const sheetDynGroup = kit.createAnatomyPart(sheetDynGeo, {
-    ramp: "copper",
-    outline: "lo",
-    crease: "faint",
-    noCrease: true
-  });
-  sheetDynGroup.name = "rig.mainsheet.dynamic";
-  reg.detail("rig.mainsheet.dynamic", sheetDynGroup, { parent: mechGroup, stage: "mechanism" });
+  reg.part(
+    "mech.compoundShaft",
+    buildCylinderGeometry(0.045, 0.045, 0.44, { segments: 16, axis: "y" }),
+    {
+      parent: compoundGroup,
+      pos: [0, 0, 0],
+      ramp: "hi",
+      outline: "mid",
+      noCrease: true,
+      mountOn: "struct.winchBaseSkirt",
+      allowOverlap: [
+        "struct.planetCarrierPlate",
+        "subject.drumRear",
+        "subject.drumFront"
+      ]
+    }
+  );
 
-  // Dynamic Cel-Shaded Deck Lead (Traveler Car -> Turning Block)
-  const deckLeadGeo = buildCylinderGeometry(0.020, 0.020, 1.0, { segments: 12, axis: "y" });
-  const deckLeadGroup = kit.createAnatomyPart(deckLeadGeo, {
-    ramp: "copper",
-    outline: "lo",
-    crease: "faint",
-    noCrease: true
-  });
-  deckLeadGroup.name = "rig.mainsheet.deckLead";
-  reg.detail("rig.mainsheet.deckLead", deckLeadGroup, { parent: mechGroup, stage: "mechanism" });
+  reg.part(
+    "mech.compoundGear",
+    buildExternalGearGeometry(0.19, 18, 0.020, 0.11, 0.045 / 0.19),
+    {
+      parent: compoundGroup,
+      pos: [0, 0, 0],
+      rot: [Math.PI / 2, 0, 0],
+      ramp: "comp",
+      outline: "mid",
+      crease: "faint",
+      mountOn: "mech.compoundShaft",
+      allowOverlap: [
+        "mech.shaftPinion",
+        "subject.drumRear",
+        "subject.drumFront",
+        "struct.winchBaseSkirt"
+      ]
+    }
+  );
 
-  // 3. Diegetic Cockpit Rigging Telemetry Console (front-left foredeck, completely unobstructed)
-  const [scX, , scZ] = ANCHORS.screenMount;
-  reg.part("mech.screenStand", buildCylinderGeometry(0.11, 0.14, 0.22, { segments: 16, axis: "y" }), {
-    parent: mechGroup,
-    pos: [scX, topSurfaceY + 0.11, scZ - 0.03],
+  reg.part(
+    "mech.compoundPawlGear",
+    buildExternalGearGeometry(0.11, 10, 0.018, 0.10, 0.045 / 0.11),
+    {
+      parent: compoundGroup,
+      pos: [0, 0.105, 0],
+      rot: [Math.PI / 2, 0, 0],
+      ramp: "copper",
+      outline: "mid",
+      crease: "faint",
+      mountOn: "mech.compoundShaft",
+      allowOverlap: ["struct.planetCarrierPlate"]
+    }
+  );
+
+  // 2. Hydraulic Backstay Cylinder & Handwheel on Stern Pad (top at y=-0.96 clears swinging boom y_min=-0.882)
+  const backstayGroup = reg.group("mech.backstayGroup", { stage: "mechanism" });
+  reg.part(
+    "mech.backstayCylinder",
+    buildCylinderGeometry(0.068, 0.078, 0.30, { segments: 20, axis: "y" }),
+    {
+      parent: backstayGroup,
+      pos: [STERN_BACKSTAY_X, -1.11, MAST_Z],
+      ramp: "comp",
+      outline: "hi",
+      crease: "lo",
+      mountOn: "base.sternPad"
+    }
+  );
+  reg.anchor("backstay.cylinder.top", STERN_BACKSTAY_X, -0.96, MAST_Z, backstayGroup);
+
+  reg.part(
+    "mech.backstayWheel",
+    buildCylinderGeometry(0.092, 0.092, 0.04, { segments: 18, axis: "y" }),
+    {
+      parent: backstayGroup,
+      pos: [STERN_BACKSTAY_X, -1.06, MAST_Z + 0.085],
+      rot: [Math.PI / 2, 0, 0],
+      ramp: "brass",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "mech.backstayCylinder"
+    }
+  );
+
+  // 3. Dynamic Standing Rigging Shrouds, Forestay, Backstay & Mainsheet Tackle (detail: true)
+  const riggingGroup = reg.group("mech.riggingGroup", { stage: "mechanism" });
+  const rodSpec = [
+    { name: "mech.shroud.windwardV1", ramp: "comb", radius: 0.020 },
+    { name: "mech.shroud.windwardUpper", ramp: "comb", radius: 0.019 },
+    { name: "mech.shroud.windwardD1", ramp: "comb", radius: 0.017 },
+    { name: "mech.shroud.leewardV1", ramp: "intake", radius: 0.016 },
+    { name: "mech.shroud.leewardUpper", ramp: "intake", radius: 0.015 },
+    { name: "mech.shroud.leewardD1", ramp: "intake", radius: 0.014 },
+    { name: "mech.forestayRod", ramp: "hi", radius: 0.019 },
+    { name: "mech.backstayRod", ramp: "comp", radius: 0.019 },
+    { name: "mech.mainsheetSpan1", ramp: "lit", radius: 0.020 },
+    { name: "mech.mainsheetSpan2", ramp: "lit", radius: 0.020 }
+  ];
+
+  const rodMeshes = {};
+  rodSpec.forEach((spec) => {
+    const rodGroup = reg.group(`${spec.name}.group`, {
+      parent: riggingGroup,
+      stage: "mechanism"
+    });
+    const rodUnitGeo = buildCylinderGeometry(spec.radius, spec.radius, 1, { segments: 10, axis: "y" });
+    reg.part(spec.name, rodUnitGeo, {
+      parent: rodGroup,
+      pos: [0, 0, 0],
+      ramp: spec.ramp,
+      outline: "lo",
+      noCrease: true,
+      detail: true,
+      mountOn: "struct.turnbuckle.windward"
+    });
+    rodMeshes[spec.name] = { mesh: rodGroup };
+  });
+  reg.root.userData.rigRods = rodMeshes;
+
+  // 4. Audited Sheet Line Conduits (block -> winch entry fairlead; stripper tip -> cockpit cleat)
+  reg.tube(
+    "tube.sheet.lead",
+    "block.sheet.out",
+    [
+      [-0.22, -1.04, 1.00],
+      [0.00, -0.96, 1.02],
+      [0.18, -0.92, 0.82]
+    ],
+    "winch.sheet.in",
+    {
+      parent: riggingGroup,
+      stage: "mechanism",
+      fromPart: "struct.turningSheave",
+      toPart: "struct.sheetEntryGuide",
+      leadOut: 0.22,
+      leadIn: 0.22,
+      radius: 0.032,
+      segments: 34,
+      radialSegments: 10,
+      ramp: "lit",
+      outline: "lit"
+    }
+  );
+
+  reg.tube(
+    "tube.sheet.tail",
+    "winch.tail.exit",
+    [
+      [1.48, -0.15, 1.24],
+      [1.84, -0.72, 1.26]
+    ],
+    "cleat.tail.in",
+    {
+      parent: riggingGroup,
+      stage: "mechanism",
+      fromPart: "struct.stripperTip",
+      toPart: "struct.tailCleat",
+      leadOut: 0.20,
+      leadIn: 0.20,
+      radius: 0.032,
+      segments: 38,
+      radialSegments: 10,
+      ramp: "lit",
+      outline: "lit"
+    }
+  );
+
+  // 5. Diegetic Cockpit Force & Camber Monitor Pedestal + Screen
+  const screenGroup = reg.group("mech.screenGroup", { stage: "mechanism" });
+  reg.part("mech.screenPedestal", new THREE.BoxGeometry(0.42, 0.10, 0.16), {
+    parent: screenGroup,
+    pos: [-0.04, -1.37, 1.36],
     ramp: "mid",
     outline: "mid",
     crease: "lo",
-    mountOn: "base.deckSection"
-  });
-  reg.detail("mech.screenStand.screw", makeScrewDetail(scX, topSurfaceY + 0.004, scZ + 0.14, 0.022, "y", kit), {
-    parent: mechGroup
+    mountOn: "base.deckSlab"
   });
 
   reg.screen("rig.screen", {
-    parent: mechGroup,
-    pos: [scX, topSurfaceY + 0.38, scZ],
-    rot: [-0.36, -0.22, 0],
-    width: 0.90,
-    height: 0.56,
-    resolution: [280, 174],
+    parent: screenGroup,
+    pos: [-0.04, -1.14, 1.36],
+    rot: [-0.30, 0, 0],
+    width: 0.96,
+    height: 0.46,
+    depth: 0.06,
+    resolution: [288, 136],
     ramp: "lo",
     outline: "mid",
-    mountOn: "mech.screenStand",
-    draw: (ctx, canvas, state, theme) => {
-      const r = getRigState(state);
-      const W = canvas.width;
-      const H = canvas.height;
-      ctx.fillStyle = theme.isDark ? "#0d1622" : "#131c29";
-      ctx.fillRect(0, 0, W, H);
+    stage: "mechanism",
+    mountOn: "mech.screenPedestal",
+    draw: drawRigScreen
+  });
 
-      // Header: Active Gear Mode & Apparent Wind
-      ctx.fillStyle = r.isLowGear ? "#f59e0b" : r.isHold ? "#94a3b8" : "#38bdf8";
-      ctx.font = "bold 12px monospace";
-      ctx.fillText(`${r.gearLabel}`, 12, 18);
-      ctx.fillStyle = "#38bdf8";
-      ctx.fillText(`${r.effWind.toFixed(1)} KN`, 196, 18);
-
-      // Shroud Load Cells
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = "11px monospace";
-      ctx.fillText(`STBD SHROUD ${r.windwardShroudKn.toFixed(1)} kN`, 12, 42);
-      ctx.fillStyle = "rgba(148,163,184,0.22)";
-      ctx.fillRect(12, 48, W - 24, 11);
-      ctx.fillStyle = r.windwardShroudKn > 12 ? "#ef4444" : "#f97316";
-      ctx.fillRect(12, 48, Math.min(1, r.windwardShroudKn / 22) * (W - 24), 11);
-
-      ctx.fillStyle = "#94a3b8";
-      ctx.fillText(`PORT SHROUD ${r.leewardShroudKn.toFixed(1)} kN`, 12, 78);
-      ctx.fillStyle = "rgba(148,163,184,0.22)";
-      ctx.fillRect(12, 84, W - 24, 9);
-      ctx.fillStyle = "#38bdf8";
-      ctx.fillRect(12, 84, Math.min(1, r.leewardShroudKn / 22) * (W - 24), 9);
-
-      // Live Sail Camber Airfoil Section Preview
-      ctx.fillStyle = "#cbd5e1";
-      ctx.font = "10px monospace";
-      ctx.fillText(`CAMBER ${(r.camber * 100).toFixed(0)}% · TORQUE ${r.ratio.toFixed(1)}x`, 12, 114);
-      ctx.strokeStyle = "#f97316";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      for (let i = 0; i <= 28; i++) {
-        const u = i / 28;
-        const ax = 18 + u * (W - 36);
-        const ay = 152 - Math.sin(Math.PI * Math.pow(u, 0.78)) * r.camber * 92;
-        if (i === 0) ctx.moveTo(ax, ay);
-        else ctx.lineTo(ax, ay);
+  // Sync #leg-comp swatch with active theme (runtime.mjs syncs lit/intake/comb/exhaust only)
+  const legCompEl = typeof document !== "undefined" ? document.getElementById("leg-comp") : null;
+  if (legCompEl) {
+    const syncComp = (theme) => {
+      if (theme?.channels?.comp) {
+        legCompEl.style.background = theme.channels.comp;
       }
-      ctx.stroke();
-    }
-  });
-
-  // 4. Direct 3D Interactables (Winch Handle, Drum, Boom, Traveler Car, Wind Vane)
-  reg.interactable("winch.handle.arm", {
-    cursor: "grab",
-    hint: "Drag winch handle CW (1:1 fast) or CCW (3.5:1 planetary power)",
-    onDrag: ({ dx, state, setParam }) => {
-      state.theta -= dx * 0.025;
-      if (Math.abs(dx) > 0.5) {
-        setParam("rpm", dx > 0 ? 40 : -36);
-      }
-    }
-  });
-  reg.interactable("winch.handle.grip", {
-    cursor: "grab",
-    hint: "Drag winch handle grip to crank",
-    onDrag: ({ dx, state }) => {
-      state.theta -= dx * 0.025;
-    }
-  });
-  reg.interactable("winch.drum", {
-    cursor: "grab",
-    hint: "Drag drum to wind mainsheet",
-    onDrag: ({ dx, state }) => {
-      state.theta -= dx * 0.02;
-    }
-  });
-  reg.interactable("boom.spar", {
-    cursor: "grab",
-    hint: "Drag boom to ease or sheet in mainsail trim",
-    onDrag: ({ dx, state, setParam }) => {
-      setParam("trim", (state.params.trim ?? 58) - dx * 0.45);
-    }
-  });
-  reg.interactable("struct.traveler.car", {
-    cursor: "grab",
-    hint: "Drag traveler car to adjust mainsheet trim",
-    onDrag: ({ dx, state, setParam }) => {
-      setParam("trim", (state.params.trim ?? 58) - dx * 0.45);
-    }
-  });
-  reg.interactable("struct.windVane.arm", {
-    cursor: "grab",
-    hint: "Drag masthead wind vane to change wind speed",
-    onDrag: ({ dx, state, setParam }) => {
-      setParam("wind", (state.params.wind ?? 18) + dx * 0.25);
-    }
-  });
-}
-
-const _ptA = new THREE.Vector3();
-const _ptB = new THREE.Vector3();
-const _mid = new THREE.Vector3();
-const _dir = new THREE.Vector3();
-const _up = new THREE.Vector3(0, 1, 0);
-
-function updateDynamicLine(reg, name, anchorAId, anchorBId) {
-  const aObj = reg.joints.get(anchorAId);
-  const bObj = reg.joints.get(anchorBId);
-  const meshGroup = reg.root.getObjectByName(name);
-  if (!aObj || !bObj || !meshGroup) return;
-
-  aObj.getWorldPosition(_ptA);
-  bObj.getWorldPosition(_ptB);
-  reg.root.worldToLocal(_ptA);
-  reg.root.worldToLocal(_ptB);
-
-  _mid.addVectors(_ptA, _ptB).multiplyScalar(0.5);
-  _dir.subVectors(_ptB, _ptA);
-  const len = _dir.length();
-  if (len > 0.001) {
-    meshGroup.position.copy(_mid);
-    meshGroup.scale.set(1, len, 1);
-    meshGroup.quaternion.setFromUnitVectors(_up, _dir.normalize());
+    };
+    if (kit?.theme) syncComp(kit.theme);
+    if (kit?.onThemeChange) kit.onThemeChange(syncComp);
   }
+
+  // 6. Direct 3D Interactable Drag Controls
+  reg.interactable("subject.handleGroup", {
+    cursor: "grab",
+    hint: "Drag sideways to crank 46ST winch handle (cranks drum / adjusts cadence)",
+    onDrag: ({ dx, state, setParam }) => {
+      state.theta -= dx * 0.022;
+      if (setParam) {
+        setParam("rpm", Math.round((state.params.rpm ?? 55) + dx * 0.12));
+      }
+    }
+  });
+
+  reg.interactable("subject.drumGroup", {
+    cursor: "ew-resize",
+    hint: "Drag drum horizontally to crank sheet wraps clockwise",
+    onDrag: ({ dx, state }) => {
+      state.theta -= dx * 0.016;
+    }
+  });
+
+  reg.interactable("subject.boomGroup", {
+    cursor: "ns-resize",
+    hint: "Drag boom or sail to adjust apparent wind load & trim camber",
+    onDrag: ({ dx, dy, state, setParam }) => {
+      if (setParam) {
+        setParam("windKt", Math.round((state.params.windKt ?? 18) - dy * 0.08 + dx * 0.04));
+      }
+    }
+  });
+
+  reg.interactable("mech.backstayCylinder", {
+    cursor: "ns-resize",
+    hint: "Drag hydraulic backstay vertically to pump mast bend & flatten camber",
+    onDrag: ({ dy, state, setParam }) => {
+      if (setParam) {
+        setParam("backstay", Math.round((state.params.backstay ?? 45) - dy * 0.35));
+      }
+    }
+  });
+
+  // Perform initial rod placement so initial pose matches exact deformed state
+  updateKinematics(reg, {
+    theta: SPEC.initialTheta,
+    params: { rpm: 55, gearMode: 1, windKt: 18, backstay: 45 },
+    triggers: {}
+  });
 }
 function updateKinematics(reg, state) {
-  const r = getRigState(state);
+  const st = getRigState(state.theta ?? SPEC.initialTheta, state.params || state, state.triggers || {});
 
-  // 1. Planetary Winch Kinematics (CW 1:1 Direct vs CCW 3.5:1 Planetary Reduction)
-  const handleGroup = reg.groups.get("winch.handle.group")?.group;
-  const spindleGroup = reg.groups.get("winch.spindle.group")?.group;
-  const carrierGroup = reg.groups.get("winch.carrier.group")?.group;
-  const drumGroup = reg.groups.get("winch.drum.group")?.group;
+  // 1. Planetary & 2nd-Speed Compound Winch Kinematics
+  const shaftGroup = reg.groups.get("subject.shaftGroup")?.group;
+  const carrierGroup = reg.groups.get("subject.carrierGroup")?.group;
+  const drumGroup = reg.groups.get("subject.drumGroup")?.group;
+  const compoundGroup = reg.groups.get("mech.compoundGroup")?.group;
 
-  if (handleGroup) handleGroup.rotation.y = r.handleRotY;
-  if (spindleGroup) spindleGroup.rotation.y = r.handleRotY;
-  if (carrierGroup) carrierGroup.rotation.y = r.carrierRotY;
-  if (drumGroup) drumGroup.rotation.y = r.drumRotY;
+  if (shaftGroup) shaftGroup.rotation.y = st.handleRad;
+  if (carrierGroup) carrierGroup.rotation.y = st.carrierRad;
+  if (drumGroup) drumGroup.rotation.y = st.drumRad;
+  if (compoundGroup) compoundGroup.rotation.y = st.compoundRad;
 
-  for (let idx = 0; idx < 3; idx++) {
-    const pSpin = reg.groups.get(`winch.planet.spin.${idx}`)?.group;
-    if (pSpin) {
-      pSpin.rotation.y = r.planetSelfRot;
-    }
+  for (let i = 0; i < 3; i++) {
+    const pSpin = reg.groups.get(`subject.planetSpin.${i}`)?.group;
+    if (pSpin) pSpin.rotation.y = st.planetSelfRad;
   }
 
-  // 2. Boom, Traveler Car & Masthead Wind Vane
-  const boomGroup = reg.groups.get("boom.group")?.group;
+  // 2. Deflecting Masthead & Pivoting Boom
+  const mastTopGroup = reg.groups.get("struct.mastTopGroup")?.group;
+  if (mastTopGroup) {
+    mastTopGroup.rotation.z = -st.mastAftBendRad;
+    mastTopGroup.rotation.x = -st.mastLeewardDropRad;
+  }
+
+  const boomGroup = reg.groups.get("subject.boomGroup")?.group;
   if (boomGroup) {
-    boomGroup.rotation.y = r.boomAngleY;
+    boomGroup.rotation.y = -st.boomAngleRad;
   }
 
-  const carGroup = reg.groups.get("struct.traveler.carGroup")?.group;
-  if (carGroup) {
-    carGroup.position.z = ANCHORS.travelerCenter[2] + r.travelerCarZ;
+  // 3. Real-Time Aerodynamic Sail Camber & Leech Twist Vertex Deformation
+  if (typeof reg.root.userData.updateSail === "function") {
+    reg.root.userData.updateSail(st);
   }
 
-  const vaneGroup = reg.groups.get("struct.windVane.group")?.group;
-  if (vaneGroup) {
-    vaneGroup.rotation.y = r.windVaneYaw;
-  }
-
-  // 3. Stretch Live Cel-Shaded Mainsheet Tackle & Deck Lead
+  // Propagate matrix updates before reading world positions of moving rigging anchors
   reg.root.updateMatrixWorld(true);
-  updateDynamicLine(reg, "rig.mainsheet.dynamic", "boom.clew", "traveler.car.top");
-  updateDynamicLine(reg, "rig.mainsheet.deckLead", "traveler.car.out", "turningBlock.in");
+  const riggingGroup = reg.groups.get("mech.riggingGroup")?.group || reg.root;
+  _invRig.copy(riggingGroup.matrixWorld).invert();
 
-  // 4. Update Dynamic Sail Camber & Wind Flow Shader Uniforms
-  const sailMat = reg.groups.get("shader.sailData")?.group?.userData?.material;
-  const windMat = reg.groups.get("shader.windData")?.group?.userData?.material;
-  if (sailMat) {
-    sailMat.uniforms.uTime.value = state.simClock ?? 0;
-    sailMat.uniforms.uCamber.value = r.camber;
-    sailMat.uniforms.uWind.value = r.effWind;
-    sailMat.uniforms.uEnvelope.value = state.shaderEnv ?? 1.0;
+  const toRigLocal = (anchorId, outVec) => {
+    const obj = reg.joints.get(anchorId);
+    if (!obj) return outVec.set(0, 0, 0);
+    return obj.getWorldPosition(outVec).applyMatrix4(_invRig);
+  };
+
+  const rods = reg.root.userData.rigRods;
+  if (rods) {
+    const setRod = (name, anchorA, anchorB, scaleMul = 1) => {
+      const entry = rods[name];
+      if (!entry) return;
+      toRigLocal(anchorA, _rodPosA);
+      toRigLocal(anchorB, _rodPosB);
+      orientRodBetween(entry.mesh, _rodPosA, _rodPosB, scaleMul);
+    };
+
+    const windThick = 0.92 + 0.34 * ((st.windwardShroudKn - 2.5) / 16.0);
+    setRod("mech.shroud.windwardV1", "turnbuckle.windward.top", "spreader.tip.windward", windThick);
+    setRod("mech.shroud.windwardUpper", "spreader.tip.windward", "masthead.windward", windThick);
+    setRod("mech.shroud.windwardD1", "turnbuckle.windward.top", "spreader.root.windward", windThick * 0.95);
+
+    setRod("mech.shroud.leewardV1", "turnbuckle.leeward.top", "spreader.tip.leeward", 0.9);
+    setRod("mech.shroud.leewardUpper", "spreader.tip.leeward", "masthead.leeward", 0.9);
+    setRod("mech.shroud.leewardD1", "turnbuckle.leeward.top", "spreader.root.leeward", 0.85);
+
+    setRod("mech.forestayRod", "forestay.turnbuckle.top", "masthead.fore", 1.0);
+    setRod("mech.backstayRod", "backstay.cylinder.top", "masthead.aft", 0.95 + 0.25 * st.backstayNorm);
+
+    // Two-part mainsheet tackle between boom bail and deck turning block sheave
+    toRigLocal("boom.mainsheet.bail", _bailPos);
+    toRigLocal("block.sheet.out", _blockPos);
+    orientRodBetween(rods["mech.mainsheetSpan1"]?.mesh, _rodPosA.copy(_bailPos).add(_offA), _rodPosB.copy(_blockPos).add(_offA), 0.9);
+    orientRodBetween(rods["mech.mainsheetSpan2"]?.mesh, _rodPosA.copy(_bailPos).add(_offB), _rodPosB.copy(_blockPos).add(_offB), 0.9);
   }
-  if (windMat) {
-    windMat.uniforms.uTime.value = state.simClock ?? 0;
-    windMat.uniforms.uWind.value = r.effWind;
-    windMat.uniforms.uEnvelope.value = state.shaderEnv ?? 1.0;
+
+  // 4. Update Stage 6 GLSL Aerodynamic Wind-Flow Shader Uniforms
+  const shaderMat = reg.root.userData.windShaderMat;
+  if (shaderMat?.uniforms) {
+    shaderMat.uniforms.uTime.value = Math.abs(state.theta ?? SPEC.initialTheta) * 0.45;
+    shaderMat.uniforms.uWindSpeed.value = 0.6 + st.windNorm * 1.6;
+    shaderMat.uniforms.uCamber.value = st.camberRatio;
+    shaderMat.uniforms.uGust.value = st.gustEnv;
+    shaderMat.uniforms.uEnvelope.value = state.shaderEnv !== undefined ? state.shaderEnv : 1.0;
   }
+}
+function tourAt(clock, _state) {
+  return {
+    azimOffsetDeg: Math.sin(clock * 0.22) * 8.0,
+    elevOffsetDeg: Math.sin(clock * 0.14 + 0.6) * 3.0
+  };
 }
 
 
 /* --- figure/shader.mjs --- */
 function buildShader(reg, kit) {
+  const boomGroup = reg.groups.get("subject.boomGroup")?.group || reg.root;
+  const shaderGroup = reg.group("shader.group", { parent: boomGroup, stage: "shader" });
   const theme = kit.currentTheme;
-  const boomGroup = reg.groups.get("boom.group")?.group || reg.root;
-  const shaderGroup = reg.group("shader.group", { stage: "shader" });
+  const initSt = getRigState(SPEC.initialTheta, {}, {});
 
-  // 1. Dynamic Wind-Pressure Cambered Mainsail with Curved Roach & Batten Pockets
-  const sailMat = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: true,
-    side: THREE.DoubleSide,
-    uniforms: {
-      uTime: { value: 0 },
-      uCamber: { value: 0.22 },
-      uWind: { value: 18.0 },
-      uEnvelope: { value: 1.0 },
-      uColSail: { value: new THREE.Color(theme.ramps.hi[2]) },
-      uColSailShade: { value: new THREE.Color(theme.ramps.mid[1]) },
-      uColHi: { value: new THREE.Color(theme.channels.comb) },
-      uColLo: { value: new THREE.Color(theme.channels.intake) },
-      uInk: { value: new THREE.Color(theme.ink) }
-    },
-    vertexShader: `
-      uniform float uTime;
-      uniform float uCamber;
-      uniform float uWind;
-      varying vec2 vSailUv;
-      varying float vBillow;
+  const sharedUniforms = {
+    uTime: { value: Math.abs(SPEC.initialTheta) * 0.45 },
+    uWindSpeed: { value: 0.6 + initSt.windNorm * 1.6 },
+    uCamber: { value: initSt.camberRatio },
+    uGust: { value: initSt.gustEnv },
+    uEnvelope: { value: 1.0 },
+    uIsDark: { value: theme.isDark ? 1.0 : 0.0 },
+    uColIntake: { value: new THREE.Color(theme.channels.intake) },
+    uColComb: { value: new THREE.Color(theme.channels.comb) },
+    uColLit: { value: new THREE.Color(theme.channels.lit) }
+  };
 
-      void main() {
-        vSailUv = uv;
-        float u = uv.x; // 0 = luff (mast), 1 = leech
-        float v = uv.y; // 0 = foot (boom), 1 = head (masthead)
-
-        // Authentic airfoil camber peaking at ~35% chord, tapering smoothly toward luff, foot & head
-        float chordEnv = sin(3.14159265 * pow(clamp(u, 0.0, 1.0), 0.76));
-        float spanEnv = sin(3.14159265 * clamp(v, 0.06, 0.96));
-        float flutter = sin(uTime * (3.2 + uWind * 0.15) - u * 6.5) * 0.010 * u * smoothstep(0.3, 1.0, u);
-        float billow = chordEnv * (0.42 + 0.58 * spanEnv) * uCamber + flutter;
-
-        vec3 displaced = position;
-        displaced.z += billow;
-        vBillow = billow / max(0.05, uCamber);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float uEnvelope;
-      uniform float uTime;
-      uniform float uWind;
-      uniform vec3 uColSail;
-      uniform vec3 uColSailShade;
-      uniform vec3 uColHi;
-      uniform vec3 uColLo;
-      uniform vec3 uInk;
-      varying vec2 vSailUv;
-      varying float vBillow;
-
-      void main() {
-        float u = vSailUv.x;
-        float v = vSailUv.y;
-
-        // Crisp batten pockets & horizontal draft stripe
-        float batten = step(0.95, fract(v * 4.0)) * step(0.35, u);
-        float draftStripe = exp(-pow((v - 0.40) / 0.014, 2.0));
-
-        // Quantized 3-band cel shading on sailcloth + aerodynamic pressure field
-        float cp = clamp(vBillow, 0.0, 1.0);
-        float band = floor(cp * 3.0 + 0.5) / 3.0;
-        vec3 clothCol = mix(uColSailShade, uColSail, 0.35 + 0.65 * band);
-
-        // Animated flow ripple across pressure contours when shader is ON
-        float flowWave = 0.06 * sin(u * 18.0 - uTime * (1.8 + uWind * 0.12));
-        vec3 pressCol = mix(uColLo, uColHi, smoothstep(0.22, 0.88, cp + flowWave));
-        vec3 baseCol = mix(clothCol, pressCol, 0.68 * uEnvelope);
-        baseCol = mix(baseCol, uInk, 0.22 * batten + 0.26 * draftStripe);
-
-        // Crisp technical ink border along luff, foot, and roach leech
-        float edge = min(min(u, 1.0 - u), min(v, 1.0 - v));
-        if (edge < 0.016) {
-          baseCol = mix(baseCol, uInk, 0.65);
-        }
-
-        float alpha = mix(0.96, 0.88, uEnvelope);
-        gl_FragColor = vec4(baseCol, alpha);
-      }
-    `
-  });
-
-  // Build roach-curved mainsail mesh in boom local space
-  const segU = 24;
-  const segV = 24;
-  const sailH = SPEC.topSurfaceY + 0.14 + SPEC.mastHeight - 0.08 - SPEC.boomY;
-  const sailLen = SPEC.boomLength - 0.12;
-  const posArr = [];
-  const uvArr = [];
-  const idxArr = [];
-
-  for (let iv = 0; iv <= segV; iv++) {
-    const v = iv / segV;
-    // Convex parabolic roach gives realistic sailboat mainsail profile
-    const roach = 0.14 * Math.sin(Math.PI * v);
-    const maxLenAtV = sailLen * (1.0 - v * 0.90) + roach;
-    const y = v * sailH + 0.06;
-    for (let iu = 0; iu <= segU; iu++) {
-      const u = iu / segU;
-      const x = 0.02 + u * maxLenAtV;
-      posArr.push(x, y, 0);
-      uvArr.push(u, v);
-    }
-  }
-  for (let iv = 0; iv < segV; iv++) {
-    for (let iu = 0; iu < segU; iu++) {
-      const a = iv * (segU + 1) + iu;
-      const b = a + 1;
-      const c = a + (segU + 1);
-      const d = c + 1;
-      idxArr.push(a, b, d, a, d, c);
-    }
-  }
-
-  const sailGeo = new THREE.BufferGeometry();
-  sailGeo.setAttribute("position", new THREE.Float32BufferAttribute(posArr, 3));
-  sailGeo.setAttribute("uv", new THREE.Float32BufferAttribute(uvArr, 2));
-  sailGeo.setIndex(idxArr);
-  sailGeo.computeVertexNormals();
-
-  const sailMesh = new THREE.Mesh(sailGeo, sailMat);
-  reg.detail("shader.mainsail", sailMesh, { parent: boomGroup, stage: "shader" });
-
-  // 2. Non-Intersecting Leeward/Windward Aerodynamic Flow Streamlines (parented to boomGroup so they wrap cleanly around the sail!)
-  const windMat = new THREE.ShaderMaterial({
+  // 1. Vertical Sail-Span Apparent Wind & Leeward Suction Streamline Sheet
+  const spanMat = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    uniforms: {
-      uTime: { value: 0 },
-      uWind: { value: 18.0 },
-      uEnvelope: { value: 1.0 },
-      uColWind: { value: new THREE.Color(theme.channels.intake) }
-    },
+    uniforms: sharedUniforms,
     vertexShader: `
       varying vec2 vUv;
       void main() {
@@ -5097,48 +5350,125 @@ function buildShader(reg, kit) {
     `,
     fragmentShader: `
       uniform float uTime;
-      uniform float uWind;
+      uniform float uWindSpeed;
+      uniform float uCamber;
+      uniform float uGust;
       uniform float uEnvelope;
-      uniform vec3 uColWind;
+      uniform float uIsDark;
+      uniform vec3 uColIntake;
+      uniform vec3 uColComb;
       varying vec2 vUv;
+
       void main() {
-        float streak = smoothstep(0.25, 0.92, sin(vUv.x * 16.0 - uTime * (2.6 + uWind * 0.22)));
-        float ends = smoothstep(0.0, 0.16, vUv.x) * smoothstep(1.0, 0.84, vUv.x);
-        float edge = 1.0 - abs(vUv.y - 0.5) * 2.0;
-        float alpha = ends * smoothstep(0.0, 0.45, edge) * (0.20 + 0.58 * streak) * uEnvelope;
-        if (alpha < 0.01) discard;
-        gl_FragColor = vec4(uColWind, clamp(alpha, 0.0, 0.72));
+        if (uEnvelope < 0.004) discard;
+
+        // Taper chord envelope with sail planform from foot (v=0) toward masthead (v=1)
+        float maxChordU = mix(0.95, 0.24, pow(vUv.y, 1.08));
+        float uChord = vUv.x / max(0.08, maxChordU);
+
+        // Soft boundary fade inside quad (no visible rectangular card edge)
+        float maskX = smoothstep(0.02, 0.14, vUv.x) * (1.0 - smoothstep(maxChordU - 0.14, maxChordU + 0.06, vUv.x));
+        float maskY = smoothstep(0.04, 0.18, vUv.y) * (1.0 - smoothstep(0.84, 0.98, vUv.y));
+        float env = maskX * maskY * uEnvelope;
+        if (env < 0.004) discard;
+
+        // Flowing chordwise wind streamlines curved slightly by NACA camber draft peak at 38% chord
+        float draftCurve = sin(clamp(uChord, 0.0, 1.0) * 3.14159) * (uCamber * 2.1);
+        float laneCoord = (vUv.y - draftCurve * 0.12) * 14.0;
+        float flowWave = 0.5 + 0.5 * sin(uChord * 12.0 - uTime * (2.6 * uWindSpeed) + laneCoord * 0.6);
+        float streak = smoothstep(0.62, 0.98, abs(sin(laneCoord * 3.14159))) * (0.45 + 0.55 * flowWave);
+
+        // Stagnation pressure peak near 32% chord (comb) transitioning into fast trailing wash (intake)
+        float stagZone = exp(-pow((uChord - 0.30) / 0.24, 2.0));
+        vec3 flowCol = mix(uColIntake, uColComb, clamp(stagZone * (0.68 + uGust * 0.32), 0.0, 1.0));
+
+        float alpha = clamp((0.06 + 0.30 * streak + 0.14 * stagZone * uGust) * env * (uIsDark > 0.5 ? 0.92 : 0.72), 0.0, 0.44);
+        if (alpha < 0.004) discard;
+        gl_FragColor = vec4(flowCol, alpha);
       }
     `
   });
 
-  // Streamlines sweep cleanly on the leeward (+Z) side of the cambered sail without piercing the cloth
-  [0.24, 0.48, 0.72].forEach((vFrac, idx) => {
-    const wy = vFrac * sailH + 0.08;
-    const maxX = sailLen * (1.0 - vFrac * 0.90) + 0.14 * Math.sin(Math.PI * vFrac);
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.75, wy, -0.35),
-      new THREE.Vector3(-0.08, wy + 0.03, 0.18),
-      new THREE.Vector3(maxX * 0.45, wy + 0.02, 0.42),
-      new THREE.Vector3(maxX + 0.45, wy - 0.03, 0.16)
-    ]);
-    const ribbonGeo = new THREE.TubeGeometry(curve, 36, 0.015, 6, false);
-    const ribbonMesh = new THREE.Mesh(ribbonGeo, windMat);
-    reg.detail(`shader.windRibbon.${idx}`, ribbonMesh, { parent: boomGroup, stage: "shader" });
+  const spanGeo = new THREE.PlaneGeometry(1.56, 2.40, 1, 1);
+  const spanMesh = new THREE.Mesh(spanGeo, spanMat);
+  spanMesh.position.set(0.68, 1.28, 0.05);
+  reg.detail("rig.windShaderPlane", spanMesh, { parent: shaderGroup, stage: "shader" });
+
+  // 2. Horizontal Mid-Span Aerodynamic Pressure & Leeward Slot Slice (visible in TOP & ISO)
+  const sliceMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    uniforms: sharedUniforms,
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uWindSpeed;
+      uniform float uCamber;
+      uniform float uGust;
+      uniform float uEnvelope;
+      uniform float uIsDark;
+      uniform vec3 uColIntake;
+      uniform vec3 uColComb;
+      varying vec2 vUv;
+
+      void main() {
+        if (uEnvelope < 0.004) discard;
+
+        // Smooth elliptical aperture fade so horizontal slice never shows a box border
+        vec2 c = (vUv - 0.5) * 2.0;
+        float rad = length(c);
+        float mask = 1.0 - smoothstep(0.62, 0.98, rad);
+        float env = mask * uEnvelope;
+        if (env < 0.004) discard;
+
+        // vUv.x runs 0..1 along chord (luff -> leech); vUv.y runs 0..1 across leeward (-Z) -> windward (+Z)
+        float p = 0.38;
+        float xi = clamp((vUv.x - 0.14) / 0.72, 0.0, 1.0);
+        float camberProf = xi < p
+          ? (2.0 * p * xi - xi * xi) / (p * p)
+          : (1.0 - 2.0 * p + 2.0 * p * xi - xi * xi) / ((1.0 - p) * (1.0 - p));
+        // Sail cross-section sits shifted toward -Z (lower vUv.y in PlaneGeometry after rotateX(-PI/2))
+        float foilZ = 0.48 - camberProf * clamp(uCamber * 1.45, 0.06, 0.32);
+
+        float distFoil = vUv.y - foilZ;
+        // Windward (+Z, distFoil > 0) = stagnation pressure; Leeward (-Z, distFoil < 0) = accelerated suction slot
+        float leeSide = smoothstep(0.02, -0.14, distFoil);
+        float windSide = smoothstep(-0.02, 0.16, distFoil);
+
+        // Deflected airflow streamlines curving smoothly past the cambered section
+        float psi = vUv.y - (foilZ - 0.48) * exp(-pow(abs(distFoil) / 0.18, 2.0));
+        float lines = smoothstep(0.68, 0.99, abs(sin(psi * 26.0)));
+        float pulse = 0.55 + 0.45 * sin(vUv.x * 16.0 - uTime * (3.2 * uWindSpeed));
+
+        vec3 col = mix(uColComb, uColIntake, leeSide);
+        float intensity = lines * pulse * (0.55 * windSide + 0.85 * leeSide) + exp(-abs(distFoil) * 14.0) * 0.25;
+        float alpha = clamp(intensity * env * (uIsDark > 0.5 ? 0.88 : 0.65), 0.0, 0.46);
+        if (alpha < 0.004) discard;
+        gl_FragColor = vec4(col, alpha);
+      }
+    `
   });
 
-  const sData = reg.group("shader.sailData", { parent: shaderGroup, stage: "shader" });
-  sData.userData.material = sailMat;
-  const wData = reg.group("shader.windData", { parent: shaderGroup, stage: "shader" });
-  wData.userData.material = windMat;
+  const sliceGeo = new THREE.PlaneGeometry(1.76, 1.12, 1, 1);
+  sliceGeo.rotateX(-Math.PI / 2);
+  const sliceMesh = new THREE.Mesh(sliceGeo, sliceMat);
+  sliceMesh.position.set(0.64, 0.92, -0.10);
+  reg.detail("rig.windSliceShader", sliceMesh, { parent: shaderGroup, stage: "shader" });
+
+  reg.root.userData.windShaderMat = { uniforms: sharedUniforms };
 
   kit.onThemeChange((nextTheme) => {
-    sailMat.uniforms.uColSail.value.set(nextTheme.ramps.hi[2]);
-    sailMat.uniforms.uColSailShade.value.set(nextTheme.ramps.mid[1]);
-    sailMat.uniforms.uColHi.value.set(nextTheme.channels.comb);
-    sailMat.uniforms.uColLo.value.set(nextTheme.channels.intake);
-    sailMat.uniforms.uInk.value.set(nextTheme.ink);
-    windMat.uniforms.uColWind.value.set(nextTheme.channels.intake);
+    sharedUniforms.uIsDark.value = nextTheme.isDark ? 1.0 : 0.0;
+    sharedUniforms.uColIntake.value.set(nextTheme.channels.intake);
+    sharedUniforms.uColComb.value.set(nextTheme.channels.comb);
+    sharedUniforms.uColLit.value.set(nextTheme.channels.lit);
   });
 }
 

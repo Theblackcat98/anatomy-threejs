@@ -1,190 +1,201 @@
 import * as THREE from "three";
 import {
   buildSlabGeometry,
-  makeDatumGrid,
+  buildCylinderGeometry,
   makePlanOutline,
   makeScrewDetail,
-  makeHaloMesh
+  makeRulerTicks,
+  makeHaloMesh,
+  makeDatumGrid
 } from "../../kit/primitives.mjs";
-import { SPEC, ANCHORS } from "./model.mjs";
+import { SPEC } from "./model.mjs";
 
 export function buildBase(reg, kit) {
   const baseGroup = reg.group("base.group", { stage: "base" });
-  const { deckW, deckD, deckH, deckY, topSurfaceY } = SPEC;
+  const {
+    DECK_W,
+    DECK_D,
+    DECK_H,
+    FLOOR_Y,
+    DECK_SLAB_Y,
+    topSurfaceY,
+    WINCH_CX,
+    WINCH_CZ,
+    WINCH_PLINTH_H,
+    WINCH_BASE_Y,
+    MAST_X,
+    MAST_Z,
+    MAST_STEP_Y,
+    CHAINPLATE_Z_WIND,
+    CHAINPLATE_Z_LEE,
+    STEMHEAD_X,
+    STERN_BACKSTAY_X
+  } = SPEC;
 
-  // Ground shadow halo + blueprint datum grid beneath sliced yacht hull section
-  reg.detail("base.halo", makeHaloMesh(deckW + 0.40, deckD + 0.40, 0.38, [0.04, deckY - 0.14, 0.04], kit), {
-    parent: baseGroup,
-    stage: "base"
-  });
-  reg.detail("base.datumGrid", makeDatumGrid(deckW + 0.85, deckD + 0.80, 14, 9, deckY - 0.08, kit, "faint"), {
-    parent: baseGroup,
-    stage: "base"
-  });
-
-  // Lower hull chine plinth (gives authentic sliced boat-section depth under the deck)
-  const hullChineH = 0.10;
-  reg.part(
-    "base.hullChine",
-    buildSlabGeometry(deckW - 0.24, deckD - 0.24, hullChineH, {
-      radius: 0.28,
-      bevel: true,
-      bevelSize: 0.015,
-      bevelThickness: 0.015,
-      bevelSegments: 1
-    }),
-    {
-      parent: baseGroup,
-      pos: [0, deckY + 0.04, 0],
-      ramp: "lo",
-      outline: "lo",
-      crease: "faint",
-      clippable: true,
-      mountOn: "ground"
-    }
+  // 1. Ground Shadow Halo & Orthographic Blueprint Datum Grid
+  reg.detail(
+    "base.halo",
+    makeHaloMesh(5.10, 3.80, 0.36, [0, FLOOR_Y + 0.002, 0], kit),
+    { parent: baseGroup, stage: "base" }
+  );
+  reg.detail(
+    "base.datumGrid",
+    makeDatumGrid(5.40, 4.10, 10, 8, FLOOR_Y + 0.004, kit, "faint"),
+    { parent: baseGroup, stage: "base" }
   );
 
-  // Main Sliced Yacht Foredeck & Cockpit Deck Slab
-  const deckGeo = buildSlabGeometry(deckW, deckD, deckH, {
-    radius: 0.34,
+  // 2. Sliced Yacht Deck Section Structural Plinth (y in [-1.75, -1.42])
+  const deckGeo = buildSlabGeometry(DECK_W, DECK_D, DECK_H, {
+    radius: 0.24,
     bevel: true,
     bevelSize: 0.025,
-    bevelThickness: 0.025,
-    bevelSegments: 2
+    bevelThickness: 0.025
   });
-  reg.part("base.deckSection", deckGeo, {
+  reg.part("base.deckSlab", deckGeo, {
     parent: baseGroup,
-    pos: [0, deckY + deckH, 0],
-    ramp: "mid",
+    pos: [0, DECK_SLAB_Y, 0],
+    ramp: "lo",
     outline: "mid",
     crease: "faint",
-    outlineWidth: 0.018,
-    clippable: true,
-    mountOn: "base.hullChine"
+    mountOn: "ground"
   });
 
-  // Port & Starboard Raised Bulwark Toe-Rails along deck edges
-  const railW = deckW - 0.88;
-  const railH = 0.065;
-  const railD = 0.07;
-  const railGeo = buildSlabGeometry(railW, railD, railH, {
-    radius: 0.03,
-    bevel: true,
-    bevelSize: 0.01,
-    bevelThickness: 0.01,
-    bevelSegments: 1
-  });
-  reg.part("base.toeRail.port", railGeo, {
-    parent: baseGroup,
-    pos: [0, topSurfaceY + railH - 0.01, -1.22],
-    ramp: "lo",
-    outline: "lo",
-    crease: "faint",
-    clippable: true,
-    mountOn: "base.deckSection"
-  });
-  reg.part("base.toeRail.stbd", railGeo, {
-    parent: baseGroup,
-    pos: [0, topSurfaceY + railH - 0.01, 1.23],
-    ramp: "lo",
-    outline: "lo",
-    crease: "faint",
-    clippable: true,
-    mountOn: "base.deckSection"
-  });
-
-  // Teak deck planking seam lines along X (stop cleanly inside toe-rails)
-  const plankPts = [];
+  // Inset deck plank perimeter outline & teak plank seam lines
+  reg.detail(
+    "base.deckOutline",
+    makePlanOutline(DECK_W - 0.32, DECK_D - 0.32, 0.16, topSurfaceY + 0.003, kit, "lo"),
+    { parent: baseGroup }
+  );
+  const seamPts = [];
   for (let i = -3; i <= 3; i++) {
-    const pz = i * 0.28;
-    plankPts.push(
-      new THREE.Vector3(-deckW * 0.42, topSurfaceY + 0.003, pz),
-      new THREE.Vector3(deckW * 0.42, topSurfaceY + 0.003, pz)
+    const z = i * 0.36;
+    seamPts.push(
+      new THREE.Vector3(-DECK_W * 0.43, topSurfaceY + 0.0025, z),
+      new THREE.Vector3(DECK_W * 0.43, topSurfaceY + 0.0025, z)
     );
   }
-  reg.detail("base.teakSeams", new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(plankPts), kit.lineMaterials.faint), {
-    parent: baseGroup
-  });
-
-  reg.detail("base.groove.outer", makePlanOutline(deckW - 0.30, deckD - 0.30, 0.24, topSurfaceY + 0.003, kit, "faint"), {
-    parent: baseGroup
-  });
-
-  // Two-tier Sculpted Cockpit Winch Coaming Pedestal (right-front, top exact at SPEC.winchBaseY)
-  const lowerH = 0.12;
-  reg.part(
-    "base.winchCoamingLower",
-    buildSlabGeometry(1.64, 1.54, lowerH, {
-      radius: 0.24,
-      bevel: true,
-      bevelSize: 0.016,
-      bevelThickness: 0.016
-    }),
-    {
-      parent: baseGroup,
-      pos: [SPEC.winchX, topSurfaceY + lowerH - 0.016, SPEC.winchZ],
-      ramp: "lo",
-      outline: "mid",
-      crease: "lo",
-      clippable: true,
-      mountOn: "base.deckSection"
-    }
+  reg.detail(
+    "base.teakSeams",
+    new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(seamPts), kit.lineMaterials.faint),
+    { parent: baseGroup }
   );
 
-  const upperH = 0.12;
+  // 4 corner deck fastener details
+  [
+    [-2.05, 1.40],
+    [2.05, 1.40],
+    [-2.05, -1.40],
+    [2.05, -1.40]
+  ].forEach(([sx, sz], idx) => {
+    reg.detail(
+      `base.cornerBolt.${idx}`,
+      makeScrewDetail(sx, topSurfaceY + 0.004, sz, 0.055, "y", kit),
+      { parent: baseGroup }
+    );
+  });
+
+  // 3. Starboard Cockpit Winch Coaming Pedestal (y in [-1.42, -1.18])
   reg.part(
-    "base.winchCoaming",
-    buildSlabGeometry(1.46, 1.38, upperH, {
-      radius: 0.22,
-      bevel: true,
-      bevelSize: 0.016,
-      bevelThickness: 0.016
-    }),
+    "base.winchPlinth",
+    buildCylinderGeometry(0.84, 0.92, WINCH_PLINTH_H, { segments: 32, axis: "y" }),
     {
       parent: baseGroup,
-      pos: [SPEC.winchX, topSurfaceY + lowerH + upperH - 0.016, SPEC.winchZ],
+      pos: [WINCH_CX, topSurfaceY + WINCH_PLINTH_H * 0.5, WINCH_CZ],
       ramp: "mid",
       outline: "mid",
       crease: "lo",
-      clippable: true,
-      mountOn: "base.winchCoamingLower"
+      mountOn: "base.deckSlab"
     }
   );
 
-  // Register section anchors
-  reg.anchor("base.top", ...ANCHORS.baseTop, baseGroup);
-  reg.anchor("mast.step", ...ANCHORS.mastStep, baseGroup);
-  reg.anchor("shroud.port", ...ANCHORS.shroudPort, baseGroup);
-  reg.anchor("shroud.stbd", ...ANCHORS.shroudStbd, baseGroup);
-  reg.anchor("forestay.deck", ...ANCHORS.forestayDeck, baseGroup);
-  reg.anchor("backstay.deck", ...ANCHORS.backstayDeck, baseGroup);
-  reg.anchor("traveler.center", ...ANCHORS.travelerCenter, baseGroup);
-  reg.anchor("turningBlock", ...ANCHORS.turningBlock, baseGroup);
-  reg.anchor("winch.base", ...ANCHORS.winchBase, baseGroup);
-  reg.anchor("screen.mount", ...ANCHORS.screenMount, baseGroup);
+  // 4. Fore/Port Mast Step & Rigging Chainplate Foundations
+  reg.part(
+    "base.mastStep",
+    buildCylinderGeometry(0.28, 0.32, 0.12, { segments: 24, axis: "y" }),
+    {
+      parent: baseGroup,
+      pos: [MAST_X, -1.36, MAST_Z],
+      ramp: "mid",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "base.deckSlab"
+    }
+  );
 
-  // Brass Spec Plaque on front apron between cockpit console and winch coaming
-  const [pqX, , pqZ] = ANCHORS.plaqueCenter;
-  const plaqueGeo = buildSlabGeometry(1.12, 0.28, 0.036, {
-    radius: 0.04,
-    bevel: true,
-    bevelSize: 0.008,
-    bevelThickness: 0.008,
-    bevelSegments: 1
-  });
-  reg.part("base.plaque", plaqueGeo, {
+  reg.part("base.chainplate.windward", new THREE.BoxGeometry(0.20, 0.16, 0.16), {
     parent: baseGroup,
-    pos: [pqX, topSurfaceY + 0.036, pqZ],
+    pos: [MAST_X, -1.34, CHAINPLATE_Z_WIND],
     ramp: "brass",
     outline: "mid",
     crease: "lo",
-    mountOn: "base.deckSection"
-  });
-  [[-0.46, -0.08], [0.46, -0.08], [-0.46, 0.08], [0.46, 0.08]].forEach(([dx, dz], idx) => {
-    reg.detail(`base.plaque.screw.${idx}`, makeScrewDetail(pqX + dx, topSurfaceY + 0.045, pqZ + dz, 0.020, "y", kit), {
-      parent: baseGroup
-    });
+    mountOn: "base.deckSlab"
   });
 
-  reg.tag("tag-plate", "2-SPD · 3.5:1", pqX, topSurfaceY + 0.048, pqZ + 0.01);
+  reg.part("base.chainplate.leeward", new THREE.BoxGeometry(0.20, 0.16, 0.16), {
+    parent: baseGroup,
+    pos: [MAST_X, -1.34, CHAINPLATE_Z_LEE],
+    ramp: "brass",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.deckSlab"
+  });
+
+  reg.part("base.stemhead", new THREE.BoxGeometry(0.24, 0.16, 0.16), {
+    parent: baseGroup,
+    pos: [STEMHEAD_X, -1.34, MAST_Z],
+    ramp: "brass",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.deckSlab"
+  });
+
+  reg.part("base.sternPad", new THREE.BoxGeometry(0.24, 0.16, 0.18), {
+    parent: baseGroup,
+    pos: [STERN_BACKSTAY_X, -1.34, MAST_Z],
+    ramp: "mid",
+    outline: "mid",
+    crease: "lo",
+    mountOn: "base.deckSlab"
+  });
+
+  // 5. Front Apron Trim Scale & Engraved Brass Spec Plaque
+  reg.part(
+    "base.ruler",
+    buildSlabGeometry(1.34, 0.18, 0.025, { radius: 0.03, bevel: false }),
+    {
+      parent: baseGroup,
+      pos: [-1.28, -1.395, 1.42],
+      ramp: "hi",
+      outline: "lo",
+      crease: "lo",
+      mountOn: "base.deckSlab"
+    }
+  );
+  reg.detail(
+    "base.rulerTicks",
+    makeRulerTicks(-1.28, 1.24, 1.42, 0.14, -1.392, 24, 4, kit),
+    { parent: baseGroup }
+  );
+
+  reg.part(
+    "base.plaque",
+    buildSlabGeometry(1.24, 0.24, 0.03, { radius: 0.04, bevel: false }),
+    {
+      parent: baseGroup,
+      pos: [1.16, -1.39, 1.42],
+      ramp: "brass",
+      outline: "mid",
+      crease: "lo",
+      mountOn: "base.deckSlab"
+    }
+  );
+  reg.tag("tag-plate", "46ST 2-SPEED · 13.5:1 / 46:1 · MASTHEAD RIG", 1.16, -1.38, 1.44);
+
+  // Stage 2 mounting anchors for downstream stages
+  reg.anchor("winch.center", WINCH_CX, WINCH_BASE_Y, WINCH_CZ, baseGroup);
+  reg.anchor("mast.step", MAST_X, MAST_STEP_Y, MAST_Z, baseGroup);
+  reg.anchor("chainplate.windward", MAST_X, -1.26, CHAINPLATE_Z_WIND, baseGroup);
+  reg.anchor("chainplate.leeward", MAST_X, -1.26, CHAINPLATE_Z_LEE, baseGroup);
+  reg.anchor("stemhead.anchor", STEMHEAD_X, -1.26, MAST_Z, baseGroup);
+  reg.anchor("stern.pad", STERN_BACKSTAY_X, -1.26, MAST_Z, baseGroup);
 }
